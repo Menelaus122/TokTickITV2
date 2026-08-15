@@ -1,7 +1,6 @@
 # TokTickIT
 
-A small IT Service Desk application. This repository is built up over a series of
-issues; **Issue 1** establishes the project foundation:
+A small IT Service Desk application, built up over a series of issues.
 
 - **Frontend** — React + TypeScript + Vite, styled with Bootstrap
 - **Backend** — Node.js + Express + TypeScript
@@ -9,8 +8,15 @@ issues; **Issue 1** establishes the project foundation:
 - **Testing** — Vitest (both apps) + Supertest (backend API)
 - **Containers** — Docker Compose for the database and both apps
 
-> Issues 2–4 fill in the health check, category seed, and category list. Their
-> routes/components are present as clearly marked `TODO(Issue N)` stubs.
+## Progress
+
+- [x] **Issue 1** — Project foundation (frontend, backend, database, tests, Docker)
+- [x] **Issue 2** — API health check + live backend status on the React page
+- [ ] **Issue 3** — Create and seed IT request categories
+- [ ] **Issue 4** — Category list endpoint and UI
+
+> Routes/components for the remaining issues are present as clearly marked
+> `TODO(Issue N)` stubs.
 
 ## Project layout
 
@@ -55,6 +61,25 @@ You can also run **just the database** in Docker and the apps on your host:
 ```bash
 docker compose up -d db
 ```
+
+On the frontend, click **Check System** to call the backend: a green **Online**
+badge confirms the API is healthy, and a red **Offline** badge with a helpful
+message appears if the backend is unreachable.
+
+---
+
+## API
+
+| Method | Endpoint | Description | Response |
+|--------|----------|-------------|----------|
+| GET | `/api/health` | Backend health/liveness check | `200 { "status": "ok", "service": "TokTickIT API" }` |
+
+```bash
+curl http://localhost:3000/api/health
+# {"status":"ok","service":"TokTickIT API"}
+```
+
+> More endpoints (category list) arrive with Issue 4.
 
 ---
 

@@ -7,13 +7,25 @@ type UiState = "idle" | "loading" | "success" | "error";
 export default function App() {
   const [state, setState] = useState<UiState>("idle");
   const [categories, setCategories] = useState<Category[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string>("");
   void categories;
 
   async function handleCheck() {
-    // TODO(Issue 4): set loading, call checkSystem(), then either
-    //   - success: store categories and show Online + the list, or
-    //   - error: show Offline + a useful message.
+    // Issue 2 — call the real backend and reflect its status in the UI.
     setState("loading");
+    setErrorMessage("");
+    try {
+      const status = await checkSystem();
+      setCategories(status.categories);
+      setState("success");
+    } catch {
+      setErrorMessage(
+        "Cannot reach the TokTickIT API. Make sure the backend is running on " +
+          (import.meta.env.VITE_API_URL ?? "http://localhost:3000") +
+          " and try again."
+      );
+      setState("error");
+    }
   }
 
   return (
@@ -26,7 +38,21 @@ export default function App() {
         {state === "loading" ? "Loading…" : "Check System"}
       </button>
 
-      {/* TODO(Issue 4): render loading / success (Online + categories) / error (Offline) states. */}
+      {state === "success" && (
+        <div className="alert alert-success mt-4 d-flex align-items-center" role="status">
+          <span className="badge bg-success me-2">Online</span>
+          <span>Backend is reachable — TokTickIT API is healthy.</span>
+        </div>
+      )}
+
+      {state === "error" && (
+        <div className="alert alert-danger mt-4" role="alert">
+          <span className="badge bg-danger me-2">Offline</span>
+          {errorMessage}
+        </div>
+      )}
+
+      {/* TODO(Issue 4): on success, also render the list of seeded categories. */}
     </div>
   );
 }
