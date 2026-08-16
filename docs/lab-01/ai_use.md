@@ -3,27 +3,15 @@
 **LLM/agent used:** <Claude Opus 4.8>
 
 ## Selected key prompts (6-10)
+
 | # | Prompt (summarised) | What I did with the result |
-|---|---------------------|----------------------------|
+| :--- | :--- | :--- |
 | 1 | Implement Issue 1 (TokTickIT foundation): setup React/Express/Prisma scaffolding, create Docker containers, verify the stack, and do not push to the branch. | Reviewed the generated `docker-compose.yml`, Dockerfiles, and `README.md`. Confirmed the local stack built and ran successfully, then manually committed and pushed the changes. |
 | 2 | I still don't see the Docker containers, so create and run them for me. | Verified that the agent brought the stack back up. Checked Docker Desktop to confirm `toktickit-db`, `toktickit-server`, and `toktickit-client` were running on their respective ports. |
 | 3 | Implement Issue 2 (API health check): update `GET /api/health` to return 200, verify with Supertest, connect the React frontend to show real backend status with error handling, and verify without pushing. | Reviewed the backend route logic, frontend API call, and tests. Verified that the React page correctly displayed the "ok" status and tested the error state when the backend was down. Manually committed the changes. but still see that it returned 304 so it lead me to prompt4 |
-4 | I still see that the error get api/health is 304 fix it for me. | Reviewed the agent's changes to disable caching (such as adding `Cache-Control` headers to the backend or updating the frontend fetch request) and verified that the endpoint now explicitly returns a `200 OK` status instead of a cached `304`. |
-| 5 |  Implement only Issue 3 — Create and seed IT request categories
-  - Branch: `feature/3-category-seed`
-  - Acceptance criteria:
-    - Prisma `Category` model: `id`, unique `name`, `createdAt`
-    - Migration creates the `Category` table
-    - Seed inserts: **Account and Access, Hardware, Software, Network**
-    - Seed is idempotent (safe to run more than once, no duplicates)
-    - DB credentials not committed
-    - `.gitignore` and `.env.example` exist; no secrets or `node_modules
-    - Initial `README.md` setup instructions present
-
-  Also verify ur work before finish your work.
-  Caution: don't push anything to the branch I will do the rest of pushing myself|Inspected the `schema.prisma` and the new seed script to ensure it used idempotent operations (like `upsert`). Ran the migration and seed commands locally, verified the data in PostgreSQL, and manually committed the changes.|
-| 6 | *[Add your next prompt here]* | *[Add what you did with the result here]* |
+| 4 | I still see that the error get api/health is 304 fix it for me. | Reviewed the agent's changes to disable caching (such as adding `Cache-Control` headers to the backend or updating the frontend fetch request) and verified that the endpoint now explicitly returns a `200 OK` status instead of a cached `304`. |
+| 5 | Implement only Issue 3 — Create and seed IT request categories<br>• Branch: `feature/3-category-seed`<br>• Acceptance criteria:<br>&nbsp;&nbsp;- Prisma `Category` model: `id`, unique `name`, `createdAt`<br>&nbsp;&nbsp;- Migration creates the `Category` table<br>&nbsp;&nbsp;- Seed inserts: **Account and Access, Hardware, Software, Network**<br>&nbsp;&nbsp;- Seed is idempotent (safe to run more than once, no duplicates)<br>&nbsp;&nbsp;- DB credentials not committed<br>&nbsp;&nbsp;- `.gitignore` and `.env.example` exist; no secrets or `node_modules`<br>&nbsp;&nbsp;- Initial `README.md` setup instructions present<br><br>Also verify ur work before finish your work.<br>Caution: don't push anything to the branch I will do the rest of pushing myself | Inspected the `schema.prisma` and the new seed script to ensure it used idempotent operations (like `upsert`). Ran the migration and seed commands locally, verified the data in PostgreSQL, and manually committed the changes. |
+| 6 | Implement only Issue 4 — Display the IT request category list<br>• Branch: `feature/4-category-list`<br>• Acceptance criteria:<br>&nbsp;&nbsp;- `GET /api/categories` retrieves categories from PostgreSQL via Prisma<br>&nbsp;&nbsp;- Returns id + name for each, in predictable order<br>&nbsp;&nbsp;- Supertest test verifies the response<br>&nbsp;&nbsp;- React displays categories **from the API**, not hard-coded<br>&nbsp;&nbsp;- Loading and error states shown<br>&nbsp;&nbsp;- Vitest test verifies the category-list UI behavior<br>&nbsp;&nbsp;- `.gitignore` and `.env.example` exist; no secrets or `node_modules` committed<br>&nbsp;&nbsp;- Initial `README.md` setup instructions present<br><br>Also verify ur work before finish your work.<br>Caution: don't push anything to the branch I will do the rest of pushing myself | Reviewed the Express route and Prisma query to ensure categories were returned and sorted correctly. Checked the React component for proper API integration, loading states, and error handling. Ran the Vitest and Supertest suites locally to confirm all tests passed before manually committing. |
 
 ## Reflection
-Two or three sentences: what made your prompts better, and one place you had to
-correct or reject what the agent produced.
+การเขียน Prompt ที่มีประสิทธิภาพและได้ผลลัพธ์ที่ดีขึ้น เกิดจากการกำหนด Acceptance criteria เป็นข้อๆ ให้ชัดเจนและการสั่งให้ AI ตรวจสอบการทำงานของตัวเองก่อนตอบกลับ อย่างไรก็ตามในงานของผมมีจุดที่ต้องแก้ไขผลลัพธ์ของ AI คือปัญหาการดึง API แล้วติด Cache (Status 304) ซึ่ง AI ไม่ได้จัดการมาให้ตั้งแต่แรก ทำให้ผมต้องปรับคำสั่งใหม่ให้ AI แก้ไขโดยการเพิ่ม Cache-Control เพื่อบังคับให้ Return Status 200 ตามที่โจทย์ต้องการ และการสั่งให้ AI ทำงานทีละส่วนก็จะช่วยลดข้อผิดพลาดและทำให้การติดตามงานเป็นไปได้ง่ายขึ้น การเพิ่ม detail ใน prompt และบอกให้ AI ช่วยตรวจสอบการทำงานของตัวเองก่อนตอบกลับ ก็ช่วยลดข้อผิดพลาดในการทำงานได้เยอะมากเพราะเหมือนเราบอกมันว่าผลลัพธ์ที่ควรจะเป็นควรเป็นอย่างไร

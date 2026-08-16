@@ -8,7 +8,6 @@ export default function App() {
   const [state, setState] = useState<UiState>("idle");
   const [categories, setCategories] = useState<Category[]>([]);
   const [errorMessage, setErrorMessage] = useState<string>("");
-  void categories;
 
   async function handleCheck() {
     // Issue 2 — call the real backend and reflect its status in the UI.
@@ -39,9 +38,24 @@ export default function App() {
       </button>
 
       {state === "success" && (
-        <div className="alert alert-success mt-4 d-flex align-items-center" role="status">
-          <span className="badge bg-success me-2">Online</span>
-          <span>Backend is reachable — TokTickIT API is healthy.</span>
+        <div className="mt-4">
+          <div className="alert alert-success d-flex align-items-center" role="status">
+            <span className="badge bg-success me-2">Online</span>
+            <span>Backend is reachable — TokTickIT API is healthy.</span>
+          </div>
+
+          <h2 className="h5 mt-4">Supported Request Categories</h2>
+          {categories.length === 0 ? (
+            <p className="text-muted mt-2">No categories found.</p>
+          ) : (
+            <ol className="list-group list-group-numbered mt-2">
+              {categories.map((category) => (
+                <li key={category.id} className="list-group-item">
+                  {category.name}
+                </li>
+              ))}
+            </ol>
+          )}
         </div>
       )}
 
@@ -51,8 +65,6 @@ export default function App() {
           {errorMessage}
         </div>
       )}
-
-      {/* TODO(Issue 4): on success, also render the list of seeded categories. */}
     </div>
   );
 }
