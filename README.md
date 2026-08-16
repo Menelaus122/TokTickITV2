@@ -12,7 +12,7 @@ A small IT Service Desk application, built up over a series of issues.
 
 - [x] **Issue 1** — Project foundation (frontend, backend, database, tests, Docker)
 - [x] **Issue 2** — API health check + live backend status on the React page
-- [ ] **Issue 3** — Create and seed IT request categories
+- [x] **Issue 3** — `Category` model, migration, and idempotent seed
 - [ ] **Issue 4** — Category list endpoint and UI
 
 > Routes/components for the remaining issues are present as clearly marked
@@ -155,12 +155,43 @@ Lab test files live under `server/tests/lab-01/` and `client/tests/lab-01/`.
 ## Database (Prisma)
 
 The Prisma schema lives at `server/prisma/schema.prisma` and points at
-PostgreSQL via `DATABASE_URL`. Data models and migrations are introduced in a
-later issue. Common commands:
+PostgreSQL via `DATABASE_URL`.
+
+### Model
+
+```prisma
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+}
+```
+
+The seed inserts four IT request categories — **Account and Access, Hardware,
+Software, Network** — and is **idempotent** (uses `upsert`, so running it more
+than once never creates duplicates).
+
+### Migrate & seed (via Docker)
+
+Run Prisma inside the backend container so it reaches the database over the
+compose network (`db:5432`) and matches the container's environment:
 
 ```bash
-cd server
+docker compose up -d                                  # start the stack
+docker compose exec server npx prisma migrate deploy  # apply migrations
+docker compose exec server npx prisma db seed         # seed the categories
+```
+
+Common commands (host-run: `cd server` first, with the DB reachable on `localhost`):
+
+```bash
 npx prisma generate               # regenerate the client
-npx prisma migrate dev --name x   # create & apply a migration
+npx prisma migrate dev --name x   # create & apply a new migration
 npm run prisma:seed               # seed data
 ```
+
+> **Notes**
+> - The Alpine-based backend image installs `openssl`, which Prisma's engines require.
+> - If you have a **local PostgreSQL** already listening on `localhost:5432`, it
+>   can shadow the Docker database from the host. Running Prisma inside the
+>   container (as above) avoids the conflict.

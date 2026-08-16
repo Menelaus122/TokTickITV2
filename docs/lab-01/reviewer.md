@@ -13,7 +13,10 @@ What I checked:
 Client: reachable, loads without errors
 Server: reachable, port:3000 correctly returns the "Not implemented" stub, which is expected.
 DB: confirmed reachable — I deliberately triggered an error to trigger a response from DB which succeeded. |
-|  67070501041  | feature/2-health-check |  |
+|  67070501041  | feature/2-health-check | Worked well for me! I have confirmed by:
+Browsing /api/health and receiving the correct JSON body and status code.
+Understanding the messages returned to the front-end when the API both works and fails.
+Wirachat 67070501041 |
 |  67070501041  | feature/3-category-seed |  |
 |  67070501041  | feature/4-category-list |  |
 
@@ -33,9 +36,20 @@ Postgres + Prisma — db healthcheck passes and Prisma connects fine; confirmed 
 Tests run in both client/ and server/. Client passes. Server health test fails, but that's expected — it's Issue 2's job.
 .env.example committed for both, and .gitignore is covering node_modules/, .env, *.env. No secrets in the repo.
 README is there with setup docs (Docker quick-start, local dev, Prisma, testing).|
-|  67070501041  | feature/2-health-check |  |
-|  67070501041  | feature/3-category-seed |  |
-|  67070501041  | feature/4-category-list |  |
+|  67070501035  | feature/2-health-check | I cloned your branch fresh from GitHub, and ran the full stack with Docker:
+
+toktickit-db — PostgreSQL running
+toktickit-server — Express API on http://localhost:3000/
+toktickit-client — Vite on http://localhost:5173/
+
+Acceptance Criteria — All Passed
+
+GET /api/health returns HTTP 200 with correct JSON Result: PASS
+Supertest test verifies the endpoint Result: PASS
+React page shows backend status from a real API call Result: PASS
+Useful error message shown when backend is unavailable Result: PASS|
+|  67070501035  | feature/3-category-seed |  |
+|  67070501035  | feature/4-category-list |  |
 My comment: <...>
 Partner's response: <...>
 
