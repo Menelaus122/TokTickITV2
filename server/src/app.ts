@@ -1,9 +1,6 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
 import { getPrisma } from "./prisma.js";
-// getPrisma() is your lazy database handle. Call it INSIDE a route when you
-// need the DB (Issue 4). It is intentionally unused until then.
-void getPrisma;
 
 // The Express app is exported separately from app.listen() (see index.ts) so
 // Supertest can import `app` without opening a port. Do not merge these files.
@@ -31,11 +28,25 @@ app.get("/api/health", (_req: Request, res: Response) => {
 
 // ---------------------------------------------------------------------------
 // Issue 4 — Category list
-// Add:  GET /api/categories
-//   -> read categories from PostgreSQL via getPrisma().category.findMany(...)
-//   -> return each { id, name } in a predictable (id) order
-//   -> on failure, respond 500 with a safe message (no internal details)
-// TODO(Issue 4): implement the route here.
+// GET /api/categories reads the supported request categories from PostgreSQL
+// via Prisma and returns each { id, name } in a predictable id order.
 // ---------------------------------------------------------------------------
+app.get("/api/categories", async (_req: Request, res: Response) => {
+  // Category data is small and always-fresh; skip conditional caching so a
+  // browser reload comes back as a clean 200 rather than a 304 Not Modified.
+  res.set("Cache-Control", "no-store");
+  try {
+    const categories = await getPrisma().category.findMany({
+      // Only expose id + name — createdAt is an internal detail.
+      select: { id: true, name: true },
+      // Predictable, stable ordering for the UI and the Supertest assertion.
+      orderBy: { id: "asc" },
+    });
+    res.status(200).json(categories);
+  } catch {
+    // Never leak internal/database details to the client.
+    res.status(500).json({ error: "Failed to load categories" });
+  }
+});
 
 export default app;

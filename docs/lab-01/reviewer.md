@@ -1,55 +1,36 @@
 # Lab 1 — Peer Review Record  (fill this in)
 
-**Author:** <your name> — <student id> — GitHub: @<username>
-**Peer reviewer:** <partner name> — <student id> — GitHub: @<username>
+**Author:** Poomipat Apiwattanaphong — 67070501035 — GitHub: @<https://github.com/Menelaus122>
+**Peer reviewer:** Wirachat — 67070501041 — GitHub: @<https://github.com/WirachatTH>
 
 ## Pull Requests I authored (reviewed by my partner)
+
 | PR | Branch | Reviewer verdict |
-|----|--------|------------------|
-|  67070501041  | feature/1-project-foundation | Reviewed and tested this locally against Issue 1's acceptance criteria. Looks good to me overall!
+| :--- | :--- | :--- |
+| 67070501041 | feature/1-project-foundation | Approved |
+| 67070501041 | feature/2-health-check | Approved |
+| 67070501041 | feature/3-category-seed | Approved |
+| 67070501041 | feature/4-category-list | Pending |
 
-What I checked:
-
-Client: reachable, loads without errors
-Server: reachable, port:3000 correctly returns the "Not implemented" stub, which is expected.
-DB: confirmed reachable — I deliberately triggered an error to trigger a response from DB which succeeded. |
-|  67070501041  | feature/2-health-check | Worked well for me! I have confirmed by:
-Browsing /api/health and receiving the correct JSON body and status code.
-Understanding the messages returned to the front-end when the API both works and fails.
-Wirachat 67070501041 |
-|  67070501041  | feature/3-category-seed |  |
-|  67070501041  | feature/4-category-list |  |
-
-Reviewer comment I received: <...>
-How I responded: <...>
+| Feature | **Reviewer comment I received:** | **How I responded:** |
+| :--- | :--- | :--- |
+| feature1 | Reviewed and tested this locally against Issue 1's acceptance criteria. Looks good to me overall!<br><br>**What I checked:**<br>• Client: reachable, loads without errors<br>• Server: reachable, port:3000 correctly returns the "Not implemented" stub, which is expected.<br>• DB: confirmed reachable — I deliberately triggered an error to trigger a response from DB which succeeded.<br><br>*Wirachat 67070501041* | Thx for ur comment and merging na kub. I love you na. |
+| feature2 | Worked well for me! I have confirmed by:<br>• Browsing `/api/health` and receiving the correct JSON body and status code.<br>• Understanding the messages returned to the front-end when the API both works and fails.<br><br>*Wirachat 67070501041* | Thx for ur comment and merging na kub. I love you na. |
+| feature3 | I pulled down the branch and tested the full stack locally using Docker Compose. Everything works perfectly:<br><br>• **Migrations & Seeding:** The DB started up cleanly.<br>• **Categories verified:** The database correctly contains exactly the 4 expected categories (Account and Access, Hardware, Software, Network).<br>• **Documentation:** The updates to the README.md are clear and the Docker instructions work correctly.<br><br>*Wirachat 67070501041* | Thx for ur reviews and merge na kub. I will start on issue4 and will let u know when I done asap. |
+| feature4 | | |
 
 ## Pull Requests I reviewed for my partner
 
 | Me | Branch | Reviewer verdict |
-|----|--------|------------------|
-|  67070501035  |  feature/1-project-foundation| I have review your work leaw na. And I have pulled the branch, ran docker compose -p friend-review up --build -d, and went through it end to end. All good on my end:
+| :--- | :--- | :--- |
+| 67070501035 | feature/1-project-foundation | Approved |
+| 67070501035 | feature/2-health-check | Approved |
+| 67070501035 | feature/3-category-seed | Approved |
+| 67070501035 | feature/4-category-list | Pending |
 
-Frontend comes up clean on :5173, title's correct, renders with no console errors.
-Bootstrap (5.3.3) is in client/package.json and imported in main.tsx — styles are applying to the buttons/containers.
-Backend starts on :3000, logs the listening message, and /api/health returns JSON as expected (stub's in place for Issue 2).
-Postgres + Prisma — db healthcheck passes and Prisma connects fine; confirmed with a prisma db pull. Should be ready for the first migrate dev once the Category model lands in Issue 3.
-Tests run in both client/ and server/. Client passes. Server health test fails, but that's expected — it's Issue 2's job.
-.env.example committed for both, and .gitignore is covering node_modules/, .env, *.env. No secrets in the repo.
-README is there with setup docs (Docker quick-start, local dev, Prisma, testing).|
-|  67070501035  | feature/2-health-check | I cloned your branch fresh from GitHub, and ran the full stack with Docker:
-
-toktickit-db — PostgreSQL running
-toktickit-server — Express API on http://localhost:3000/
-toktickit-client — Vite on http://localhost:5173/
-
-Acceptance Criteria — All Passed
-
-GET /api/health returns HTTP 200 with correct JSON Result: PASS
-Supertest test verifies the endpoint Result: PASS
-React page shows backend status from a real API call Result: PASS
-Useful error message shown when backend is unavailable Result: PASS|
-|  67070501035  | feature/3-category-seed |  |
-|  67070501035  | feature/4-category-list |  |
-My comment: <...>
-Partner's response: <...>
-
+| Feature | **My comment:** | **Partner's response:** |
+| :--- | :--- | :--- |
+| feature1 | I have review your work leaw na. And I have pulled the branch, ran `docker compose -p friend-review up --build -d`, and went through it end to end. All good on my end:<br><br>• Frontend comes up clean on `:5173`, title's correct, renders with no console errors.<br>• Bootstrap (5.3.3) is in `client/package.json` and imported in `main.tsx` — styles are applying to the buttons/containers.<br>• Backend starts on `:3000`, logs the listening message, and `/api/health` returns JSON as expected (stub's in place for Issue 2).<br>• Postgres + Prisma — db healthcheck passes and Prisma connects fine; confirmed with a `prisma db pull`. Should be ready for the first migrate dev once the Category model lands in Issue 3.<br>• Tests run in both `client/` and `server/`. Client passes. Server health test fails, but that's expected — it's Issue 2's job.<br>• `.env.example` committed for both, and `.gitignore` is covering `node_modules/`, `.env`, `*.env`. No secrets in the repo.<br>• README is there with setup docs (Docker quick-start, local dev, Prisma, testing).<br><br>*Poomipat Apiwattanaphong 67070501035* | Thanks for your comment and approval! |
+| feature2 | I cloned your branch fresh from GitHub, and ran the full stack with Docker:<br>• toktickit-db — PostgreSQL running<br>• toktickit-server — Express API on `http://localhost:3000/`<br>• toktickit-client — Vite on `http://localhost:5173/`<br><br>**Acceptance Criteria — All Passed**<br>• GET `/api/health` returns HTTP 200 with correct JSON Result: **PASS**<br>• Supertest test verifies the endpoint Result: **PASS**<br>• React page shows backend status from a real API call Result: **PASS**<br>• Useful error message shown when backend is unavailable Result: **PASS**<br><br>*Poomipat Apiwattanaphong 67070501035* | Thank you mak mak krub. I will continue to do the next feature ASAP. |
+| feature3 | I have pulled and tested `feature/3-category-seed` locally with Docker. All acceptance criteria passed:<br><br>• **Prisma Category Model & Migration:** Verified with `npx prisma migrate status` that the schema and migration applied cleanly to PostgreSQL.<br>• **Seed Data Verification:** Verified via database query that all 4 categories (Account and Access, Hardware, Software, Network) were inserted correctly.<br>• **Seed Idempotency:** Ran `npx prisma db seed` multiple times and confirmed COUNT(*) remained 4 without creating duplicate records.<br>• **Security:** Confirmed real database credentials reside in ignored `.env` files while `.env.example` contains safe placeholders.<br>• **Documentation:** `README.md` includes clear verification commands.<br><br>Looks great! Approved and ready to merge kub.<br><br>*Poomipat Apiwattanaphong 67070501035* | Thank you for your confirmation! |
+| feature4 | | |

@@ -13,10 +13,7 @@ A small IT Service Desk application, built up over a series of issues.
 - [x] **Issue 1** — Project foundation (frontend, backend, database, tests, Docker)
 - [x] **Issue 2** — API health check + live backend status on the React page
 - [x] **Issue 3** — `Category` model, migration, and idempotent seed
-- [ ] **Issue 4** — Category list endpoint and UI
-
-> Routes/components for the remaining issues are present as clearly marked
-> `TODO(Issue N)` stubs.
+- [x] **Issue 4** — Category list endpoint and UI
 
 ## Project layout
 
@@ -73,13 +70,20 @@ message appears if the backend is unreachable.
 | Method | Endpoint | Description | Response |
 |--------|----------|-------------|----------|
 | GET | `/api/health` | Backend health/liveness check | `200 { "status": "ok", "service": "TokTickIT API" }` |
+| GET | `/api/categories` | Supported request categories from PostgreSQL, in id order | `200 [ { "id": 1, "name": "Account and Access" }, … ]` |
 
 ```bash
 curl http://localhost:3000/api/health
 # {"status":"ok","service":"TokTickIT API"}
+
+curl http://localhost:3000/api/categories
+# [{"id":1,"name":"Account and Access"},{"id":2,"name":"Hardware"},{"id":3,"name":"Software"},{"id":4,"name":"Network"}]
 ```
 
-> More endpoints (category list) arrive with Issue 4.
+`/api/categories` reads from PostgreSQL via Prisma, so the database must be
+migrated and seeded first (see [Database (Prisma)](#database-prisma)). On the
+frontend, clicking **Check System** shows the **Online** badge followed by the
+numbered list of categories returned by this endpoint.
 
 ---
 
