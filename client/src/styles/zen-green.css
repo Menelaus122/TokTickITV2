@@ -334,6 +334,24 @@ textarea.tt-field__control {
 .tt-shell__brand { font-size: var(--tt-font-h2); font-weight: 700; }
 .tt-shell__nav { display: flex; gap: var(--tt-space-4); }
 
+.tt-shell__link {
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+  padding: var(--tt-space-2) 0;
+  /* Reserved so the active underline does not shift the row when it appears. */
+  border-bottom: 3px solid transparent;
+}
+
+.tt-shell__link:hover { border-bottom-color: var(--tt-green-pale); }
+
+/* Active page is marked by an underline AND aria-current, so the indication
+   never rests on colour alone. */
+.tt-shell__link--active { border-bottom-color: #fff; }
+
+/* The hamburger is hidden until the mobile breakpoint. */
+.tt-shell__menu-toggle { display: none; color: #fff; font-size: 20px; }
+
 /* Pushed to the right edge; the identity is the last thing on the bar. */
 .tt-shell__requester {
   margin-left: auto;
@@ -509,6 +527,28 @@ textarea.tt-field__control {
 
   /* Toolbar and pagination stack so every control stays reachable and nothing
      is pushed off the side of the screen. */
+  /* Navigation collapses behind the hamburger; the header keeps only the
+     wordmark and the toggle, so nothing is pushed off the side. */
+  .tt-shell__desktop-nav { display: none; }
+  .tt-shell__menu-toggle { display: inline-flex; margin-left: auto; }
+  .tt-shell__requester { width: 100%; order: 3; justify-content: flex-start; }
+
+  .tt-shell__header { flex-wrap: wrap; min-height: 56px; padding: var(--tt-space-2) var(--tt-space-4); }
+
+  .tt-shell__mobile-nav {
+    background: var(--tt-green-secondary);
+    padding: var(--tt-space-2) var(--tt-space-4);
+  }
+  .tt-shell__mobile-nav .tt-shell__nav { flex-direction: column; gap: 0; }
+  /* Touch-friendly rows rather than a cramped inline list. */
+  .tt-shell__mobile-nav .tt-shell__link {
+    display: block;
+    min-height: 44px;
+    line-height: 44px;
+    border-bottom: 1px solid rgba(255, 255, 255, .25);
+  }
+  .tt-shell__mobile-nav .tt-shell__link--active { background: rgba(255, 255, 255, .15); }
+
   .tt-toolbar,
   .tt-pagination { flex-direction: column; align-items: stretch; }
 

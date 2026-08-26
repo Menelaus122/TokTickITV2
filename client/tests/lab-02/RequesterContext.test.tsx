@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { TokTickITApp } from "../../src/TokTickITApp.js";
 import { AppShell } from "../../src/components/AppShell.js";
 import { RequesterProvider, STORAGE_KEY } from "../../src/context/RequesterContext.js";
+import { MemoryRouter } from "react-router-dom";
 import * as api from "../../src/api.js";
 import type { Requester } from "../../src/api.js";
 
@@ -203,10 +204,14 @@ describe("shell without a provider", () => {
   });
 
   it("renders no requester block when none is selected", () => {
+    // AppShell reads the current route to mark the active page, so it needs
+    // router context when rendered on its own.
     render(
-      <RequesterProvider available={REQUESTERS}>
-        <AppShell>child</AppShell>
-      </RequesterProvider>,
+      <MemoryRouter>
+        <RequesterProvider available={REQUESTERS}>
+          <AppShell>child</AppShell>
+        </RequesterProvider>
+      </MemoryRouter>,
     );
 
     expect(screen.queryByTestId("current-requester")).not.toBeInTheDocument();

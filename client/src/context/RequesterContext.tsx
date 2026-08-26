@@ -14,6 +14,12 @@ export const STORAGE_KEY = "toktickit.devRequesterId";
 interface RequesterContextValue {
   /** The selected Requester, or null when none has been chosen. */
   requester: Requester | null;
+  /**
+   * False until the stored selection has been looked up. A route guard must
+   * wait for this: acting on `requester === null` too early would bounce a
+   * returning user off the URL they asked for before the selection is restored.
+   */
+  ready: boolean;
   /** Stores the selection and enters the application. */
   selectRequester: (requester: Requester) => void;
   /** Drops the selection and returns to the Selection screen. */
@@ -65,18 +71,23 @@ export function RequesterProvider({
 }) {
   const [requester, setRequester] = useState<Requester | null>(null);
   const [generation, setGeneration] = useState(0);
+  const [restored, setRestored] = useState(false);
 
   useEffect(() => {
-    if (requester) return;
+    if (restored) return;
     if (!available) return; // still loading — keep the stored id for now
 
     const storedId = readStoredId();
-    if (storedId === null) return;
+    if (storedId !== null) {
+      const match = available.find((candidate) => candidate.id === storedId);
+      if (match) setRequester(match);
+      else writeStoredId(null); // stale or now-inactive: discard it
+    }
 
-    const match = available.find((candidate) => candidate.id === storedId);
-    if (match) setRequester(match);
-    else writeStoredId(null); // stale or now-inactive: discard it
-  }, [available, requester]);
+    // Marked done whether or not anything was found, so a guard knows the
+    // question has been answered rather than merely not answered yet.
+    setRestored(true);
+  }, [available, restored]);
 
   const selectRequester = useCallback((next: Requester) => {
     writeStoredId(next.id);
@@ -94,8 +105,8 @@ export function RequesterProvider({
   }, []);
 
   const value = useMemo(
-    () => ({ requester, selectRequester, changeRequester, generation }),
-    [requester, selectRequester, changeRequester, generation],
+    () => ({ requester, ready: restored, selectRequester, changeRequester, generation }),
+    [requester, restored, selectRequester, changeRequester, generation],
   );
 
   return <RequesterContext.Provider value={value}>{children}</RequesterContext.Provider>;
