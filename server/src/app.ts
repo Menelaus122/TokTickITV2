@@ -4,6 +4,7 @@ import { getPrisma } from "./prisma.js";
 import { resolveRequester, REQUESTER_HEADER } from "./requesterContext.js";
 import { validateTicketInput } from "./validation.js";
 import { nextTicketNumber } from "./ticketNumber.js";
+import { parseTicketListQuery, buildPageMeta } from "./listQuery.js";
 
 // The Express app is exported separately from app.listen() (see index.ts) so
 // Supertest can import `app` without opening a port. Do not merge these files.
@@ -218,6 +219,98 @@ app.post("/api/tickets", async (req: Request, res: Response) => {
     // Nothing partial is persisted: the create is the transaction (FR-33).
     return res.status(500).json({
       error: { code: "INTERNAL_ERROR", message: "Failed to create the ticket." },
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Lab 2, Issue 6 — the selected Requester's Tickets
+//
+// Search, filter, sort, and paginate, always scoped to the requester from the
+// X-Requester-Id header. The owner filter is part of the database query itself
+// rather than a check applied afterwards (BR-15), so there is no code path that
+// can fetch another requester's rows and forget to discard them.
+// ---------------------------------------------------------------------------
+
+const TICKET_LIST_SELECT = {
+  id: true,
+  ticketNumber: true,
+  summary: true,
+  requestedPriority: true,
+  currentStatus: true,
+  createdAt: true,
+  updatedAt: true,
+  category: { select: { id: true, name: true } },
+  relatedSystem: { select: { id: true, name: true } },
+  // Only active attachments are counted (BR-34). Selecting ids and taking the
+  // length keeps this to one query and avoids relying on a filtered relation
+  // count, and a page holds at most 50 tickets.
+  attachments: { where: { removedAt: null }, select: { id: true } },
+} as const;
+
+app.get("/api/tickets", async (req: Request, res: Response) => {
+  res.set("Cache-Control", "no-store");
+  const prisma = getPrisma();
+
+  const context = await resolveRequester(prisma, req.headers[REQUESTER_HEADER]);
+  if (!context.ok) {
+    return res
+      .status(context.status)
+      .json({ error: { code: context.code, message: context.message } });
+  }
+
+  const parsed = parseTicketListQuery(req.query as Record<string, unknown>);
+  if (!parsed.ok) {
+    // No ticket data accompanies a rejected query (BR-23).
+    return res.status(400).json({ error: { code: "INVALID_QUERY", message: parsed.message } });
+  }
+  const query = parsed.value;
+
+  try {
+    const where = {
+      requesterId: context.requesterId,
+      ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+      ...(query.relatedSystemId ? { relatedSystemId: query.relatedSystemId } : {}),
+      ...(query.requestedPriority ? { requestedPriority: query.requestedPriority } : {}),
+      ...(query.currentStatus ? { currentStatus: query.currentStatus } : {}),
+      // Search spans Ticket Number and Summary, case-insensitively (BR-18),
+      // and combines with the filters above using AND (BR-19).
+      ...(query.search
+        ? {
+            OR: [
+              { ticketNumber: { contains: query.search, mode: "insensitive" as const } },
+              { summary: { contains: query.search, mode: "insensitive" as const } },
+            ],
+          }
+        : {}),
+    };
+
+    const [totalItems, tickets] = await Promise.all([
+      prisma.ticket.count({ where }),
+      prisma.ticket.findMany({
+        where,
+        // id desc is the secondary key on every sort, so ordering is stable and
+        // pagination cannot repeat or skip a row when timestamps tie (BR-21).
+        orderBy: [{ [query.sortBy]: query.sortDir }, { id: "desc" }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        select: TICKET_LIST_SELECT,
+      }),
+    ]);
+
+    return res.status(200).json({
+      data: tickets.map(({ attachments, createdAt, ...ticket }) => ({
+        ...ticket,
+        // description is deliberately absent: it can be 4000 characters and no
+        // list column shows it.
+        ticketDate: createdAt,
+        activeAttachmentCount: attachments.length,
+      })),
+      meta: buildPageMeta(query.page, query.pageSize, totalItems),
+    });
+  } catch {
+    return res.status(500).json({
+      error: { code: "INTERNAL_ERROR", message: "Failed to load tickets." },
     });
   }
 });
