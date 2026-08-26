@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useId, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useRequester } from "../context/RequesterContext.js";
+import { ROUTES } from "../routes.js";
 
 // Application shell (ui-spec.md 7).
 //
@@ -8,13 +9,14 @@ import { useRequester } from "../context/RequesterContext.js";
 // Development Requester, on every screen inside the application.
 
 export const NAV_ITEMS = [
-  { to: "/tickets", label: "My Tickets" },
-  { to: "/tickets/new", label: "Create Ticket" },
+  { to: ROUTES.list, label: "My Tickets" },
+  { to: ROUTES.create, label: "Create Ticket" },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { requester, changeRequester } = useRequester();
   const location = useLocation();
+  const navigate = useNavigate();
   const menuId = useId();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -59,7 +61,13 @@ export function AppShell({ children }: { children: ReactNode }) {
             <button
               type="button"
               className="tt-btn tt-btn--tertiary tt-shell__change"
-              onClick={changeRequester}
+              onClick={() => {
+                changeRequester();
+                // Aimed at the list, not at wherever the user happened to be.
+                // Deliberately changing identity should not drop them back on
+                // the previous Requester's ticket, which would then 404.
+                navigate(ROUTES.select, { replace: true, state: { from: ROUTES.list } });
+              }}
             >
               Change Requester
             </button>

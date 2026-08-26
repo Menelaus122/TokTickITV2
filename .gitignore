@@ -25,3 +25,7 @@ server/uploads/
 # Vite compiles TypeScript itself, so these are never needed.
 client/src/**/*.js
 client/tests/**/*.js
+
+# Playwright traces and failure screenshots (the checklist screenshots are kept)
+artifacts/lab-02/playwright-output/
+playwright-report/

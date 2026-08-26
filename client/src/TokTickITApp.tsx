@@ -17,6 +17,9 @@ import { MyTickets } from "./screens/MyTickets.js";
 import { RequesterTicketDetail } from "./screens/RequesterTicketDetail.js";
 import { AppShell } from "./components/AppShell.js";
 import { LoadingState, Page } from "./components/index.js";
+import { ROUTES } from "./routes.js";
+
+export { ROUTES };
 
 // Lab 2 application root and routing.
 //
@@ -28,13 +31,6 @@ import { LoadingState, Page } from "./components/index.js";
 // Every requester-scoped route is guarded: with no Requester selected there is
 // nothing requester-scoped to render, so the guard redirects to the selector
 // (FR-05).
-
-export const ROUTES = {
-  select: "/select-requester",
-  list: "/tickets",
-  create: "/tickets/new",
-  detail: (id: number | string) => `/tickets/${id}`,
-} as const;
 
 function RequireRequester({ children }: { children: React.ReactNode }) {
   const { requester, ready } = useRequester();

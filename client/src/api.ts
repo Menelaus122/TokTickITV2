@@ -272,6 +272,40 @@ export async function uploadAttachment(
   throw await readError(response);
 }
 
+/**
+ * Downloads an active attachment and hands it to the browser to save.
+ *
+ * This cannot be a plain link or `window.open`. The download route is
+ * requester-scoped, so the request has to carry `X-Requester-Id`, and a
+ * navigation cannot set headers. The relative `downloadUrl` from the API is
+ * also relative to the API origin, not the page's — which differ whenever the
+ * client and server are served separately, as they are in development.
+ */
+export async function downloadAttachment(
+  requesterId: number,
+  attachment: Pick<Attachment, "id" | "originalFilename">,
+): Promise<void> {
+  const response = await fetch(`${API_URL}/api/attachments/${attachment.id}/download`, {
+    headers: requesterHeaders(requesterId),
+  });
+
+  if (!response.ok) throw await readError(response);
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = attachment.originalFilename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } finally {
+    // Released on the next tick so the click has taken the URL first.
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+  }
+}
+
 export async function removeAttachment(
   requesterId: number,
   attachmentId: number,

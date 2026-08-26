@@ -3,6 +3,7 @@ import {
   Attachment,
   AttachmentError,
   TicketDetail,
+  downloadAttachment,
   fetchTicketDetail,
   removeAttachment,
   uploadAttachment,
@@ -117,9 +118,19 @@ export function RequesterTicketDetail({
     }
   }
 
-  function handleDownload(attachment: Attachment) {
+  async function handleDownload(attachment: Attachment) {
     if (onDownload) return onDownload(attachment);
-    if (attachment.downloadUrl) window.open(attachment.downloadUrl, "_blank", "noopener");
+    if (!requester) return;
+
+    try {
+      await downloadAttachment(requester.id, attachment);
+    } catch (error) {
+      // Reported on the failing row only; the rest of the screen is untouched.
+      reject(
+        attachment.originalFilename,
+        error instanceof AttachmentError ? error.message : "The file could not be downloaded.",
+      );
+    }
   }
 
   if (status === "loading") return <LoadingState rows={6} label="Loading the ticket…" />;
@@ -199,7 +210,7 @@ export function RequesterTicketDetail({
         busyId={removingId}
         rejected={rejected}
         onUpload={handleUpload}
-        onDownload={handleDownload}
+        onDownload={(attachment) => void handleDownload(attachment)}
         onRemove={handleRemove}
         onDismissRejection={(filename) =>
           setRejected((current) => current.filter((r) => r.filename !== filename))
