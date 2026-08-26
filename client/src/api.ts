@@ -111,6 +111,75 @@ export async function createTicket(requesterId: number, ticket: NewTicket): Prom
   throw new Error(`Failed to create the ticket (HTTP ${response.status})`);
 }
 
+// --- Lab 2, Issue 6 — My Tickets -------------------------------------------
+
+// A list row. Description is absent on purpose: no column shows it, and it can
+// be 4000 characters.
+export interface TicketListItem {
+  id: number;
+  ticketNumber: string;
+  ticketDate: string;
+  summary: string;
+  requestedPriority: RequestedPriority;
+  currentStatus: "NEW";
+  category: { id: number; name: string };
+  relatedSystem: { id: number; name: string };
+  activeAttachmentCount: number;
+  updatedAt: string;
+}
+
+export interface PageMeta {
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+  hasPrev: boolean;
+  hasNext: boolean;
+}
+
+export interface TicketListResponse {
+  data: TicketListItem[];
+  meta: PageMeta;
+}
+
+export interface TicketListParams {
+  search?: string;
+  categoryId?: number | "";
+  relatedSystemId?: number | "";
+  requestedPriority?: RequestedPriority | "";
+  currentStatus?: "NEW" | "";
+  sortBy?: "createdAt" | "updatedAt";
+  sortDir?: "asc" | "desc";
+  page?: number;
+  pageSize?: number;
+}
+
+export const PERMITTED_PAGE_SIZES = [10, 20, 50] as const;
+
+// Lists tickets owned by the given requester. Ownership is decided server-side
+// from the header; sending a different id here would change nothing.
+export async function fetchMyTickets(
+  requesterId: number,
+  params: TicketListParams = {},
+): Promise<TicketListResponse> {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    // Empty means "no filter" and is left out of the query entirely, rather
+    // than sent as a blank the server would have to interpret.
+    if (value !== undefined && value !== "" && value !== null) {
+      search.set(key, String(value));
+    }
+  }
+
+  const suffix = search.toString() ? `?${search.toString()}` : "";
+  const response = await fetch(`${API_URL}/api/tickets${suffix}`, {
+    headers: { "X-Requester-Id": String(requesterId) },
+  });
+
+  if (!response.ok) throw new Error(`Failed to load tickets (HTTP ${response.status})`);
+  return (await response.json()) as TicketListResponse;
+}
+
 // Issue 2 + Issue 4 — call the backend.
 // Confirms the API is healthy, then loads the categories it serves.
 // Throwing on any failure lets the UI show a single Offline/error state.

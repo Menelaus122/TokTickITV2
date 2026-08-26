@@ -366,6 +366,35 @@ textarea.tt-field__control {
 .tt-selection__card { width: 100%; max-width: 440px; }
 .tt-selection__card .tt-btn { width: 100%; }
 
+/* --- List toolbar and pagination (ui-spec.md 10.2) ------------------------ */
+
+.tt-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tt-space-3);
+  margin-bottom: var(--tt-space-4);
+}
+
+.tt-toolbar .tt-field__control { width: auto; min-width: 160px; }
+.tt-toolbar input[type="search"] { flex: 1 1 240px; }
+
+.tt-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tt-space-3);
+  margin-top: var(--tt-space-4);
+}
+
+.tt-card-row__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tt-space-2);
+  margin: 0 0 var(--tt-space-2);
+}
+
 /* --- Responsive grid ------------------------------------------------------ */
 
 .tt-grid { display: grid; gap: var(--tt-space-4); }
@@ -405,6 +434,13 @@ textarea.tt-field__control {
 
   .tt-table { display: none; }
   .tt-cards { display: block; }
+
+  /* Toolbar and pagination stack so every control stays reachable and nothing
+     is pushed off the side of the screen. */
+  .tt-toolbar,
+  .tt-pagination { flex-direction: column; align-items: stretch; }
+  .tt-toolbar .tt-field__control,
+  .tt-pagination .tt-field__control { width: 100%; min-width: 0; }
 }
 
 /* Nothing may push the page sideways at any width. */

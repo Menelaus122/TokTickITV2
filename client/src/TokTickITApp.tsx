@@ -3,6 +3,7 @@ import { fetchRequesters, Requester } from "./api.js";
 import { RequesterProvider, useRequester } from "./context/RequesterContext.js";
 import { RequesterSelection, SelectionStatus } from "./screens/RequesterSelection.js";
 import { CreateTicket } from "./screens/CreateTicket.js";
+import { MyTickets } from "./screens/MyTickets.js";
 import { AppShell } from "./components/AppShell.js";
 import { Page, Card } from "./components/index.js";
 import App from "./App.js";
@@ -26,6 +27,9 @@ function RequesterGate({
   onRetry: () => void;
 }) {
   const { requester, selectRequester } = useRequester();
+  // Bumped after a successful creation so My Tickets refetches and the new
+  // ticket appears without a manual reload.
+  const [listVersion, setListVersion] = useState(0);
 
   if (!requester) {
     return (
@@ -48,12 +52,15 @@ function RequesterGate({
             {requester.department ? ` — ${requester.department}` : ""}
           </p>
           <p className="tt-muted">{requester.email}</p>
-          <p className="tt-muted">My Tickets and Ticket Detail arrive in Issues 6 and 7.</p>
+          <p className="tt-muted">Ticket Detail arrives in Issue 7.</p>
         </Card>
 
-        {/* Remounted whenever the requester changes, so no value typed by the
-            previous requester survives the switch (BR-11). */}
-        <CreateTicket key={requester.id} />
+        {/* Both screens are remounted whenever the requester changes, so no
+            value typed and no row loaded for the previous requester survives
+            the switch (BR-11). */}
+        <CreateTicket key={`create-${requester.id}`} onCreated={() => setListVersion((v) => v + 1)} />
+
+        <MyTickets key={`list-${requester.id}-${listVersion}`} />
 
         {/* The Lab 1 system check, kept as a panel inside the shell so the
             backend's health is still visible from the running application. */}
