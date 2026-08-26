@@ -17,3 +17,11 @@ server/prisma/*.db
 docs/lab-02/Lab_02_labsheet.md
 docs/lab-02/TokTickIT_GitHub_Workflow_Guide_TH_EN.md
 docs/lab-02/MyIssue.md
+
+# uploaded attachment files (metadata lives in PostgreSQL)
+server/uploads/
+
+# compiled output emitted beside client sources by a bare `tsc`.
+# Vite compiles TypeScript itself, so these are never needed.
+client/src/**/*.js
+client/tests/**/*.js
