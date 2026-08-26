@@ -485,6 +485,16 @@ textarea.tt-field__control {
 
 .tt-dialog .tt-card { width: 100%; max-width: 480px; }
 
+/* Attachment picker on the Create Ticket form. */
+.tt-fieldset {
+  border: 1px solid var(--tt-border);
+  border-radius: var(--tt-radius);
+  padding: var(--tt-space-4);
+  margin: var(--tt-space-4) 0 0;
+}
+
+.tt-fieldset legend { padding: 0 var(--tt-space-2); }
+
 /* --- Responsive grid ------------------------------------------------------ */
 
 .tt-grid { display: grid; gap: var(--tt-space-4); }

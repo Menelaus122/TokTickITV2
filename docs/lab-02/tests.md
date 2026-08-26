@@ -9,7 +9,7 @@ cited as **AC-nn** and are defined in §9 of that document.
 > output quoted in §6 — no row was marked Pass on the strength of a code review
 > or an agent's claim.
 >
-> The delivered suite is larger than the plan: 65 tests were planned, and **382**
+> The delivered suite is larger than the plan: 65 tests were planned, and **402**
 > exist. The extra coverage is boundary and failure cases discovered while
 > building each feature. Where a planned row names a behaviour, the test file
 > named beside it contains that assertion along with its neighbours.
@@ -223,6 +223,9 @@ here rests on someone having glanced at a page.
 | Filters and pagination usable | ✅ | ✅ | ✅ | RESP-04; MyTickets.test.tsx |
 | Keyboard focus visible throughout | ✅ | ✅ | ✅ | The `:focus-visible` outline is asserted in the stylesheet; FormComponents.test.tsx |
 | Removed attachment marked, with no download control | ✅ | ✅ | ✅ | AttachmentSection.test.tsx; `ticket-detail/attachment-removed.png` |
+| Create Ticket success shows the official Ticket Number | ✅ | ✅ | ✅ | CreateTicket.test.tsx; `create-ticket/success.png` |
+| Create Ticket API failure keeps every entered value | ✅ | ✅ | ✅ | CreateTicket.test.tsx; `create-ticket/api-failure.png` |
+| Attachments can be chosen on Create Ticket, invalid ones explained | ✅ | ✅ | ✅ | CreateTicket.test.tsx; `create-ticket/invalid-attachment.png` |
 
 ### 4.1 Screenshot artifacts
 
@@ -231,13 +234,14 @@ Captured by `e2e/lab-02/responsive.spec.ts` into `artifacts/lab-02/screenshots/`
 ```text
 requester-selection/  desktop.png  tablet.png  mobile.png
 create-ticket/        desktop.png  tablet.png  mobile.png  validation-failure.png
+                      success.png  api-failure.png  invalid-attachment.png
 my-tickets/           desktop.png  tablet.png  mobile.png  no-results.png
 ticket-detail/        desktop.png  tablet.png  mobile.png
                       invalid-attachment.png  removal-confirm.png
                       attachment-removed.png  not-found.png
 ```
 
-18 files: the four screens at all three viewports, plus the six states a static
+21 files: the four screens at all three viewports, plus the nine states a static
 screenshot is the only practical way to record.
 
 ---
@@ -326,11 +330,11 @@ standard seed. This section is re-run and re-recorded from `main` in Issue 10.
 | :--- | ---: | ---: | ---: | ---: | ---: |
 | Unit | 5 | 73 | 73 | 0 | 0 |
 | API | 28 | 88 | 88 | 0 | 0 |
-| UI component | 18 | 164 | 164 | 0 | 0 |
+| UI component | 18 | 182 | 182 | 0 | 0 |
 | UI style | 6 | 38 | 38 | 0 | 0 |
 | Responsive | 4 | 9 | 9 | 0 | 0 |
-| E2E | 4 | 10 | 10 | 0 | 0 |
-| **Total** | **65** | **382** | **382** | **0** | **0** |
+| E2E | 4 | 12 | 12 | 0 | 0 |
+| **Total** | **65** | **402** | **402** | **0** | **0** |
 
 How the levels map onto the test files:
 
@@ -340,10 +344,10 @@ How the levels map onto the test files:
 * **UI style** (38) — `ZenGreenTheme` (tokens and breakpoints) and
   `FormComponents` (required marker, validation placement, read-only versus
   editable): assertions about the markup `ui-spec.md` requires.
-* **UI component** (164) — every other `client/` test: screen behaviour and state.
-* **Responsive** (9) and **E2E** (10) — the two Playwright specs.
+* **UI component** (182) — every other `client/` test: screen behaviour and state.
+* **Responsive** (9) and **E2E** (12) — the two Playwright specs.
 
-73 + 88 = 161 backend; 164 + 38 = 202 frontend; 9 + 10 = 19 Playwright; 382 total.
+73 + 88 = 161 backend; 182 + 38 = 220 frontend; 9 + 12 = 21 Playwright; 402 total.
 
 **Backend — `npx vitest run` in `server/`**
 
@@ -373,14 +377,14 @@ How the levels map onto the test files:
  ✓ tests/lab-02/MyTickets.test.tsx              (23 tests)
  ✓ tests/lab-02/UiFoundation.test.tsx           (19 tests)
  ✓ tests/lab-02/RequesterContext.test.tsx       (18 tests)
- ✓ tests/lab-02/CreateTicket.test.tsx           (18 tests)
+ ✓ tests/lab-02/CreateTicket.test.tsx           (36 tests)
  ✓ tests/lab-02/RequesterTicketDetail.test.tsx  (14 tests)
  ✓ tests/lab-02/RequesterSelection.test.tsx     (13 tests)
  ✓ tests/lab-02/FormComponents.test.tsx         (12 tests)
  ✓ tests/lab-01/App.test.tsx                    ( 3 tests)
 
  Test Files  11 passed (11)
-      Tests  202 passed (202)
+      Tests  220 passed (220)
 ```
 
 **End-to-end — `npx playwright test e2e/lab-02/requester-ticket-flow.spec.ts`**
@@ -397,7 +401,10 @@ How the levels map onto the test files:
   ok  9 E2E-04 › switching identity replaces the visible list
   ok 10 E2E-04 › the selection survives a page reload
 
-  10 passed (8.8s)
+  ok 11 E2E-05 - a file chosen on the form is attached to the new ticket
+  ok 12 E2E-05 - a valid and an invalid file are handled differently on the form
+
+  12 passed (9.4s)
 ```
 
 **Responsive — `npx playwright test e2e/lab-02/responsive.spec.ts`**

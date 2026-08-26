@@ -80,12 +80,16 @@ export async function createTicket(
 
   await page.getByRole("button", { name: "Submit Ticket" }).click();
 
-  // Landing on the detail screen means creation succeeded and the app routed
-  // to the new ticket.
-  const number = page.getByTestId("detail-ticket-number");
-  await expect(number).toBeVisible();
+  // Creation lands on the success state, which is where the official number
+  // is confirmed; View ticket is the next action from there.
+  const confirmed = page.getByTestId("created-ticket-number");
+  await expect(confirmed).toBeVisible();
+  const number = (await confirmed.innerText()).trim();
 
-  return { number: (await number.innerText()).trim(), summary };
+  await page.getByRole("button", { name: "View ticket" }).click();
+  await expect(page.getByTestId("detail-ticket-number")).toHaveText(number);
+
+  return { number, summary };
 }
 
 /** Returns the ticket id from the current /tickets/:id URL. */

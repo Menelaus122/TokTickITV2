@@ -217,3 +217,60 @@ test.describe("E2E-04 changing Requester", () => {
     await expect(page.getByTestId("current-requester")).toHaveText(REQUESTER_A);
   });
 });
+test.describe("E2E-05 attaching while creating the ticket", () => {
+  test("a file chosen on the form is attached to the new ticket", async ({ page }) => {
+    await selectRequester(page, REQUESTER_A);
+    await page.goto("/tickets/new");
+
+    // Chosen before the ticket exists, so it can only be uploaded afterwards.
+    await page.getByLabel("Choose a file to attach").setInputFiles({
+      name: "at-creation.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.4\ntrailer\n%%EOF\n"),
+    });
+    await expect(page.getByText("at-creation.pdf")).toBeVisible();
+
+    await page.getByLabel(/^Category/).selectOption({ index: 1 });
+    await page.getByLabel(/^Related System/).selectOption({ index: 1 });
+    await page.getByLabel(/^Requested Priority/).selectOption("MEDIUM");
+    await page.getByLabel(/^Ticket Summary/).fill(`E2E attach at creation ${Date.now()}`);
+    await page
+      .getByLabel(/^Description/)
+      .fill("Created by the end-to-end suite to prove a file chosen on the form is attached.");
+
+    await page.getByRole("button", { name: "Submit Ticket" }).click();
+
+    // The success state confirms the number, then View ticket opens it with
+    // the file already attached.
+    await expect(page.getByTestId("created-ticket-number")).toBeVisible();
+    await page.getByRole("button", { name: "View ticket" }).click();
+    await expect(page.getByTestId("detail-ticket-number")).toBeVisible();
+    created.push(ticketIdFromUrl(page));
+
+    await expect(page.getByText("at-creation.pdf")).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Attachments \(1 of 5 active\)/ })).toBeVisible();
+  });
+
+  test("a valid and an invalid file are handled differently on the form", async ({ page }) => {
+    await selectRequester(page, REQUESTER_A);
+    await page.goto("/tickets/new");
+
+    const picker = page.getByLabel("Choose a file to attach");
+
+    await picker.setInputFiles({
+      name: "good.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.4\ntrailer\n%%EOF\n"),
+    });
+    await picker.setInputFiles({
+      name: "bad.exe",
+      mimeType: "application/octet-stream",
+      buffer: Buffer.from("MZ"),
+    });
+
+    // The permitted file is queued; the rejected one is explained and dropped.
+    await expect(page.getByText("good.pdf")).toBeVisible();
+    await expect(page.getByRole("alert")).toContainText("bad.exe");
+    await expect(page.getByRole("alert")).toContainText(/files are permitted/);
+  });
+});
