@@ -319,6 +319,53 @@ textarea.tt-field__control {
   margin-bottom: var(--tt-space-3);
 }
 
+/* --- Application shell (ui-spec.md 7) ------------------------------------- */
+
+.tt-shell__header {
+  display: flex;
+  align-items: center;
+  gap: var(--tt-space-4);
+  min-height: 64px;
+  padding: 0 var(--tt-space-6);
+  background: var(--tt-green-primary);
+  color: #fff;
+}
+
+.tt-shell__brand { font-size: var(--tt-font-h2); font-weight: 700; }
+.tt-shell__nav { display: flex; gap: var(--tt-space-4); }
+
+/* Pushed to the right edge; the identity is the last thing on the bar. */
+.tt-shell__requester {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--tt-space-3);
+}
+
+.tt-shell__requester-name { font-weight: 600; }
+.tt-shell__change { color: #fff; text-decoration: underline; }
+
+.tt-shell__notice {
+  margin: 0;
+  padding: var(--tt-space-2) var(--tt-space-6);
+  background: var(--tt-warning-bg);
+  color: var(--tt-warning);
+  font-size: var(--tt-font-help);
+  text-align: center;
+}
+
+/* --- Requester Selection screen (ui-spec.md 8) ---------------------------- */
+
+.tt-selection {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tt-selection__card { width: 100%; max-width: 440px; }
+.tt-selection__card .tt-btn { width: 100%; }
+
 /* --- Responsive grid ------------------------------------------------------ */
 
 .tt-grid { display: grid; gap: var(--tt-space-4); }

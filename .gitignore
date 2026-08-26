@@ -12,3 +12,8 @@ server/prisma/*.db
 # logs & OS
 *.log
 .DS_Store
+
+# lab reference docs
+docs/lab-02/Lab_02_labsheet.md
+docs/lab-02/TokTickIT_GitHub_Workflow_Guide_TH_EN.md
+docs/lab-02/MyIssue.md

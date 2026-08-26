@@ -49,4 +49,36 @@ app.get("/api/categories", async (_req: Request, res: Response) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Lab 2, Issue 4 — active Development Requesters
+// GET /api/requesters lists the temporary Lab 2 testing identities so the
+// Development Requester Selection screen can offer them.
+//
+// This is NOT authentication (BR-03). The response carries no password, role,
+// or token, because the model has none. Only isActive requesters are returned,
+// so a deactivated one can never be selected (BR-09).
+// ---------------------------------------------------------------------------
+app.get("/api/requesters", async (_req: Request, res: Response) => {
+  res.set("Cache-Control", "no-store");
+  try {
+    const requesters = await getPrisma().requesterUser.findMany({
+      where: { isActive: true },
+      // Sorted by name because this list is read by a human scanning a dropdown.
+      orderBy: { fullName: "asc" },
+      select: { id: true, fullName: true, email: true, department: true },
+    });
+    // An empty array is a valid answer; it drives the selection screen's empty
+    // state rather than being an error (BR-13).
+    res.status(200).json(requesters);
+  } catch {
+    // Never leak internal/database details to the client (FR-33).
+    res.status(500).json({
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Failed to load development requesters.",
+      },
+    });
+  }
+});
+
 export default app;
