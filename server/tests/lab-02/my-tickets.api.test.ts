@@ -80,15 +80,26 @@ afterAll(async () => {
 describe("ownership scoping", () => {
   it("returns only the tickets of the requester in the header", async () => {
     const res = await list(requesterA, "?pageSize=50");
-
     expect(res.status).toBe(200);
-    const ids = res.body.data.map((t: { id: number }) => t.id);
-    const owned = await prisma.ticket.findMany({
-      where: { requesterId: requesterA },
-      select: { id: true },
-    });
 
-    expect(ids.sort()).toEqual(owned.map((t) => t.id).sort());
+    // Asserts the property that matters — every row returned is owned by the
+    // requester — rather than comparing one page against the whole set. The
+    // database is shared, so the requester may legitimately own more tickets
+    // than a single page holds.
+    const ids: number[] = res.body.data.map((t: { id: number }) => t.id);
+    expect(ids.length).toBeGreaterThan(0);
+
+    const owned = await prisma.ticket.count({
+      where: { id: { in: ids }, requesterId: requesterA },
+    });
+    expect(owned).toBe(ids.length);
+  });
+
+  it("reports a total that matches what the requester owns", async () => {
+    const res = await list(requesterA, "?pageSize=10");
+    const owned = await prisma.ticket.count({ where: { requesterId: requesterA } });
+
+    expect(res.body.meta.totalItems).toBe(owned);
   });
 
   it("never leaks another requester's ticket", async () => {

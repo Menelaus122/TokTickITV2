@@ -1,0 +1,13 @@
+{
+  "name": "toktickit",
+  "private": true,
+  "version": "1.0.0",
+  "description": "TokTickIT — end-to-end and responsive tests. The application itself lives in client/ and server/.",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}
