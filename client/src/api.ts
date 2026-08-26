@@ -180,6 +180,113 @@ export async function fetchMyTickets(
   return (await response.json()) as TicketListResponse;
 }
 
+// --- Lab 2, Issue 7 — Ticket Detail and Attachments ------------------------
+
+export interface Attachment {
+  id: number;
+  originalFilename: string;
+  mimeType: string;
+  sizeBytes: number;
+  uploadedAt: string;
+  removedAt: string | null;
+  removalReason: string | null;
+  /** null for a removed attachment, so no working link can be constructed. */
+  downloadUrl: string | null;
+}
+
+export interface TicketDetail extends Ticket {
+  attachments: Attachment[];
+}
+
+export const MAX_FILE_BYTES = 5 * 1024 * 1024;
+export const MAX_ACTIVE_ATTACHMENTS = 5;
+export const PERMITTED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".pdf"];
+
+// Thrown for a rejection the UI should explain on the offending row rather than
+// as a screen-level failure.
+export class AttachmentError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "AttachmentError";
+  }
+}
+
+function requesterHeaders(requesterId: number): HeadersInit {
+  return { "X-Requester-Id": String(requesterId) };
+}
+
+export async function fetchTicketDetail(
+  requesterId: number,
+  ticketId: number,
+): Promise<TicketDetail> {
+  const response = await fetch(`${API_URL}/api/tickets/${ticketId}`, {
+    headers: requesterHeaders(requesterId),
+  });
+
+  if (response.status === 404) {
+    throw new AttachmentError("NOT_FOUND", "That ticket could not be found.");
+  }
+  if (!response.ok) throw new Error(`Failed to load the ticket (HTTP ${response.status})`);
+  return (await response.json()) as TicketDetail;
+}
+
+export async function fetchAttachments(
+  requesterId: number,
+  ticketId: number,
+): Promise<Attachment[]> {
+  const response = await fetch(`${API_URL}/api/tickets/${ticketId}/attachments`, {
+    headers: requesterHeaders(requesterId),
+  });
+  if (!response.ok) throw new Error(`Failed to load attachments (HTTP ${response.status})`);
+  return (await response.json()) as Attachment[];
+}
+
+async function readError(response: Response): Promise<AttachmentError> {
+  const body = (await response.json().catch(() => null)) as
+    | { error?: { code?: string; message?: string } }
+    | null;
+  return new AttachmentError(
+    body?.error?.code ?? "UPLOAD_FAILED",
+    body?.error?.message ?? "The file could not be attached.",
+  );
+}
+
+export async function uploadAttachment(
+  requesterId: number,
+  ticketId: number,
+  file: File,
+): Promise<Attachment> {
+  const form = new FormData();
+  form.append("file", file);
+
+  const response = await fetch(`${API_URL}/api/tickets/${ticketId}/attachments`, {
+    method: "POST",
+    headers: requesterHeaders(requesterId),
+    body: form,
+  });
+
+  if (response.status === 201) return (await response.json()) as Attachment;
+  throw await readError(response);
+}
+
+export async function removeAttachment(
+  requesterId: number,
+  attachmentId: number,
+  removalReason: string,
+): Promise<Attachment> {
+  const response = await fetch(`${API_URL}/api/attachments/${attachmentId}/remove`, {
+    method: "PATCH",
+    headers: { ...requesterHeaders(requesterId), "Content-Type": "application/json" },
+    body: JSON.stringify({ removalReason }),
+  });
+
+  if (response.ok) return (await response.json()) as Attachment;
+  throw await readError(response);
+}
+
 // Issue 2 + Issue 4 — call the backend.
 // Confirms the API is healthy, then loads the categories it serves.
 // Throwing on any failure lets the UI show a single Offline/error state.

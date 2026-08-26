@@ -4,6 +4,7 @@ import { RequesterProvider, useRequester } from "./context/RequesterContext.js";
 import { RequesterSelection, SelectionStatus } from "./screens/RequesterSelection.js";
 import { CreateTicket } from "./screens/CreateTicket.js";
 import { MyTickets } from "./screens/MyTickets.js";
+import { RequesterTicketDetail } from "./screens/RequesterTicketDetail.js";
 import { AppShell } from "./components/AppShell.js";
 import { Page, Card } from "./components/index.js";
 import App from "./App.js";
@@ -30,6 +31,9 @@ function RequesterGate({
   // Bumped after a successful creation so My Tickets refetches and the new
   // ticket appears without a manual reload.
   const [listVersion, setListVersion] = useState(0);
+  // Which ticket the detail screen is showing, or null for the list. Issue 8
+  // replaces this with a real route.
+  const [openTicketId, setOpenTicketId] = useState<number | null>(null);
 
   if (!requester) {
     return (
@@ -60,7 +64,18 @@ function RequesterGate({
             the switch (BR-11). */}
         <CreateTicket key={`create-${requester.id}`} onCreated={() => setListVersion((v) => v + 1)} />
 
-        <MyTickets key={`list-${requester.id}-${listVersion}`} />
+        {openTicketId === null ? (
+          <MyTickets
+            key={`list-${requester.id}-${listVersion}`}
+            onOpenTicket={(ticket) => setOpenTicketId(ticket.id)}
+          />
+        ) : (
+          <RequesterTicketDetail
+            key={`detail-${requester.id}-${openTicketId}`}
+            ticketId={openTicketId}
+            onBack={() => setOpenTicketId(null)}
+          />
+        )}
 
         {/* The Lab 1 system check, kept as a panel inside the shell so the
             backend's health is still visible from the running application. */}
