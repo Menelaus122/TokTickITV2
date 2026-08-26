@@ -32,6 +32,85 @@ export async function fetchRequesters(): Promise<Requester[]> {
   return (await response.json()) as Requester[];
 }
 
+// --- Lab 2, Issue 5 — reference data and ticket creation -------------------
+
+export interface RelatedSystem {
+  id: number;
+  name: string;
+}
+
+export type RequestedPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+
+export interface NewTicket {
+  categoryId: number;
+  relatedSystemId: number;
+  summary: string;
+  description: string;
+  requestedPriority: RequestedPriority;
+}
+
+export interface Ticket {
+  id: number;
+  ticketNumber: string;
+  ticketDate: string;
+  summary: string;
+  description: string;
+  requestedPriority: RequestedPriority;
+  currentStatus: "NEW";
+  requester: { id: number; fullName: string };
+  category: { id: number; name: string };
+  relatedSystem: { id: number; name: string };
+  createdAt: string;
+  updatedAt: string;
+}
+
+// A rejection the form can render field by field. Anything else is a transport
+// or server failure and becomes one safe form-level message.
+export class TicketValidationError extends Error {
+  constructor(readonly fields: Record<string, string>) {
+    super("The ticket was rejected by the server.");
+    this.name = "TicketValidationError";
+  }
+}
+
+export async function fetchCategories(): Promise<Category[]> {
+  const response = await fetch(`${API_URL}/api/categories`);
+  if (!response.ok) throw new Error(`Failed to load categories (HTTP ${response.status})`);
+  return (await response.json()) as Category[];
+}
+
+export async function fetchRelatedSystems(): Promise<RelatedSystem[]> {
+  const response = await fetch(`${API_URL}/api/related-systems`);
+  if (!response.ok) throw new Error(`Failed to load related systems (HTTP ${response.status})`);
+  return (await response.json()) as RelatedSystem[];
+}
+
+// Creates one Ticket for the selected Development Requester. The requester
+// travels in the X-Requester-Id header, never in the body (BR-14), and the
+// server owns the ticket number, date, and status.
+export async function createTicket(requesterId: number, ticket: NewTicket): Promise<Ticket> {
+  const response = await fetch(`${API_URL}/api/tickets`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Requester-Id": String(requesterId),
+    },
+    body: JSON.stringify(ticket),
+  });
+
+  if (response.status === 201) return (await response.json()) as Ticket;
+
+  if (response.status === 400) {
+    const body = (await response.json().catch(() => null)) as
+      | { error?: { fields?: Record<string, string> } }
+      | null;
+    const fields = body?.error?.fields;
+    if (fields && Object.keys(fields).length > 0) throw new TicketValidationError(fields);
+  }
+
+  throw new Error(`Failed to create the ticket (HTTP ${response.status})`);
+}
+
 // Issue 2 + Issue 4 — call the backend.
 // Confirms the API is healthy, then loads the categories it serves.
 // Throwing on any failure lets the UI show a single Offline/error state.

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { fetchRequesters, Requester } from "./api.js";
 import { RequesterProvider, useRequester } from "./context/RequesterContext.js";
 import { RequesterSelection, SelectionStatus } from "./screens/RequesterSelection.js";
+import { CreateTicket } from "./screens/CreateTicket.js";
 import { AppShell } from "./components/AppShell.js";
 import { Page, Card } from "./components/index.js";
 import App from "./App.js";
@@ -47,10 +48,12 @@ function RequesterGate({
             {requester.department ? ` — ${requester.department}` : ""}
           </p>
           <p className="tt-muted">{requester.email}</p>
-          <p className="tt-muted">
-            My Tickets, Create Ticket, and Ticket Detail arrive in Issues 5 to 7.
-          </p>
+          <p className="tt-muted">My Tickets and Ticket Detail arrive in Issues 6 and 7.</p>
         </Card>
+
+        {/* Remounted whenever the requester changes, so no value typed by the
+            previous requester survives the switch (BR-11). */}
+        <CreateTicket key={requester.id} />
 
         {/* The Lab 1 system check, kept as a panel inside the shell so the
             backend's health is still visible from the running application. */}
