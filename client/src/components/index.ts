@@ -17,3 +17,6 @@ export type { EmptyStateProps, NoResultsStateProps, ErrorStateProps } from "./St
 
 export { Page, Card, FieldGrid, FullWidth, ActionBar, ResponsiveList } from "./Layout.js";
 export type { ResponsiveListProps } from "./Layout.js";
+
+export { AttachmentSection, checkFileBeforeUpload } from "./AttachmentSection.js";
+export type { AttachmentSectionProps } from "./AttachmentSection.js";

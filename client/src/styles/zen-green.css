@@ -395,6 +395,78 @@ textarea.tt-field__control {
   margin: 0 0 var(--tt-space-2);
 }
 
+/* --- Ticket Detail and attachments (ui-spec.md 11) ------------------------ */
+
+.tt-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.tt-detail__header {
+  display: flex;
+  align-items: center;
+  gap: var(--tt-space-3);
+  flex-wrap: wrap;
+}
+
+.tt-detail { display: grid; grid-template-columns: 200px 1fr; gap: var(--tt-space-2) var(--tt-space-4); }
+.tt-detail dt { font-weight: 600; color: var(--tt-text-muted); }
+.tt-detail dd { margin: 0; }
+.tt-detail__description { white-space: pre-wrap; }
+
+.tt-attachments__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tt-space-3);
+  flex-wrap: wrap;
+}
+
+.tt-attachments { list-style: none; margin: var(--tt-space-3) 0 0; padding: 0; }
+
+.tt-attachment {
+  display: flex;
+  align-items: center;
+  gap: var(--tt-space-3);
+  flex-wrap: wrap;
+  padding: var(--tt-space-3);
+  border: 1px solid var(--tt-border);
+  border-radius: var(--tt-radius);
+  margin-bottom: var(--tt-space-2);
+}
+
+.tt-attachment__name { font-weight: 600; word-break: break-all; }
+.tt-attachment__actions { margin-left: auto; display: flex; gap: var(--tt-space-2); }
+.tt-attachment__reason { margin-left: auto; }
+
+/* A removed row is visibly inert: struck through, greyed, and carrying no
+   control that could reach the file. */
+.tt-attachment--removed { background: var(--tt-disabled-bg); color: var(--tt-text-muted); }
+.tt-attachment--removed .tt-attachment__name { text-decoration: line-through; font-weight: 400; }
+
+.tt-attachment--invalid {
+  background: var(--tt-error-bg);
+  border-color: var(--tt-error);
+  color: var(--tt-error);
+}
+
+.tt-dialog {
+  position: fixed;
+  inset: 0;
+  background: rgba(28, 43, 36, .45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--tt-space-4);
+  z-index: 10;
+}
+
+.tt-dialog .tt-card { width: 100%; max-width: 480px; }
+
 /* --- Responsive grid ------------------------------------------------------ */
 
 .tt-grid { display: grid; gap: var(--tt-space-4); }
@@ -439,6 +511,14 @@ textarea.tt-field__control {
      is pushed off the side of the screen. */
   .tt-toolbar,
   .tt-pagination { flex-direction: column; align-items: stretch; }
+
+  /* Attachment rows become stacked blocks with full-width actions, and long
+     filenames wrap rather than clipping. */
+  .tt-detail { grid-template-columns: 1fr; }
+  .tt-attachment { flex-direction: column; align-items: stretch; }
+  .tt-attachment__actions,
+  .tt-attachment__reason { margin-left: 0; }
+  .tt-attachment__actions .tt-btn { flex: 1; }
   .tt-toolbar .tt-field__control,
   .tt-pagination .tt-field__control { width: 100%; min-width: 0; }
 }
