@@ -110,7 +110,10 @@ function CreateTicketRoute() {
     <Page>
       <CreateTicket
         key={`create-${requester?.id}`}
+        // Reached from the success state's View ticket button, so the
+        // confirmation with the official number is always seen first.
         onCreated={(ticket) => navigate(ROUTES.detail(ticket.id))}
+        onCancel={() => navigate(ROUTES.list)}
       />
     </Page>
   );

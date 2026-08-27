@@ -198,6 +198,46 @@ test.describe("RESP-03 screenshots for the visual checklist", () => {
     await expect(page.getByText(/Captured for the visual checklist/)).toBeVisible();
     await shoot(page, "ticket-detail", "attachment-removed");
 
+    // Create Ticket — the success state, which Part 6 asks for by name.
+    await page.goto("/tickets/new");
+    await page.getByLabel(/^Category/).selectOption({ index: 1 });
+    await page.getByLabel(/^Related System/).selectOption({ index: 1 });
+    await page.getByLabel(/^Requested Priority/).selectOption("MEDIUM");
+    await page.getByLabel(/^Ticket Summary/).fill(`Success state capture ${Date.now()}`);
+    await page
+      .getByLabel(/^Description/)
+      .fill("Captured for the Part 6 success-state screenshot in the visual checklist.");
+    await page.getByRole("button", { name: "Submit Ticket" }).click();
+    await expect(page.getByTestId("created-ticket-number")).toBeVisible();
+    await shoot(page, "create-ticket", "success");
+
+    // Create Ticket — an invalid attachment chosen on the form itself.
+    await page.goto("/tickets/new");
+    await page.getByLabel("Choose a file to attach").setInputFiles({
+      name: "virus.exe",
+      mimeType: "application/octet-stream",
+      buffer: Buffer.from("MZ"),
+    });
+    await expect(page.getByText(/files are permitted/)).toBeVisible();
+    await shoot(page, "create-ticket", "invalid-attachment");
+
+    // Create Ticket — the safe API-failure state, with every value kept.
+    await page.route("**/api/tickets", (route) =>
+      route.request().method() === "POST" ? route.abort("failed") : route.continue(),
+    );
+    await page.goto("/tickets/new");
+    await page.getByLabel(/^Category/).selectOption({ index: 1 });
+    await page.getByLabel(/^Related System/).selectOption({ index: 1 });
+    await page.getByLabel(/^Requested Priority/).selectOption("HIGH");
+    await page.getByLabel(/^Ticket Summary/).fill("Backend unavailable capture");
+    await page
+      .getByLabel(/^Description/)
+      .fill("Captured for the Part 6 API-failure screenshot; these values must survive.");
+    await page.getByRole("button", { name: "Submit Ticket" }).click();
+    await expect(page.getByText(/Cannot reach the TokTickIT API/)).toBeVisible();
+    await shoot(page, "create-ticket", "api-failure");
+    await page.unroute("**/api/tickets");
+
     // My Tickets — the no-results state.
     await page.goto("/tickets");
     await page.getByLabel("Search tickets").fill("zzz-no-such-ticket-zzz");
