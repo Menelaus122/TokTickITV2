@@ -32,7 +32,7 @@ manage its attachments from Ticket Detail.
 - [x] **Issue 8** — Application shell navigation and routing
 - [x] **Issue 9** — E2E and responsive suites with visual artifacts
 - [x] **Issue 10** — Create Ticket completion (attachments, success state, Cancel)
-- [ ] **Issue 11** — Staging integration, documentation, and delivery
+- [x] **Issue 11** — Staging integration, documentation, and delivery
 
 > **Note on Lab 2 authentication.** There is none, by design. A Development
 > Requester selector stands in for login so requester-specific behaviour can be

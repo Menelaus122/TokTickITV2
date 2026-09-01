@@ -323,8 +323,12 @@ npx playwright test --reporter=list
 
 ## 6. Final Results
 
-Run on `feature/9-automated-tests-and-screenshots` against PostgreSQL 16 with the
-standard seed. This section is re-run and re-recorded from `main` in Issue 10.
+Re-run in full from the delivery commit — the tree that the release Pull Request
+merges into `main` unchanged — using the commands in section 5 exactly as
+written, against PostgreSQL 16 with the standard seed. The backend suite was run
+through `docker exec toktickit-server`, as section 5 requires, so it reaches the
+database over the compose network rather than through a host port a native
+PostgreSQL can shadow.
 
 | Level | Planned | Delivered | Passed | Failed | Skipped |
 | :--- | ---: | ---: | ---: | ---: | ---: |

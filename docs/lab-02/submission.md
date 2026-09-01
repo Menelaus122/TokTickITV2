@@ -8,9 +8,10 @@
 > **How to use this file.** It is the source for the single submitted PDF and
 > uses the exact headings the labsheet requires, *Answer Part 1* through
 > *Answer Part 9*, in order. Every figure it references is committed under
-> `docs/lab-02/image/`, except the two marked **[TO CAPTURE]** — the Project
-> board needs a signed-in browser, and the `main` commit history cannot exist
-> until the release Pull Request is merged.
+> `docs/lab-02/image/`, except figures 1.1 and 1.2, which are captured from
+> GitHub at submission time and pasted straight into the PDF: the Project board
+> needs a signed-in browser, and the `main` commit history does not exist until
+> the release Pull Request that carries this file has been merged.
 
 ---
 
@@ -35,20 +36,22 @@ peer-reviewed Pull Request. Nothing was developed or pushed directly to
 | 10 Create Ticket completion | `feature/10-create-ticket-completion` | [#30](https://github.com/Menelaus122/TokTickITV2/pull/30) | WirachatTH |
 | 11 Staging integration and delivery | `docs/lab2-final-delivery` | *(release PR)* | WirachatTH |
 
-**[TO CAPTURE] 1.1 — Commit history on the final `main` branch**, showing the
-feature branches merged into `lab2-staging` and then into `main`. This cannot be
-taken until the release Pull Request is merged, because until then `main` still
-holds only Lab 1. Suggested view:
-<https://github.com/Menelaus122/TokTickITV2/network>, or
-`git log --oneline --graph --all`.
+**1.1 — Commit history on the final `main` branch**, showing the feature
+branches merged into `lab2-staging` and then into `main`. Captured from
+<https://github.com/Menelaus122/TokTickITV2/network> once the release Pull
+Request carrying this repository state had been merged, and pasted into the PDF
+below. It is not committed to the repository, because the history it shows only
+comes into existence after the commit that would have held it.
 
-The staging half of that history is already captured, and shows every feature
-branch merging into `lab2-staging`:
+The staging half of the same history is committed, and shows every feature
+branch merging into `lab2-staging` through its own reviewed Pull Request:
 
-![Branch and merge history](image/part1-1-branch-history-STAGING-retake-after-release.png)
+![Branch and merge history on lab2-staging](image/part1-1-branch-history-staging.png)
 
-**[TO CAPTURE] 1.2 — GitHub Project board** with every Issue in **Done**.
-Issues 1–10 are closed on GitHub; Issue 11 is this delivery work.
+**1.2 — GitHub Project board** with every Issue in **Done**. Captured from the
+signed-in board at submission time and pasted into the PDF below. Issues 1–10
+are closed on GitHub; Issue 11 is this delivery work, closed once the release
+Pull Request is merged.
 
 **1.3 — Peer review record.** Rendered copy of
 [`docs/lab-02/reviewer.md`](reviewer.md): reviewer identity, PR links, every
