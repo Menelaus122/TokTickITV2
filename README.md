@@ -200,8 +200,13 @@ Run inside the server container so the tests reach the seeded PostgreSQL over
 the compose network (`db:5432`):
 
 ```bash
+docker exec toktickit-server npx prisma migrate deploy
+docker exec toktickit-server npm run prisma:seed
 docker exec toktickit-server npx vitest run --reporter=verbose
 ```
+
+The migrate and seed lines are only needed on a fresh database; the seed is
+idempotent, so running them again on a seeded one changes nothing.
 
 > Run this via `docker exec`, not a plain `npm test` on the host. A native
 > PostgreSQL listening on `localhost:5432` can shadow the Docker database from
@@ -222,10 +227,14 @@ These drive a real stack, so the database, API, and client must be running:
 
 ```bash
 docker compose up -d
+docker exec toktickit-server npx prisma migrate deploy
+docker exec toktickit-server npm run prisma:seed
 npx playwright install chromium   # first run only
 npx playwright test --reporter=list
 ```
 
+The suite selects a Requester and picks a Category and Related System from the
+dropdowns, so it fails on an unseeded database with nothing to select.
 Screenshots are written to `artifacts/lab-02/screenshots/`. Point the suite at a
 stack on non-default ports with `E2E_BASE_URL` and `E2E_API_URL`.
 
@@ -235,6 +244,13 @@ endpoint by design. Reset afterwards with:
 ```bash
 docker exec toktickit-db psql -U toktickit -d toktickit -c 'DELETE FROM "Ticket";'
 ```
+
+> This deletes **every** ticket, including any you created by hand in the
+> running app. The suite prints the ids it created, but that line is printed
+> before the responsive spec has finished creating its own, so it is not the
+> full list. To keep tickets of your own, delete by id range instead and remove
+> the matching files from `/app/uploads` in the server container — the cascade
+> clears the `Attachment` rows but not the uploaded files.
 
 ### Everything
 

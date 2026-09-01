@@ -285,9 +285,14 @@ running first:
 
 ```bash
 docker compose up -d
+docker exec toktickit-server npx prisma migrate deploy
+docker exec toktickit-server npm run prisma:seed
 npx playwright install chromium   # first run only
 npx playwright test --reporter=list
 ```
+
+The suite drives the real dropdowns, so an unseeded database gives it no
+Requester, Category, or Related System to select and every spec fails.
 
 Point the suite at a stack on non-default ports with `E2E_BASE_URL` and
 `E2E_API_URL`:
