@@ -249,9 +249,24 @@ describe("filters", () => {
       `?categoryId=${categoryX}&requestedPriority=HIGH&pageSize=50`,
     );
 
-    // categoryX tickets were created with MEDIUM, so this combination is empty.
-    expect(res.body.data).toEqual([]);
-    expect(res.body.meta.totalItems).toBe(0);
+    expect(res.status).toBe(200);
+
+    // Every row returned satisfies BOTH filters, not just one of them.
+    for (const ticket of res.body.data) {
+      expect(ticket.category.id).toBe(categoryX);
+      expect(ticket.requestedPriority).toBe("HIGH");
+    }
+
+    // This suite's fixtures pair categoryX with MEDIUM and categoryY with HIGH,
+    // so none of them satisfies both filters at once. Asserting that — rather
+    // than that the whole result is empty — keeps the test correct when the
+    // database also holds tickets created outside this suite, which is the
+    // normal state of a development database someone has been clicking around
+    // in.
+    const returned = res.body.data.map((ticket: { id: number }) => ticket.id);
+    for (const id of createdIds) {
+      expect(returned).not.toContain(id);
+    }
   });
 
   it("returns an empty result set rather than an error when nothing matches", async () => {
