@@ -58,6 +58,10 @@ Pull Request is merged.
 comment received, my response to each, and all ten approvals. Every merge was
 performed by the reviewer, never by me, per the Part 9 workflow agreement.
 
+![Rendered reviewer.md — Pull Requests I authored](image/rendered-reviewer-1-authored.png)
+
+![Rendered reviewer.md — Pull Requests I reviewed for my partner](image/rendered-reviewer-2-reviewed.png)
+
 **1.4 — `README.md` and `.gitignore` contents.**
 `README.md` carries the current setup, seed, and test commands for Lab 2.
 `.gitignore` covers `node_modules/`, `.env`, build output, uploaded attachment
@@ -137,9 +141,24 @@ been run — never on the strength of a code review or an agent's claim.
 
 73 + 88 = 161 backend · 182 + 38 = 220 frontend · 9 + 12 = 21 Playwright.
 
-**Traceability.** `tests.md` §3 maps all **28 acceptance criteria** to the tests
-that prove them; no AC is unmapped. §2 lists every planned test with its real
-file path and final status.
+**Rendered `tests.md`.** The planned-test table, with each row's acceptance
+criterion, expected result, real test-file path, and final status:
+
+![Rendered tests.md — planned tests](image/rendered-tests-1-planned.png)
+
+**Traceability.** §3 maps all **28 acceptance criteria** to the tests that prove
+them; no AC is unmapped.
+
+![Rendered tests.md — acceptance-criterion traceability](image/rendered-tests-2-traceability.png)
+
+**The responsive and visual checklist**, §4 — nineteen rows, each naming the
+automated assertion or artifact that proves it:
+
+![Rendered tests.md — responsive and visual checklist](image/rendered-tests-3-checklist.png)
+
+**Final pass status**, §6:
+
+![Rendered tests.md — final results](image/rendered-tests-4-final-results.png)
 
 **3.1 — Backend suite passing**, 161 of 161 across 11 files.
 
@@ -165,8 +184,14 @@ Commands are in `tests.md` §5 and in the README.
 `Co-Authored-By: Claude Opus 5`, so the contribution is traceable in `git log`
 rather than only asserted.
 
-The document contains ten selected key prompts with what I did with each result,
-followed by my reflection. The three that mattered most:
+**Rendered `ai-use.md`** — ten selected key prompts with what I did with each
+result, and the reflection:
+
+![Rendered ai-use.md — selected key prompts](image/rendered-ai-use-1-prompts.png)
+
+![Rendered ai-use.md — My Reflection](image/rendered-ai-use-2-reflection.png)
+
+The three prompts that mattered most:
 
 - **Auditing the plan before coding.** Having the agent check `MyIssue.md`
   against the labsheet found six gaps and grew the sprint from 7 issues to 10.
@@ -395,6 +420,18 @@ bodies are byte-identical.
 typography and spacing, control states, required-field marker and validation
 placement, button hierarchy, badge rules, screen layouts, responsive rules,
 accessibility rules, and the visual inspection checklist.
+
+**Rendered `ui-spec.md`.**
+
+![Rendered ui-spec.md — colour tokens and typography](image/rendered-ui-spec-1-tokens.png)
+
+![Rendered ui-spec.md — control states, buttons, and badges](image/rendered-ui-spec-2-control-states.png)
+
+![Rendered ui-spec.md — screen layouts](image/rendered-ui-spec-3-screens.png)
+
+![Rendered ui-spec.md — responsive summary](image/rendered-ui-spec-4-responsive.png)
+
+![Rendered ui-spec.md — visual inspection checklist](image/rendered-ui-spec-5-checklist.png)
 
 **Screenshots — 21 files** in `artifacts/lab-02/screenshots/`, covering four
 screens at all three viewports (1280 × 800, 900 × 1000, 375 × 812) plus nine
