@@ -97,11 +97,21 @@ contract documents; PR #20 merged them into `lab2-staging` at **16:47 UTC on
 25 Aug 2026**. The first implementation PR (#21) was opened at **17:13 UTC** —
 26 minutes later.
 
-Evidence images already captured in `docs/lab-02/image/`:
+![PR #20 merged, with the approval and the linked Issue](image/spec-dd-proof-pr20-merged.png)
 
-- `spec-dd-proof-pr20-merged.png` — PR #20 merged, with the approval and linked Issue
-- `spec-dd-proof-commit-history.png` — the file's commit history and date
-- `spec-dd-rendered-1-overview.png` … `spec-dd-rendered-5-definition-of-done.png` — the rendered specification
+![Commit history and date of specification.md](image/spec-dd-proof-commit-history.png)
+
+**Rendered specification.**
+
+![Specification overview](image/spec-dd-rendered-1-overview.png)
+
+![Functional requirements FR-01 to FR-33](image/spec-dd-rendered-2-functional-requirements.png)
+
+![Business rules BR-01 to BR-46](image/spec-dd-rendered-3-business-rules.png)
+
+![Acceptance criteria AC-01 to AC-28](image/spec-dd-rendered-4-acceptance-criteria.png)
+
+![Definition of Done](image/spec-dd-rendered-5-definition-of-done.png)
 
 ---
 
@@ -176,8 +186,11 @@ The simulated login used to choose the Requester for the session. **Not
 authentication** — the screen says so on its face, and the wording is the
 labsheet's suggested text verbatim.
 
-Screenshots in `artifacts/lab-02/screenshots/requester-selection/`:
-`desktop.png`, `tablet.png`, `mobile.png`.
+![Requester Selection at desktop](../../artifacts/lab-02/screenshots/requester-selection/desktop.png)
+
+![Requester Selection at tablet](../../artifacts/lab-02/screenshots/requester-selection/tablet.png)
+
+![Requester Selection at mobile](../../artifacts/lab-02/screenshots/requester-selection/mobile.png)
 
 Required elements, all present: TokTickIT title; the testing-only explanation as
 an amber warning; a labelled, keyboard-accessible dropdown of **active**
@@ -191,16 +204,36 @@ action, and requester-scoped data reloads whenever the selection changes.
 
 # Answer Part 6: Working Ticket Screen — Create Mode
 
-Screenshots in `artifacts/lab-02/screenshots/create-ticket/`:
+Every required state except the transient *submitting* one is photographed
+below. Submitting is an in-flight state that cannot be caught reliably by a
+screenshot, so it is asserted by a UI test instead: the submit button carries its
+busy class, its busy label, and `disabled` while the request is open.
 
-| Required state | File |
-| :--- | :--- |
-| Initial | `desktop.png` (also `tablet.png`, `mobile.png`) |
-| Validation failure | `validation-failure.png` |
-| Success | `success.png` |
-| API failure | `api-failure.png` |
-| Invalid attachment | `invalid-attachment.png` |
-| Submitting | Transient in-flight state; asserted by a UI test rather than photographed |
+**Initial state, desktop viewport.**
+
+![Create Ticket, initial state at desktop](../../artifacts/lab-02/screenshots/create-ticket/desktop.png)
+
+**Validation failure.**
+
+![Create Ticket with field-level validation messages](../../artifacts/lab-02/screenshots/create-ticket/validation-failure.png)
+
+**Success, with the official Ticket Number from the backend.**
+
+![Create Ticket success state](../../artifacts/lab-02/screenshots/create-ticket/success.png)
+
+**API failure, with the entered values preserved.**
+
+![Create Ticket safe error state](../../artifacts/lab-02/screenshots/create-ticket/api-failure.png)
+
+**Invalid attachment, rejected on selection.**
+
+![A rejected file shown with its reason](../../artifacts/lab-02/screenshots/create-ticket/invalid-attachment.png)
+
+**The same screen at tablet and mobile.**
+
+![Create Ticket at tablet](../../artifacts/lab-02/screenshots/create-ticket/tablet.png)
+
+![Create Ticket at mobile](../../artifacts/lab-02/screenshots/create-ticket/mobile.png)
 
 **1. Reference data loaded from the database.** Category and Related System
 options come from `GET /api/categories` and `GET /api/related-systems`; nothing
@@ -241,8 +274,14 @@ all come from the backend, not the form.
 
 # Answer Part 7: Working My Tickets Screen
 
-Screenshots in `artifacts/lab-02/screenshots/my-tickets/`: `desktop.png`,
-`tablet.png`, `mobile.png`, `no-results.png`.
+The three viewports of this screen are in Answer Part 9, where they carry the
+responsive argument. The state that belongs here is the one a search produces:
+
+![My Tickets with a search that matches nothing](../../artifacts/lab-02/screenshots/my-tickets/no-results.png)
+
+This is the **no-results** state, deliberately distinct from the **empty** state
+a Requester with no tickets sees — different copy, different marker, and a
+separate test asserting the two never render the same thing.
 
 The list is scoped to the selected Requester by the database query itself, not
 by a check applied after fetching, so there is no code path that can retrieve
@@ -287,9 +326,32 @@ URL shows "Ticket not found".
 
 # Answer Part 8: Working Ticket Screen — View Mode and Attachments
 
-Screenshots in `artifacts/lab-02/screenshots/ticket-detail/`: `desktop.png`,
-`tablet.png`, `mobile.png`, `removal-confirm.png`, `attachment-removed.png`,
-`invalid-attachment.png`, `not-found.png`.
+**Owned Ticket Detail, desktop viewport.**
+
+![Ticket Detail at desktop](../../artifacts/lab-02/screenshots/ticket-detail/desktop.png)
+
+**Soft removal asks for a reason before it will proceed.**
+
+![Attachment removal confirmation with a required reason](../../artifacts/lab-02/screenshots/ticket-detail/removal-confirm.png)
+
+**After removal the metadata is retained, not deleted.**
+
+![A removed attachment, struck through and badged REMOVED](../../artifacts/lab-02/screenshots/ticket-detail/attachment-removed.png)
+
+**An unsupported file is refused without leaving the screen.**
+
+![An invalid attachment rejected on Ticket Detail](../../artifacts/lab-02/screenshots/ticket-detail/invalid-attachment.png)
+
+**A ticket belonging to another Requester — the same answer as one that does not
+exist.**
+
+![Ticket not found](../../artifacts/lab-02/screenshots/ticket-detail/not-found.png)
+
+**The same screen at tablet and mobile.**
+
+![Ticket Detail at tablet](../../artifacts/lab-02/screenshots/ticket-detail/tablet.png)
+
+![Ticket Detail at mobile](../../artifacts/lab-02/screenshots/ticket-detail/mobile.png)
 
 **Owned Ticket Detail is read-only.** Every field renders as plain text, not as
 disabled inputs — a UI test asserts the count of `input`, `textarea`, and
@@ -336,7 +398,25 @@ accessibility rules, and the visual inspection checklist.
 
 **Screenshots — 21 files** in `artifacts/lab-02/screenshots/`, covering four
 screens at all three viewports (1280 × 800, 900 × 1000, 375 × 812) plus nine
-states that only a screenshot can record.
+states that only a screenshot can record. Every one of them is embedded in this
+document: Requester Selection in Part 5, Create Ticket in Part 6, the no-results
+state in Part 7, Ticket Detail in Part 8, and My Tickets here.
+
+My Tickets is the clearest responsive evidence, because the list does not merely
+reflow — it changes representation. A table at desktop and tablet becomes cards
+at mobile, which is why the page never scrolls sideways at 375 px.
+
+**Desktop, 1280 × 800 — table.**
+
+![My Tickets at desktop](../../artifacts/lab-02/screenshots/my-tickets/desktop.png)
+
+**Tablet, 900 × 1000 — still a table, narrower.**
+
+![My Tickets at tablet](../../artifacts/lab-02/screenshots/my-tickets/tablet.png)
+
+**Mobile, 375 × 812 — cards.**
+
+![My Tickets at mobile](../../artifacts/lab-02/screenshots/my-tickets/mobile.png)
 
 **Completed visual checklist:** `tests.md` §4 — 19 rows, each naming the
 automated assertion or artifact that proves it, so no line rests on someone
