@@ -95,9 +95,9 @@ Principles for this sprint:
 | UI-01 | AC-01 | UI | Selection dropdown | Renders one option per active Requester; the inactive one is absent | `client/tests/lab-02/RequesterSelection.test.tsx` | **Pass** |
 | UI-02 | AC-06 | UI | Selection empty state | Empty message shown; Continue disabled; no dropdown | `client/tests/lab-02/RequesterSelection.test.tsx` | **Pass** |
 | UI-03 | AC-05 | UI | Selection API failure | Safe error message and a retry action; no dropdown; no stack trace text | `client/tests/lab-02/RequesterSelection.test.tsx` | **Pass** |
-| UI-04 | AC-02 | UI | Route guard | Opening My Tickets with no selection renders the Selection screen | `client/tests/lab-02/RequesterGuard.test.tsx` | **Pass** |
-| UI-05 | AC-03 | UI | Shell identity | Current Requester's name and a Change Requester control render on every app screen | `client/tests/lab-02/AppShell.test.tsx` | **Pass** |
-| UI-06 | AC-04 | UI | Requester switch | After switching, the previous Requester's rows are gone and a refetch was issued for the new id | `client/tests/lab-02/AppShell.test.tsx` | **Pass** |
+| UI-04 | AC-02 | UI | Route guard | Opening My Tickets with no selection renders the Selection screen | `client/tests/lab-02/Navigation.test.tsx` | **Pass** |
+| UI-05 | AC-03 | UI | Shell identity | Current Requester's name and a Change Requester control render on every app screen | `client/tests/lab-02/RequesterContext.test.tsx` | **Pass** |
+| UI-06 | AC-04 | UI | Requester switch | After switching, the previous Requester's rows are gone and a refetch was issued for the new id | `client/tests/lab-02/RequesterContext.test.tsx`, `client/tests/lab-02/MyTickets.test.tsx` | **Pass** |
 | UI-07 | AC-09 | UI | Submit without Summary | Message rendered in the Summary field group; **API not called** | `client/tests/lab-02/CreateTicket.test.tsx` | **Pass** |
 | UI-08 | AC-08 | UI | Reference data | Category and Related System options come from the mocked API response, not a literal array | `client/tests/lab-02/CreateTicket.test.tsx` | **Pass** |
 | UI-09 | AC-11 | UI | Busy submit | Button disabled and busy during the request; a double click issues exactly one call | `client/tests/lab-02/CreateTicket.test.tsx` | **Pass** |
@@ -115,12 +115,12 @@ Principles for this sprint:
 
 | Test ID | AC | Type | What it tests | Expected result | Automated test file | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| STYLE-01 | AC-27 | UI style | Required markers | Every required field's label renders the red asterisk element | `client/tests/lab-02/zen-green.style.test.tsx` | **Pass** |
-| STYLE-02 | AC-27 | UI style | Read-only vs editable | Read-only fields carry the read-only class and `readonly`/`aria-readonly`; editable fields carry neither | `client/tests/lab-02/zen-green.style.test.tsx` | **Pass** |
-| STYLE-03 | AC-27 | UI style | Message placement | The validation message node is inside the field group and follows its control in DOM order, and is referenced by `aria-describedby` | `client/tests/lab-02/zen-green.style.test.tsx` | **Pass** |
-| STYLE-04 | AC-11 | UI style | Busy button | Submit carries the busy class, `disabled`, and its busy label while in flight | `client/tests/lab-02/zen-green.style.test.tsx` | **Pass** |
-| STYLE-05 | AC-26 | UI style | Badges are not colour-only | Priority and Status badges render their value as text, with identical class names across list, cards, and detail | `client/tests/lab-02/zen-green.style.test.tsx` | **Pass** |
-| STYLE-06 | AC-26 | UI style | Token usage | Header and primary buttons resolve to the Zen Green token variables rather than literal hex values | `client/tests/lab-02/zen-green.style.test.tsx` | **Pass** |
+| STYLE-01 | AC-27 | UI style | Required markers | Every required field's label renders the red asterisk element | `client/tests/lab-02/FormComponents.test.tsx` | **Pass** |
+| STYLE-02 | AC-27 | UI style | Read-only vs editable | Read-only fields carry the read-only class and `readonly`/`aria-readonly`; editable fields carry neither | `client/tests/lab-02/FormComponents.test.tsx` | **Pass** |
+| STYLE-03 | AC-27 | UI style | Message placement | The validation message node is inside the field group and follows its control in DOM order, and is referenced by `aria-describedby` | `client/tests/lab-02/FormComponents.test.tsx` | **Pass** |
+| STYLE-04 | AC-11 | UI style | Busy button | Submit carries the busy class, `disabled`, and its busy label while in flight | `client/tests/lab-02/UiFoundation.test.tsx` | **Pass** |
+| STYLE-05 | AC-26 | UI style | Badges are not colour-only | Priority and Status badges render their value as text, with identical class names across list, cards, and detail | `client/tests/lab-02/UiFoundation.test.tsx` | **Pass** |
+| STYLE-06 | AC-26 | UI style | Token usage | Header and primary buttons resolve to the Zen Green token variables rather than literal hex values | `client/tests/lab-02/ZenGreenTheme.test.tsx` | **Pass** |
 
 ### 2.5 Responsive
 
@@ -285,9 +285,14 @@ running first:
 
 ```bash
 docker compose up -d
+docker exec toktickit-server npx prisma migrate deploy
+docker exec toktickit-server npm run prisma:seed
 npx playwright install chromium   # first run only
 npx playwright test --reporter=list
 ```
+
+The suite drives the real dropdowns, so an unseeded database gives it no
+Requester, Category, or Related System to select and every spec fails.
 
 Point the suite at a stack on non-default ports with `E2E_BASE_URL` and
 `E2E_API_URL`:
@@ -323,8 +328,12 @@ npx playwright test --reporter=list
 
 ## 6. Final Results
 
-Run on `feature/9-automated-tests-and-screenshots` against PostgreSQL 16 with the
-standard seed. This section is re-run and re-recorded from `main` in Issue 10.
+Re-run in full from the delivery commit — the tree that the release Pull Request
+merges into `main` unchanged — using the commands in section 5 exactly as
+written, against PostgreSQL 16 with the standard seed. The backend suite was run
+through `docker exec toktickit-server`, as section 5 requires, so it reaches the
+database over the compose network rather than through a host port a native
+PostgreSQL can shadow.
 
 | Level | Planned | Delivered | Passed | Failed | Skipped |
 | :--- | ---: | ---: | ---: | ---: | ---: |
@@ -345,6 +354,13 @@ How the levels map onto the test files:
   `FormComponents` (required marker, validation placement, read-only versus
   editable): assertions about the markup `ui-spec.md` requires.
 * **UI component** (182) — every other `client/` test: screen behaviour and state.
+
+The level split above is by file. Two planned style tests do not follow it:
+STYLE-04 (busy button) and STYLE-05 (badges are not colour-only) are satisfied
+by assertions in `UiFoundation.test.tsx`, which is counted under UI component
+because the rest of that file is component behaviour. They are style assertions
+living in a component file, not missing tests — section 2.4 links each STYLE id
+to the file that actually contains it.
 * **Responsive** (9) and **E2E** (12) — the two Playwright specs.
 
 73 + 88 = 161 backend; 182 + 38 = 220 frontend; 9 + 12 = 21 Playwright; 402 total.
