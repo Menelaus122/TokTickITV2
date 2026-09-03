@@ -1,7 +1,7 @@
 # Lab 1 — Peer Review Record  (fill this in)
 
 **Author:** Poomipat Apiwattanaphong — 67070501035 — GitHub: [@Menelaus122](https://github.com/Menelaus122)
-**Peer reviewer:** Wirachat — 67070501041 — GitHub: [@WirachatTH](https://github.com/WirachatTH)
+<br>**Peer reviewer:** Wirachat — 67070501041 — GitHub: [@WirachatTH](https://github.com/WirachatTH)
 
 ## Pull Requests I authored (reviewed by my partner)
 

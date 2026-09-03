@@ -1,0 +1,577 @@
+/* ===========================================================================
+   TokTickIT — Zen Green theme
+   Implements docs/lab-02/ui-spec.md sections 1-6. Every colour, size, and
+   spacing value in the application comes from a token declared here; no screen
+   hard-codes a hex value.
+   =========================================================================== */
+
+:root {
+  /* --- Colour tokens (ui-spec.md 1) ------------------------------------- */
+  --tt-green-primary: #006B3C;
+  --tt-green-secondary: #0B7A46;
+  --tt-green-pale: #EAF6EF;
+  --tt-bg-page: #F5F7F6;
+  --tt-surface: #FFFFFF;
+  --tt-border: #D8E0DB;
+  --tt-text: #1C2B24;
+  --tt-text-muted: #5B6B63;
+  --tt-readonly-bg: #EDF1EE;
+  --tt-error: #A4161A;
+  --tt-error-bg: #FBE9E9;
+  --tt-warning: #B26A00;
+  --tt-warning-bg: #FDF3E2;
+  --tt-success: #1B7A4B;
+  --tt-success-bg: #E8F5EE;
+  --tt-disabled-bg: #EFF1F0;
+  --tt-disabled-text: #9AA5A0;
+
+  /* --- Typography (ui-spec.md 2) ---------------------------------------- */
+  --tt-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --tt-font-body: 16px;
+  --tt-font-h1: 28px;
+  --tt-font-h2: 20px;
+  --tt-font-label: 14px;
+  --tt-font-help: 13px;
+
+  /* --- Spacing scale (4px) ---------------------------------------------- */
+  --tt-space-1: 4px;
+  --tt-space-2: 8px;
+  --tt-space-3: 12px;
+  --tt-space-4: 16px;
+  --tt-space-6: 24px;
+  --tt-space-8: 32px;
+  --tt-space-12: 48px;
+
+  /* --- Shape ------------------------------------------------------------ */
+  --tt-radius: 6px;
+  --tt-control-height: 40px;
+  --tt-shadow-card: 0 1px 2px rgba(28, 43, 36, .06);
+  --tt-max-width: 1120px;
+}
+
+/* --- Page ---------------------------------------------------------------- */
+
+body {
+  margin: 0;
+  background: var(--tt-bg-page);
+  color: var(--tt-text);
+  font-family: var(--tt-font);
+  font-size: var(--tt-font-body);
+  line-height: 1.5;
+}
+
+.tt-page {
+  max-width: var(--tt-max-width);
+  margin: 0 auto;
+  padding: var(--tt-space-6);
+}
+
+.tt-h1 { font-size: var(--tt-font-h1); font-weight: 600; margin: 0 0 var(--tt-space-6); }
+.tt-h2 { font-size: var(--tt-font-h2); font-weight: 600; margin: 0 0 var(--tt-space-4); }
+.tt-muted { color: var(--tt-text-muted); font-size: var(--tt-font-help); }
+
+/* --- Card ---------------------------------------------------------------- */
+
+.tt-card {
+  background: var(--tt-surface);
+  border: 1px solid var(--tt-border);
+  border-radius: var(--tt-radius);
+  box-shadow: var(--tt-shadow-card);
+  padding: var(--tt-space-6);
+}
+
+.tt-card + .tt-card { margin-top: var(--tt-space-6); }
+
+/* --- Form fields (ui-spec.md 3) ------------------------------------------ */
+
+.tt-field { margin-bottom: var(--tt-space-4); }
+
+.tt-field__label {
+  display: block;
+  font-size: var(--tt-font-label);
+  font-weight: 600;
+  color: var(--tt-text);
+  margin-bottom: var(--tt-space-1);
+}
+
+/* Required marker. It supplements the validation message, never replaces it. */
+.tt-field__required {
+  color: var(--tt-error);
+  margin-left: 2px;
+  font-weight: 700;
+}
+
+.tt-field__control {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  height: var(--tt-control-height);
+  padding: 0 var(--tt-space-3);
+  font: inherit;
+  color: var(--tt-text);
+  background: var(--tt-surface);
+  border: 1px solid var(--tt-border);
+  border-radius: var(--tt-radius);
+}
+
+/* Multiline is taller and resizes vertically only, so it cannot break the
+   layout by growing sideways. */
+textarea.tt-field__control {
+  height: auto;
+  min-height: 150px;
+  padding: var(--tt-space-2) var(--tt-space-3);
+  resize: vertical;
+}
+
+/* Read-only shows a real value the Requester should read: distinct, but still
+   readable. Deliberately different from disabled. */
+.tt-field__control--readonly,
+.tt-field__control[readonly] {
+  background: var(--tt-readonly-bg);
+  color: var(--tt-text);
+}
+
+.tt-field__control--invalid,
+.tt-field__control[aria-invalid="true"] {
+  border-color: var(--tt-error);
+}
+
+.tt-field__control:disabled,
+.tt-field__control--disabled {
+  background: var(--tt-disabled-bg);
+  color: var(--tt-disabled-text);
+  cursor: not-allowed;
+}
+
+/* Focus stays visible for keyboard users on every control. */
+.tt-field__control:focus-visible,
+.tt-btn:focus-visible,
+.tt-link:focus-visible {
+  outline: 2px solid var(--tt-green-secondary);
+  outline-offset: 2px;
+}
+
+/* Validation message sits immediately beneath its own control. */
+.tt-field__message {
+  display: block;
+  margin-top: var(--tt-space-1);
+  font-size: var(--tt-font-help);
+  color: var(--tt-error);
+}
+
+.tt-field__help {
+  display: block;
+  margin-top: var(--tt-space-1);
+  font-size: var(--tt-font-help);
+  color: var(--tt-text-muted);
+}
+
+/* --- Buttons (ui-spec.md 4) ---------------------------------------------- */
+
+.tt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tt-space-2);
+  min-height: var(--tt-control-height);
+  padding: 0 var(--tt-space-4);
+  font: inherit;
+  font-weight: 600;
+  border-radius: var(--tt-radius);
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.tt-btn--primary { background: var(--tt-green-primary); color: #fff; }
+.tt-btn--primary:hover:not(:disabled) { background: var(--tt-green-secondary); }
+
+.tt-btn--secondary {
+  background: var(--tt-surface);
+  color: var(--tt-green-primary);
+  border-color: var(--tt-green-primary);
+}
+
+.tt-btn--tertiary {
+  background: transparent;
+  color: var(--tt-green-secondary);
+  border-color: transparent;
+  padding: 0 var(--tt-space-2);
+}
+.tt-btn--tertiary:hover:not(:disabled) { text-decoration: underline; }
+
+.tt-btn--destructive {
+  background: var(--tt-surface);
+  color: var(--tt-error);
+  border-color: var(--tt-error);
+}
+
+.tt-btn:disabled,
+.tt-btn--disabled {
+  background: var(--tt-disabled-bg);
+  color: var(--tt-disabled-text);
+  border-color: var(--tt-border);
+  cursor: not-allowed;
+}
+
+/* Busy keeps the disabled appearance and adds a spinner. */
+.tt-btn--busy { cursor: progress; }
+
+.tt-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  display: inline-block;
+  animation: tt-spin .7s linear infinite;
+}
+
+@keyframes tt-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .tt-spinner { animation: none; }
+}
+
+/* Primary right, secondary left of it. Stacks on mobile (see breakpoints). */
+.tt-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tt-space-3);
+  margin-top: var(--tt-space-6);
+}
+
+/* --- Badges (ui-spec.md 5) ----------------------------------------------- */
+
+.tt-badge {
+  display: inline-block;
+  padding: 2px var(--tt-space-2);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+  border: 1px solid transparent;
+}
+
+.tt-badge--neutral { background: var(--tt-disabled-bg); color: var(--tt-text-muted); border-color: var(--tt-border); }
+.tt-badge--green   { background: var(--tt-green-pale); color: var(--tt-green-primary); border-color: var(--tt-green-pale); }
+.tt-badge--amber   { background: var(--tt-warning-bg); color: var(--tt-warning); border-color: var(--tt-warning-bg); }
+.tt-badge--red     { background: var(--tt-error-bg); color: var(--tt-error); border-color: var(--tt-error); }
+
+/* --- States (ui-spec.md 6) ----------------------------------------------- */
+
+.tt-state {
+  text-align: center;
+  padding: var(--tt-space-8) var(--tt-space-6);
+  color: var(--tt-text-muted);
+}
+
+.tt-state__icon { font-size: 32px; line-height: 1; margin-bottom: var(--tt-space-3); }
+.tt-state__title { font-size: var(--tt-font-h2); font-weight: 600; color: var(--tt-text); margin: 0 0 var(--tt-space-2); }
+.tt-state__body { margin: 0 0 var(--tt-space-4); }
+
+.tt-skeleton {
+  height: 16px;
+  border-radius: var(--tt-radius);
+  background: linear-gradient(90deg, var(--tt-disabled-bg), var(--tt-bg-page), var(--tt-disabled-bg));
+  background-size: 200% 100%;
+  animation: tt-shimmer 1.2s ease-in-out infinite;
+  margin-bottom: var(--tt-space-3);
+}
+
+@keyframes tt-shimmer { to { background-position: -200% 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .tt-skeleton { animation: none; }
+}
+
+/* Callouts. Each carries text and an icon, so meaning never rests on colour. */
+.tt-callout {
+  display: flex;
+  gap: var(--tt-space-3);
+  padding: var(--tt-space-3) var(--tt-space-4);
+  border: 1px solid;
+  border-radius: var(--tt-radius);
+  margin-bottom: var(--tt-space-4);
+}
+
+.tt-callout--error   { background: var(--tt-error-bg);   border-color: var(--tt-error);   color: var(--tt-error); }
+.tt-callout--warning { background: var(--tt-warning-bg); border-color: var(--tt-warning); color: var(--tt-warning); }
+.tt-callout--success { background: var(--tt-success-bg); border-color: var(--tt-success); color: var(--tt-success); }
+
+.tt-callout__title { font-weight: 700; }
+
+/* --- List primitives ------------------------------------------------------ */
+
+.tt-table { width: 100%; border-collapse: collapse; background: var(--tt-surface); }
+.tt-table th,
+.tt-table td { text-align: left; padding: var(--tt-space-3); border-bottom: 1px solid var(--tt-border); }
+.tt-table th { font-size: var(--tt-font-label); color: var(--tt-text-muted); font-weight: 600; }
+.tt-table tbody tr:hover { background: var(--tt-green-pale); }
+
+.tt-cards { display: none; }
+
+.tt-card-row {
+  background: var(--tt-surface);
+  border: 1px solid var(--tt-border);
+  border-radius: var(--tt-radius);
+  padding: var(--tt-space-4);
+  margin-bottom: var(--tt-space-3);
+}
+
+/* --- Application shell (ui-spec.md 7) ------------------------------------- */
+
+.tt-shell__header {
+  display: flex;
+  align-items: center;
+  gap: var(--tt-space-4);
+  min-height: 64px;
+  padding: 0 var(--tt-space-6);
+  background: var(--tt-green-primary);
+  color: #fff;
+}
+
+.tt-shell__brand { font-size: var(--tt-font-h2); font-weight: 700; }
+.tt-shell__nav { display: flex; gap: var(--tt-space-4); }
+
+.tt-shell__link {
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+  padding: var(--tt-space-2) 0;
+  /* Reserved so the active underline does not shift the row when it appears. */
+  border-bottom: 3px solid transparent;
+}
+
+.tt-shell__link:hover { border-bottom-color: var(--tt-green-pale); }
+
+/* Active page is marked by an underline AND aria-current, so the indication
+   never rests on colour alone. */
+.tt-shell__link--active { border-bottom-color: #fff; }
+
+/* The hamburger is hidden until the mobile breakpoint. */
+.tt-shell__menu-toggle { display: none; color: #fff; font-size: 20px; }
+
+/* Pushed to the right edge; the identity is the last thing on the bar. */
+.tt-shell__requester {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--tt-space-3);
+}
+
+.tt-shell__requester-name { font-weight: 600; }
+.tt-shell__change { color: #fff; text-decoration: underline; }
+
+.tt-shell__notice {
+  margin: 0;
+  padding: var(--tt-space-2) var(--tt-space-6);
+  background: var(--tt-warning-bg);
+  color: var(--tt-warning);
+  font-size: var(--tt-font-help);
+  text-align: center;
+}
+
+/* --- Requester Selection screen (ui-spec.md 8) ---------------------------- */
+
+.tt-selection {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tt-selection__card { width: 100%; max-width: 440px; }
+.tt-selection__card .tt-btn { width: 100%; }
+
+/* --- List toolbar and pagination (ui-spec.md 10.2) ------------------------ */
+
+.tt-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tt-space-3);
+  margin-bottom: var(--tt-space-4);
+}
+
+.tt-toolbar .tt-field__control { width: auto; min-width: 160px; }
+.tt-toolbar input[type="search"] { flex: 1 1 240px; }
+
+.tt-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tt-space-3);
+  margin-top: var(--tt-space-4);
+}
+
+.tt-card-row__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tt-space-2);
+  margin: 0 0 var(--tt-space-2);
+}
+
+/* --- Ticket Detail and attachments (ui-spec.md 11) ------------------------ */
+
+.tt-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.tt-detail__header {
+  display: flex;
+  align-items: center;
+  gap: var(--tt-space-3);
+  flex-wrap: wrap;
+}
+
+.tt-detail { display: grid; grid-template-columns: 200px 1fr; gap: var(--tt-space-2) var(--tt-space-4); }
+.tt-detail dt { font-weight: 600; color: var(--tt-text-muted); }
+.tt-detail dd { margin: 0; }
+.tt-detail__description { white-space: pre-wrap; }
+
+.tt-attachments__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tt-space-3);
+  flex-wrap: wrap;
+}
+
+.tt-attachments { list-style: none; margin: var(--tt-space-3) 0 0; padding: 0; }
+
+.tt-attachment {
+  display: flex;
+  align-items: center;
+  gap: var(--tt-space-3);
+  flex-wrap: wrap;
+  padding: var(--tt-space-3);
+  border: 1px solid var(--tt-border);
+  border-radius: var(--tt-radius);
+  margin-bottom: var(--tt-space-2);
+}
+
+.tt-attachment__name { font-weight: 600; word-break: break-all; }
+.tt-attachment__actions { margin-left: auto; display: flex; gap: var(--tt-space-2); }
+.tt-attachment__reason { margin-left: auto; }
+
+/* A removed row is visibly inert: struck through, greyed, and carrying no
+   control that could reach the file. */
+.tt-attachment--removed { background: var(--tt-disabled-bg); color: var(--tt-text-muted); }
+.tt-attachment--removed .tt-attachment__name { text-decoration: line-through; font-weight: 400; }
+
+.tt-attachment--invalid {
+  background: var(--tt-error-bg);
+  border-color: var(--tt-error);
+  color: var(--tt-error);
+}
+
+.tt-dialog {
+  position: fixed;
+  inset: 0;
+  background: rgba(28, 43, 36, .45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--tt-space-4);
+  z-index: 10;
+}
+
+.tt-dialog .tt-card { width: 100%; max-width: 480px; }
+
+/* Attachment picker on the Create Ticket form. */
+.tt-fieldset {
+  border: 1px solid var(--tt-border);
+  border-radius: var(--tt-radius);
+  padding: var(--tt-space-4);
+  margin: var(--tt-space-4) 0 0;
+}
+
+.tt-fieldset legend { padding: 0 var(--tt-space-2); }
+
+/* --- Responsive grid ------------------------------------------------------ */
+
+.tt-grid { display: grid; gap: var(--tt-space-4); }
+
+/* ===========================================================================
+   Breakpoints (ui-spec.md 13)
+   Desktop >= 992px  .  Tablet 768-991px  .  Mobile < 768px
+   =========================================================================== */
+
+/* Desktop — multi-column, content centred at max width. */
+@media (min-width: 992px) {
+  .tt-grid--3 { grid-template-columns: repeat(3, 1fr); }
+  .tt-grid--2 { grid-template-columns: repeat(2, 1fr); }
+  .tt-span-all { grid-column: 1 / -1; }
+}
+
+/* Tablet — two columns where practical. */
+@media (min-width: 768px) and (max-width: 991px) {
+  .tt-grid--3,
+  .tt-grid--2 { grid-template-columns: repeat(2, 1fr); }
+  .tt-span-all { grid-column: 1 / -1; }
+}
+
+/* Mobile — everything stacks, buttons stay touch-friendly, the table becomes
+   cards so the page never scrolls horizontally. */
+@media (max-width: 767px) {
+  .tt-page { padding: var(--tt-space-4); }
+  .tt-card { padding: var(--tt-space-4); }
+
+  .tt-grid--3,
+  .tt-grid--2 { grid-template-columns: 1fr; }
+
+  .tt-actions { flex-direction: column-reverse; }
+  .tt-actions .tt-btn { width: 100%; }
+
+  .tt-btn { min-height: 44px; }
+
+  .tt-table { display: none; }
+  .tt-cards { display: block; }
+
+  /* Toolbar and pagination stack so every control stays reachable and nothing
+     is pushed off the side of the screen. */
+  /* Navigation collapses behind the hamburger; the header keeps only the
+     wordmark and the toggle, so nothing is pushed off the side. */
+  .tt-shell__desktop-nav { display: none; }
+  .tt-shell__menu-toggle { display: inline-flex; margin-left: auto; }
+  .tt-shell__requester { width: 100%; order: 3; justify-content: flex-start; }
+
+  .tt-shell__header { flex-wrap: wrap; min-height: 56px; padding: var(--tt-space-2) var(--tt-space-4); }
+
+  .tt-shell__mobile-nav {
+    background: var(--tt-green-secondary);
+    padding: var(--tt-space-2) var(--tt-space-4);
+  }
+  .tt-shell__mobile-nav .tt-shell__nav { flex-direction: column; gap: 0; }
+  /* Touch-friendly rows rather than a cramped inline list. */
+  .tt-shell__mobile-nav .tt-shell__link {
+    display: block;
+    min-height: 44px;
+    line-height: 44px;
+    border-bottom: 1px solid rgba(255, 255, 255, .25);
+  }
+  .tt-shell__mobile-nav .tt-shell__link--active { background: rgba(255, 255, 255, .15); }
+
+  .tt-toolbar,
+  .tt-pagination { flex-direction: column; align-items: stretch; }
+
+  /* Attachment rows become stacked blocks with full-width actions, and long
+     filenames wrap rather than clipping. */
+  .tt-detail { grid-template-columns: 1fr; }
+  .tt-attachment { flex-direction: column; align-items: stretch; }
+  .tt-attachment__actions,
+  .tt-attachment__reason { margin-left: 0; }
+  .tt-attachment__actions .tt-btn { flex: 1; }
+  .tt-toolbar .tt-field__control,
+  .tt-pagination .tt-field__control { width: 100%; min-width: 0; }
+}
+
+/* Nothing may push the page sideways at any width. */
+html, body { overflow-x: hidden; }
