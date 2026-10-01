@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
 import request, { type Response } from "supertest";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
 import { hashPassword, verifyPassword } from "../../src/password.js";
 import { SESSION_COOKIE, hashSessionToken } from "../../src/session.js";
+import { resetLoginThrottle } from "../../src/loginThrottle.js";
 
 // Lab 3, Issue 3 — authentication API (API-01 to API-14 and API-67 in
 // docs/lab-03/tests.md). Needs the migrated database:
@@ -42,6 +43,12 @@ beforeAll(async () => {
     });
     ids[key] = user.id;
   }
+});
+
+// Several tests here fail a login on purpose. Without a reset, those failures
+// would add up across tests and one would lock out another's account (BR-67).
+beforeEach(() => {
+  resetLoginThrottle();
 });
 
 afterAll(async () => {
