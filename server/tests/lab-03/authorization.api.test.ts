@@ -4,6 +4,7 @@ import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
 import { hashPassword } from "../../src/password.js";
 import { resetLoginThrottle } from "../../src/loginThrottle.js";
+import { hashSessionToken } from "../../src/session.js";
 import { SEED_PASSWORD } from "../../prisma/seedData.js";
 
 // Lab 3, Issue 4 — authorization and safe errors (SEC-01 to SEC-04, SEC-06,
@@ -46,9 +47,15 @@ function call(method: string, path: string, cookie?: string) {
   return method === "GET" ? req : req.send({});
 }
 
+// Every session this suite creates, so afterAll removes exactly those and a
+// developer signed in to a seeded account in the browser stays signed in.
+const suiteSessions: string[] = [];
+
 function sessionCookie(res: Response): string {
   const cookies = res.headers["set-cookie"] as unknown as string[];
-  return cookies.find((c) => c.startsWith("tt_sid="))!.split(";")[0];
+  const cookie = cookies.find((c) => c.startsWith("tt_sid="))!.split(";")[0];
+  suiteSessions.push(cookie.slice("tt_sid=".length));
+  return cookie;
 }
 
 async function signIn(email: string, password = SEED_PASSWORD): Promise<string> {
@@ -120,9 +127,8 @@ beforeAll(async () => {
 afterAll(async () => {
   await prisma.ticket.deleteMany({ where: { id: { in: createdTicketIds } } });
   await prisma.user.delete({ where: { id: mustChangeUserId } });
-  // The suite's own sign-ins; the seeded accounts' passwords are untouched.
-  await prisma.session.deleteMany({ where: { userId: { in: [requesterA, requesterB] } } });
-  await prisma.session.deleteMany({ where: { user: { email: { in: ["nattapong.it@toktickit.local", "malee.admin@toktickit.local"] } } } });
+  // Only the suite's own sign-ins; any other session of a seeded account stays.
+  await prisma.session.deleteMany({ where: { tokenHash: { in: suiteSessions.map(hashSessionToken) } } });
   resetLoginThrottle();
   await prisma.$disconnect();
 });
@@ -254,7 +260,10 @@ describe("Requester ownership through the session (BR-03, BR-22)", () => {
 describe("no password material leaves the API (BR-52)", () => {
   it("SEC-10 keeps hashes and tokens out of every user-carrying response", async () => {
     const responses = [
-      await request(app).post("/api/auth/login").send({ email: "kanya.sris@kmutt.ac.th", password: SEED_PASSWORD }),
+      await request(app).post("/api/auth/login").send({ email: "kanya.sris@kmutt.ac.th", password: SEED_PASSWORD }).then((res) => {
+        sessionCookie(res);
+        return res;
+      }),
       await request(app).get("/api/auth/me").set("Cookie", cookies.staff),
       await request(app).get("/api/requesters"),
     ];
@@ -315,5 +324,49 @@ describe("one distinct answer per kind of failure (§6.2, AC-10)", () => {
       expect(res.body.error.code, label).toBe(code);
       expect(JSON.stringify(res.body), label).not.toMatch(/stack|prisma|SELECT|\\\\|node_modules/i);
     }
+  });
+});
+
+describe("failures that must not take the server down (§6.2, FR-47)", () => {
+  it("answers a safe 500 when the database fails on the Lab 2 header path, and keeps serving", async () => {
+    // Before the fix this rejection escaped every handler's try block, and
+    // Node ended the process: one request during a database blip took the API
+    // down for everyone.
+    // Patched by hand: Prisma's model delegates are proxies, and vi.spyOn's
+    // restore leaves findUnique broken for the rest of the run. Reassigning the
+    // original function restores it cleanly.
+    const delegate = prisma.user as unknown as Record<string, unknown>;
+    const original = delegate.findUnique;
+    delegate.findUnique = () =>
+      Promise.reject(new Error("P1001: Can't reach database server at db:5432 (SELECT * FROM \"User\") C:\app\server"));
+    try {
+      const res = await request(app).get("/api/tickets").set("X-Requester-Id", String(requesterA));
+      expect(res.status).toBe(500);
+      expect(res.body).toEqual({ error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." } });
+      expect(JSON.stringify(res.body)).not.toMatch(/P1001|SELECT|db:5432|\app|stack/i);
+    } finally {
+      delegate.findUnique = original;
+    }
+    expect((await request(app).get("/api/health")).status).toBe(200);
+    expect((await request(app).get("/api/tickets").set("X-Requester-Id", String(requesterA))).status).toBe(200);
+  });
+
+  it("keeps the client's own body mistakes as 4xx, not server errors", async () => {
+    const tooLarge = await request(app).post("/api/auth/login").set("Content-Type", "application/json")
+      .send(JSON.stringify({ email: "a@example.test", password: "x".repeat(200_000) }));
+    expect(tooLarge.status).toBe(413);
+    expect(tooLarge.body.error.code).toBe("REQUEST_TOO_LARGE");
+
+    const badCharset = await request(app).post("/api/auth/login").set("Content-Type", "application/json; charset=klingon")
+      .send(JSON.stringify({ email: "a@example.test", password: "x" }));
+    expect(badCharset.status).toBe(415);
+    expect(badCharset.body.error.code).toBe("UNSUPPORTED_MEDIA_TYPE");
+  });
+
+  it("checks the Origin before anything reads the body (api-spec §7 guard order)", async () => {
+    const res = await request(app).post("/api/auth/login").set("Origin", FOREIGN_ORIGIN)
+      .set("Content-Type", "application/json").send("{not json");
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe("FORBIDDEN");
   });
 });

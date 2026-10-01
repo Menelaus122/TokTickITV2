@@ -88,7 +88,7 @@ user: no stack traces, SQL, file paths, internal ids, or password material
 | `409` | conflict — duplicate email, already claimed, invalid transition, last Administrator, self-deactivation |
 | `410` | download of a soft-removed Attachment (Lab 2) |
 | `429` | sign-in refused because the email is locked after repeated failures (BR-67) |
-| `413` / `415` | attachment too large / unsupported type (Lab 2) |
+| `413` / `415` | attachment too large / unsupported type (Lab 2); a request body over the JSON limit / in an unsupported charset or encoding |
 | `500` | unexpected server error, no internal detail in the body |
 
 ### 1.4 Error codes
@@ -111,7 +111,9 @@ user: no stack traces, SQL, file paths, internal ids, or password material
 | `SELF_DEACTIVATION` | 409 | an Administrator targeted their own account (BR-48) |
 | `LAST_ADMINISTRATOR` | 409 | the change would leave zero active Administrators (BR-49) |
 | `TOO_MANY_ATTEMPTS` | 429 | five failed sign-ins for this email within 15 minutes; locked for 15 minutes (BR-67) |
-| `INTERNAL_ERROR` | 500 | unexpected failure |
+| `REQUEST_TOO_LARGE` | 413 | the request body is over the JSON body limit |
+| `UNSUPPORTED_MEDIA_TYPE` | 415 | the request body's charset or encoding is not supported |
+| `INTERNAL_ERROR` | 500 | unexpected failure, including a database that cannot be reached; the body carries no detail and the server keeps serving |
 
 Lab 2's `ATTACHMENT_*`, `FILE_TOO_LARGE`, and `UNSUPPORTED_FILE_TYPE` codes are
 unchanged. `REQUESTER_CONTEXT_REQUIRED`, `REQUESTER_INVALID`, and

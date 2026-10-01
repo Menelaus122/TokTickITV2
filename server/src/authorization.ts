@@ -63,7 +63,15 @@ export async function resolveRequesterIdentity(prisma: PrismaClient, req: Reques
     }
     return { ok: true, requesterId: req.auth.user.id };
   }
-  return resolveRequester(prisma, req.headers[REQUESTER_HEADER]);
+  // Every handler awaits this BEFORE its own try block, and Express 4 does not
+  // pass a rejected promise to the error handler: a database failure here used
+  // to become an unhandled rejection that ended the whole process. It is turned
+  // into an ordinary safe 500 instead, for this request only.
+  try {
+    return await resolveRequester(prisma, req.headers[REQUESTER_HEADER]);
+  } catch {
+    return { ok: false, status: 500, code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." };
+  }
 }
 
 // Unknown /api routes answer in the same error envelope as everything else,
@@ -72,17 +80,22 @@ export function apiNotFound(_req: Request, res: Response) {
   return res.status(404).json({ error: { code: "NOT_FOUND", message: "That resource does not exist." } });
 }
 
-// The last line of defence for safe errors (FR-47, §6.2). A body that is not
-// valid JSON is the client's mistake and gets a 400; anything else that
-// escaped a handler gets a 500 carrying no stack trace, SQL, or path.
+// The last line of defence for safe errors (FR-47, §6.2). The client's own
+// mistakes keep a 4xx: body-parser marks each one with a status — 400 for
+// malformed JSON, 413 for a body over its limit, 415 for an unsupported
+// charset or encoding. Anything else that escaped a handler is the server's
+// and gets a 500 carrying no stack trace, SQL, or path.
+const CLIENT_ERROR_CODES: Record<number, [string, string]> = {
+  413: ["REQUEST_TOO_LARGE", "The request body is too large."],
+  415: ["UNSUPPORTED_MEDIA_TYPE", "The request body's format is not supported."],
+};
+
 export function safeErrors(error: unknown, _req: Request, res: Response, next: NextFunction) {
   if (res.headersSent) return next(error);
-  const parseFailure =
-    typeof error === "object" && error !== null && (error as { type?: string }).type === "entity.parse.failed";
-  if (parseFailure) {
-    return res
-      .status(400)
-      .json({ error: { code: "VALIDATION_FAILED", message: "The request body is not valid JSON." } });
+  const status = typeof error === "object" && error !== null ? (error as { status?: unknown }).status : undefined;
+  if (typeof status === "number" && status >= 400 && status < 500) {
+    const [code, message] = CLIENT_ERROR_CODES[status] ?? ["VALIDATION_FAILED", "The request body is not valid JSON."];
+    return res.status(status).json({ error: { code, message } });
   }
   return res.status(500).json({ error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." } });
 }
