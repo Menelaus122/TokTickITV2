@@ -23,7 +23,7 @@ test.afterAll(() => {
 });
 
 test.describe("E2E-01 complete creation journey", () => {
-  test("select a Requester, create a Ticket, find it in My Tickets", async ({ page }) => {
+  test("sign in as a Requester, create a Ticket, find it in My Tickets", async ({ page }) => {
     await selectRequester(page, REQUESTER_A);
 
     const summary = `E2E creation ${Date.now()}`;
@@ -193,7 +193,7 @@ test.describe("E2E-03 attachment lifecycle", () => {
   });
 });
 
-test.describe("E2E-04 changing Requester", () => {
+test.describe("E2E-04 changing the signed-in Requester", () => {
   test("switching identity replaces the visible list", async ({ page }) => {
     await selectRequester(page, REQUESTER_A);
     const summary = `E2E switch ${Date.now()}`;
@@ -206,15 +206,15 @@ test.describe("E2E-04 changing Requester", () => {
 
     await switchRequester(page, REQUESTER_B);
 
-    await expect(page.getByTestId("current-requester")).toHaveText(REQUESTER_B);
+    await expect(page.getByTestId("current-user")).toHaveText(REQUESTER_B);
     await expect(page.getByText(summary)).toHaveCount(0);
   });
 
-  test("the selection survives a page reload", async ({ page }) => {
+  test("the session survives a page reload", async ({ page }) => {
     await selectRequester(page, REQUESTER_A);
     await page.reload();
 
-    await expect(page.getByTestId("current-requester")).toHaveText(REQUESTER_A);
+    await expect(page.getByTestId("current-user")).toHaveText(REQUESTER_A);
   });
 });
 test.describe("E2E-05 attaching while creating the ticket", () => {

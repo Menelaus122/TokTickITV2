@@ -198,14 +198,14 @@ Principles carried over from Lab 2:
 
 | ID | AC | File | What it tests | Issue | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| UI-01 | AC-01 | `Login.test.tsx` | required-field validation, busy and disabled submit, one request per submission | 5 | Planned |
-| UI-02 | AC-04 | `Login.test.tsx` | invalid credentials render one generic message; both fields keep their values | 5 | Planned |
-| UI-03 | AC-03 | `Login.test.tsx` | inactive-account message distinct and safe | 5 | Planned |
-| UI-04 | AC-38 | `Login.test.tsx` | API failure shows the callout and a Try again action | 5 | Planned |
-| UI-05 | AC-02 | `ChangePassword.test.tsx` | rules text, mismatch, too short, too long, success path | 5 | Planned |
-| UI-06 | AC-02 | `ChangePassword.test.tsx` | mandatory mode renders without the shell and blocks navigation away | 5 | Planned |
-| UI-07 | AC-09 | `RoleNavigation.test.tsx` | each role sees only its own destinations; an unauthorized route shows the forbidden state | 5 | Planned |
-| UI-08 | AC-05 | `RoleNavigation.test.tsx` | shell shows name and Role badge, and Logout clears the session | 5 | Planned |
+| UI-01 | AC-01 | `Login.test.tsx` | required-field validation, busy and disabled submit, one request per submission | 5 | Pass |
+| UI-02 | AC-04 | `Login.test.tsx` | invalid credentials render one generic message; both fields keep their values | 5 | Pass |
+| UI-03 | AC-03 | `Login.test.tsx` | inactive-account message distinct and safe | 5 | Pass |
+| UI-04 | AC-38 | `Login.test.tsx` | API failure shows the callout and a Try again action | 5 | Pass |
+| UI-05 | AC-02 | `ChangePassword.test.tsx` | rules text, mismatch, too short, too long, success path | 5 | Pass |
+| UI-06 | AC-02 | `ChangePassword.test.tsx` | mandatory mode renders without the shell and blocks navigation away | 5 | Pass |
+| UI-07 | AC-09 | `RoleNavigation.test.tsx` | each role sees only its own destinations; an unauthorized route shows the forbidden state | 5 | Pass |
+| UI-08 | AC-05 | `RoleNavigation.test.tsx` | shell shows name and Role badge, and Logout clears the session | 5 | Pass |
 | UI-09 | AC-12 | `RequesterRegression.test.tsx` | no selector, no Change Requester control anywhere | 6 | Planned |
 | UI-10 | AC-15 | `RequesterComments.test.tsx` | comment composer validation, appears-resolved panel, undo, and the "only IT Staff can resolve" helper text | 7 | Planned |
 | UI-11 | AC-17 | `RequesterComments.test.tsx` | no Internal Notes region and no element hinting at one | 7 | Planned |
@@ -425,4 +425,5 @@ from memory.
 | Actions Taken | Deferred to Lab 4, so no test covers resolution being blocked by incomplete Actions Taken. |
 | Concurrency | API-41 covers the claim race with two sequential requests plus a conditional update; true parallel load is not tested. |
 | Accessibility | Checked by assertions on roles, labels, and focus order plus the manual checklist; no automated axe audit runs in Lab 3. |
+| Lab 2 selector suite | `client/tests/lab-02/RequesterContext.test.tsx` tested only the Development Requester selection flow, which Issue 5 removed from the application. It was deleted in Issue 5; UI-07 and UI-08 cover the shell and navigation that replaced it, and `Navigation.test.tsx` now starts from a signed-in Requester. |
 | Login throttling | The 15-minute lock and window are tested with an explicit clock (UNIT-11, UNIT-12) rather than by waiting. The counter is in memory (D-24), so the API tests cannot observe a lock surviving a restart, because it does not. |
