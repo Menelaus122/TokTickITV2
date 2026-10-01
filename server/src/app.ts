@@ -31,9 +31,13 @@ app.set("etag", false);
 // Lab 3 — the session lives in a cookie, and a browser only sends a cookie on a
 // cross-origin request when the API names the origin and allows credentials;
 // the wildcard Lab 2 used cannot be combined with credentials. The client runs
-// on Vite's port by default; CLIENT_ORIGINS (comma-separated) adds others, such
-// as an E2E stack on non-default ports.
-const CLIENT_ORIGINS = (process.env.CLIENT_ORIGINS ?? "http://localhost:5173,http://127.0.0.1:5173")
+// on Vite's port by default; CLIENT_ORIGINS (comma-separated) replaces the
+// default, for example for an E2E stack on non-default ports.
+//
+// Only localhost by default: a page on 127.0.0.1 calling the API on localhost
+// is cross-site, so the SameSite=Lax cookie would never be sent and sign-in
+// would silently fail even though CORS let the request through.
+const CLIENT_ORIGINS = (process.env.CLIENT_ORIGINS ?? "http://localhost:5173")
   .split(",")
   .map((origin) => origin.trim())
   .filter((origin) => origin.length > 0);

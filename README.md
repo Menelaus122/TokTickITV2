@@ -167,7 +167,10 @@ carries no session cookie.
 The browser client runs on another port, so the API names the allowed origins
 instead of answering `*`; a cookie is never sent to a wildcard. The default is
 Vite's `http://localhost:5173`. Set `CLIENT_ORIGINS` (comma-separated) in
-`server/.env` to allow others, such as an E2E stack on different ports.
+`server/.env` to replace it, for example for an E2E stack on different ports.
+Open the app on the same host name the API uses — `localhost` for both, or
+`127.0.0.1` for both. Across the two, the browser treats the request as
+cross-site and never sends the session cookie, so sign-in fails.
 
 ### Lab 2 endpoints
 

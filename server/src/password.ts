@@ -32,12 +32,15 @@ export async function verifyPassword(password: string, hash: string | null): Pro
 // against — an unknown email, or a migrated account with no password yet — it
 // still runs one bcrypt comparison, so the response time does not reveal which
 // emails exist (BR-16).
-let dummyHash: string | null = null;
+//
+// The dummy hash is started when the module loads, not on the first unknown
+// email: built lazily, that first request would do two bcrypt operations and
+// stand out by its timing.
+const dummyHash: Promise<string> = bcrypt.hash("toktickit-timing-equaliser", BCRYPT_COST);
 
 export async function verifyPasswordForLogin(password: string, hash: string | null): Promise<boolean> {
   if (hash === null) {
-    dummyHash ??= await bcrypt.hash("toktickit-timing-equaliser", BCRYPT_COST);
-    await bcrypt.compare(password, dummyHash);
+    await bcrypt.compare(password, await dummyHash);
     return false;
   }
   return bcrypt.compare(password, hash);
