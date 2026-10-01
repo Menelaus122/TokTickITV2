@@ -337,7 +337,7 @@ implemented, not even partially:
 | ID | Rule |
 | :--- | :--- |
 | BR-60 | The Lab 2 `RequesterUser` table is **evolved** into `User`, not replaced: the table is renamed and columns are added, so every existing row keeps its id and every `Ticket.requesterId` stays valid. |
-| BR-61 | Each migrated Requester becomes a `REQUESTER` user with `mustChangePassword` set. The SQL migration leaves `passwordHash` **null** — SQL cannot compute a bcrypt hash and a hash literal has no business being in a migration file — and the seed assigns the documented local-development initial password from §7.5 to every user who has none. Until the seed runs, those accounts simply cannot log in (BR-66). |
+| BR-61 | Each migrated Requester becomes a `REQUESTER` user with `mustChangePassword` set and `passwordHash` **null** — SQL cannot compute a bcrypt hash and a hash literal has no business being in a migration file (D-22). Until a password is assigned, those accounts cannot log in (BR-66). That is the state the migration guarantees, and it is the safe state for any real migrated account. The local-development seed then converges the four migrated Requesters to the documented dev state in §7.5: the documented password and the flag **cleared**, so they serve as ordinary Requester test accounts. |
 | BR-62 | Existing Tickets keep their Requester, their Ticket Number, their Requested Priority, their `NEW` status, and all attachment rows and files. |
 | BR-63 | `Ticket.itPriority` is backfilled from `Ticket.requestedPriority` for every existing row, so no ticket exists without an IT Priority. |
 | BR-64 | Every Lab 1 and Lab 2 test keeps passing. Lab 2 Requester tests are updated only where they must log in instead of sending `X-Requester-Id`; their assertions about behaviour do not change. |
@@ -435,6 +435,8 @@ Enums:
 | D-09 | Verify the password before reporting an inactive account | the labsheet wants a clear message for inactive accounts; revealing it only after correct credentials keeps that clarity without turning login into an account-enumeration oracle (BR-08). |
 | D-10 | `bcryptjs` at cost 10 rather than native `bcrypt` or `argon2` | pure JavaScript, so the suite runs on Windows without a native toolchain; cost 10 keeps the test suite usable and is documented as a local-lab setting. |
 | D-11 | Administrator excluded from IT Staff ticket operations | labsheet §4.3 keeps the responsibilities conceptually separate and only grants more if the matrix says so; a narrower matrix is also easier to prove in tests. |
+| D-21 | The table and enum renames are written as hand-edited SQL after `prisma migrate dev --create-only`, not left to Prisma | Prisma Migrate has no rename detection; left alone it emits `DROP` + `CREATE`, which would delete every Requester and orphan every Ticket. The generated SQL is read before it is applied, every time. |
+| D-22 | `User.passwordHash` is nullable and filled by the seed, not by the migration | SQL cannot compute a bcrypt hash, and embedding a hash literal in a migration puts a credential in version control. The cost is an intermediate state where migrated accounts cannot log in, which BR-66 makes explicit and safe. |
 
 ### 7.5 Seed data
 
@@ -452,10 +454,20 @@ additive to Lab 2's categories and related systems.
 | Public Comments / Internal Notes | several | no sensitive content |
 
 Seeded credentials are **local development only** and are documented in
-`README.md`: every seeded account uses the password `Toktickit#2026` except one
-`first.login@toktickit.local` account seeded with `mustChangePassword` set, which
-exists so the mandatory-change path can be tested end to end. No real personal
-password or production secret is committed.
+`README.md`. Every documented account — the four migrated Lab 2 Requesters
+included — has the password `Toktickit#2026` and `mustChangePassword` cleared.
+Exactly one account, `first.login@toktickit.local`, has the same password with
+`mustChangePassword` **set**, so the mandatory-change path can be tested end to
+end without disturbing the accounts every other test logs in with.
+
+The seed **converges** rather than only inserting: every run puts each documented
+account back into the state above, password and flag included. A demo, a
+screenshot session, or E2E-02 that changes `first.login`'s password is therefore
+undone by re-running the seed, and the documented password always works after
+seeding. Accounts that are not in the documented list — for example users created
+through User Management while testing — are left untouched.
+
+No real personal password or production secret is committed.
 
 ### 7.6 Migration plan
 
@@ -488,8 +500,9 @@ with it. The rename is therefore performed by hand-edited SQL (D-21):
    once no row is null. `passwordHash` stays nullable permanently; the seed fills
    it (BR-61).
 5. Create `Session`, `PublicComment`, and `InternalNote`.
-6. Run `npm run prisma:seed`, which assigns the documented initial password to
-   every user without one and adds the Lab 3 accounts from §7.5.
+6. Run `npm run prisma:seed`, which adds the Lab 3 accounts from §7.5 and
+   converges every documented account, the four migrated Requesters included, to
+   its documented password and `mustChangePassword` value.
 7. Verify with the migration/regression tests in `tests.md`: ticket count,
    attachment count, and requester bindings are identical before and after, and
    every ticket has an IT Priority.
@@ -661,6 +674,10 @@ Every criterion is observable and maps to at least one planned test in
 
 ## 11. Assumptions and Decisions
 
+Design decisions with a separate reason column — D-01 to D-11, D-21, and D-22 —
+live in §7.4. This table holds the remaining assumptions and decisions, each
+with its reason in the same cell.
+
 | ID | Assumption or decision |
 | :--- | :--- |
 | D-12 | Session lifetime is 8 hours with no sliding renewal. A lab session is shorter than that, and a fixed window is one fewer moving part to test. |
@@ -672,6 +689,4 @@ Every criterion is observable and maps to at least one planned test in
 | D-18 | The queue's ownership filter offers `any`, `unassigned`, and `me` plus a specific owner, because "what is nobody holding" and "what am I holding" are the two questions an IT Staff member actually opens the queue to answer. |
 | D-19 | Deactivating a user keeps their ticket ownership (BR-26). Reassignment is an explicit IT Staff decision, not a side effect of an account change. |
 | D-20 | Lab 4 will add Actions Taken and the rule that blocks resolution until they are complete. `RESOLVED` therefore requires only a reason in Lab 3, and the reason is already a Public Comment so Lab 4 can add its own gate without changing the comment thread. |
-| D-21 | The table and enum renames are written as hand-edited SQL after `prisma migrate dev --create-only`, not left to Prisma | Prisma Migrate has no rename detection; left alone it emits `DROP` + `CREATE`, which would delete every Requester and orphan every Ticket. The generated SQL is read before it is applied, every time. |
-| D-22 | `User.passwordHash` is nullable and filled by the seed, not by the migration | SQL cannot compute a bcrypt hash, and embedding a hash literal in a migration puts a credential in version control. The cost is an intermediate state where migrated accounts cannot log in, which BR-66 makes explicit and safe. |
-| D-23 | BR-04's "Internal Notes are visible to Administrators" is satisfied at the **API level only**; Lab 3 ships no Administrator ticket screen | An Administrator has no queue, no ticket detail screen, and no ticket list (BR-19, ui-spec §2), so there is no route by which they reach a ticket in the UI. The permission exists for Lab 4, when an Administrator may get a read-only ticket view. Tests assert it through the API with a known ticket id, and no UI test looks for a screen that does not exist. |
+| D-23 | BR-04's "Internal Notes are visible to Administrators" is satisfied at the **API level only**; Lab 3 ships no Administrator ticket screen. An Administrator has no queue, no ticket detail screen, and no ticket list (BR-19, ui-spec §2), so there is no route by which they reach a ticket in the UI. The permission exists for Lab 4, when an Administrator may get a read-only ticket view. Tests assert it through the API with a known ticket id, and no UI test looks for a screen that does not exist. |

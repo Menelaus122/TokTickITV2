@@ -174,12 +174,13 @@ Principles carried over from Lab 2:
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | MIG-01 | AC-35 | ticket count, attachment count, and requester bindings before and after migrating | identical (BR-62) | 2 | Planned |
 | MIG-02 | AC-35 | `itPriority` on every pre-existing ticket | equals `requestedPriority` (BR-63) | 2 | Planned |
-| MIG-03 | AC-35 | migrated Requesters | role `REQUESTER`, `mustChangePassword` true, a usable hash (BR-61) | 2 | Planned |
+| MIG-03 | AC-35 | migrated Requesters immediately after the migration, before the seed | role `REQUESTER`, `mustChangePassword` true, `passwordHash` null (BR-61, D-22) | 2 | Planned |
 | MIG-04 | AC-35 | ids preserved across the rename | every `Ticket.requesterId` still resolves (BR-60) | 2 | Planned |
 | MIG-05 | AC-36 | Lab 1 and Lab 2 suites after migration | all pass (BR-64) | 6 | Planned |
 | MIG-06 | BR-61 | seed run twice | no duplicate users or tickets (labsheet §5.3) | 2 | Planned |
 | MIG-07 | §7.5 | seed account counts | ≥ 4 active Requesters + 1 inactive, ≥ 3 active IT Staff + 1 inactive, ≥ 2 active Administrators | 2 | Planned |
-| MIG-08 | D-22 | migrated Requester after the migration but before the seed, then after it | `passwordHash` null and login refused; after seeding, the documented initial password works and forces a change (BR-61, BR-66) | 2 | Planned |
+| MIG-08 | D-22 | migrated Requester after the migration but before the seed, then after it | before: `passwordHash` null and login refused (BR-66); after: the documented password works with no forced change, and `first.login@toktickit.local` is the only seeded account that must change (BR-61, §7.5) | 2 | Planned |
+| MIG-09 | §7.5 | change a documented account's password and set its flag, then re-run the seed | the documented password works again and the flag is back to its documented value; an account created through User Management is untouched | 2 | Planned |
 
 ### 2.10 UI component — `client/tests/lab-03/`
 
@@ -302,7 +303,7 @@ alone.
 
 | Issue | Tests |
 | :--- | :--- |
-| 2 — User model, migration, seed | MIG-01 – MIG-04, MIG-06 – MIG-08 |
+| 2 — User model, migration, seed | MIG-01 – MIG-04, MIG-06 – MIG-09 |
 | 3 — Authentication API | UNIT-01 – UNIT-05, API-01 – API-14, API-67 |
 | 4 — Authorization | SEC-01 – SEC-04, SEC-06, SEC-07, SEC-09 – SEC-11 |
 | 5 — Login and shell | UI-01 – UI-08 |
