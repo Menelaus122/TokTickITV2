@@ -1,7 +1,7 @@
 # Lab 3 — Sprint Engineering Specification
 
 **Project:** TokTickIT · **Sprint:** Lab 3 — Users, Roles, IT Staff Ticketing, and Admin Screens
-**Status:** Draft — under review in PR #46; flipped to "Approved before implementation" when that PR merges · **Owner:** Menelaus122
+**Status:** Approved before implementation — approved by @WirachatTH in [PR #46](https://github.com/Menelaus122/TokTickITV2/pull/46) on 2026-10-01 and merged into `lab3-staging` as `76b06a0`, before any implementation PR · **Owner:** Menelaus122
 
 > This document is the engineering contract for Sprint 3. Implementation may not
 > begin on a feature branch until the section covering it is approved here, and
