@@ -280,18 +280,26 @@ Screenshots are written to `artifacts/lab-02/screenshots/`. Point the suite at a
 stack on non-default ports with `E2E_BASE_URL` and `E2E_API_URL`.
 
 The E2E suite creates tickets it cannot delete — Lab 2 exposes no delete
-endpoint by design. Reset afterwards with:
+endpoint by design. Note the highest ticket id **before** the run, then delete
+only what came after it:
 
 ```bash
-docker exec toktickit-db psql -U toktickit -d toktickit -c 'DELETE FROM "Ticket";'
+docker exec toktickit-db psql -U toktickit -d toktickit -c 'SELECT max(id) FROM "Ticket";'   # before the run, e.g. 2351
+# ... run the E2E suite ...
+docker exec toktickit-db psql -U toktickit -d toktickit -c 'DELETE FROM "Ticket" WHERE id > 2351;'
 ```
 
-> This deletes **every** ticket, including any you created by hand in the
-> running app. The suite prints the ids it created, but that line is printed
-> before the responsive spec has finished creating its own, so it is not the
-> full list. To keep tickets of your own, delete by id range instead and remove
-> the matching files from `/app/uploads` in the server container — the cascade
-> clears the `Attachment` rows but not the uploaded files.
+> **Since Lab 3, never run `DELETE FROM "Ticket";`.** Lab 2's instructions used
+> it when the suite's tickets were the only ones in the database. The database
+> now also holds the tickets migrated from Lab 2 and the 16 sample tickets the
+> seed creates, and a blanket delete removes all of them. Re-running the seed
+> brings the sample tickets back; only a backup brings back the migrated ones.
+>
+> The suite prints the ids it created, but that line is printed before the
+> responsive spec has finished creating its own, so it is not the full list,
+> which is why the reset uses the id noted before the run. The cascade clears the
+> `Attachment` rows but not the uploaded files; remove those from `/app/uploads`
+> in the server container.
 
 ### Everything
 

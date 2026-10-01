@@ -172,8 +172,10 @@ export const TICKETS: SeedTicket[] = [
     summary: "Registrar printer toner is empty",
     description: "The registrar office printer reports an empty toner cartridge and prints blank pages.",
     // Owned by an Administrator: assignable, though not an operator (BR-20).
+    // The resolution itself is an IT Staff action (BR-32), so IT Staff write
+    // the reason comment (BR-36).
     requestedPriority: "MEDIUM", itPriority: "MEDIUM", status: "RESOLVED", owner: "malee", daysAgo: 9,
-    comments: [{ author: "malee", body: "Resolved: toner replaced and a test page printed.", hoursAfter: 3 }],
+    comments: [{ author: "siriporn", body: "Resolved: toner replaced and a test page printed.", hoursAfter: 3 }],
   },
   {
     requester: "pornchai", category: "Network", system: "Campus Wi-Fi",
@@ -238,18 +240,26 @@ export interface SeedSummary {
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
 
+// When the Requester's "appears resolved" signal lands, in hours after creation.
+const RESOLVED_SIGNAL_HOURS = 26;
+
+const sameTime = (a: Date | null, b: Date | null) => (a === null || b === null ? a === b : a.getTime() === b.getTime());
+
+// Converging rows are only WRITTEN when they have drifted. An unconditional
+// update would bump @updatedAt on every run, so a second run would not end in
+// the same database and every sample row would look "just updated".
 async function convergeAccount(prisma: PrismaClient, account: SeedAccount): Promise<number> {
   const existing = await prisma.user.findUnique({
     where: { email: account.email },
-    select: { id: true, passwordHash: true },
+    select: { id: true, fullName: true, department: true, role: true, isActive: true, mustChangePassword: true, passwordHash: true },
   });
 
-  // Keep the stored hash when it already matches, so a second run leaves the
-  // row byte-identical; rehash only when the password has drifted.
+  // Keep the stored hash when it already matches; bcrypt salts every hash, so
+  // rehashing an unchanged password would itself be a change.
   const hashMatches = existing !== null && (await verifyPassword(SEED_PASSWORD, existing.passwordHash));
   const passwordHash = hashMatches ? existing.passwordHash! : await hashPassword(SEED_PASSWORD);
 
-  const data = {
+  const desired = {
     fullName: account.fullName,
     department: account.department,
     role: account.role,
@@ -258,20 +268,30 @@ async function convergeAccount(prisma: PrismaClient, account: SeedAccount): Prom
     passwordHash,
   };
 
-  const user = await prisma.user.upsert({
-    where: { email: account.email },
-    update: data,
-    create: { email: account.email, ...data },
-    select: { id: true },
-  });
+  if (existing === null) {
+    const created = await prisma.user.create({ data: { email: account.email, ...desired }, select: { id: true } });
+    return created.id;
+  }
+
+  const drifted =
+    !hashMatches ||
+    existing.fullName !== desired.fullName ||
+    existing.department !== desired.department ||
+    existing.role !== desired.role ||
+    existing.isActive !== desired.isActive ||
+    existing.mustChangePassword !== desired.mustChangePassword;
+
+  if (drifted) {
+    await prisma.user.update({ where: { id: existing.id }, data: desired });
+  }
 
   // A reset password must not leave an old session alive (as BR-47 does for an
   // Administrator's reset).
-  if (existing !== null && !hashMatches) {
-    await prisma.session.deleteMany({ where: { userId: user.id } });
+  if (!hashMatches) {
+    await prisma.session.deleteMany({ where: { userId: existing.id } });
   }
 
-  return user.id;
+  return existing.id;
 }
 
 async function convergeTicket(
@@ -282,7 +302,22 @@ async function convergeTicket(
   systemIds: Map<string, number>,
 ): Promise<void> {
   const requesterId = userIds.get(seed.requester)!;
-  const createdAt = new Date(Date.now() - seed.daysAgo * DAY);
+
+  // A seeded ticket is identified by its Requester and summary, which are
+  // unique within this file. Its Ticket Number comes from the real generator,
+  // so seeded tickets look exactly like ones raised through the app.
+  const existing = await prisma.ticket.findFirst({
+    where: { requesterId, summary: seed.summary },
+    select: {
+      id: true, createdAt: true, categoryId: true, relatedSystemId: true, description: true,
+      requestedPriority: true, itPriority: true, currentStatus: true, ownerId: true, requesterResolvedAt: true,
+    },
+  });
+
+  // Every timestamp hangs off the ticket's own createdAt — the stored one once
+  // it exists — so re-running the seed never moves a ticket's timeline.
+  const createdAt = existing?.createdAt ?? new Date(Date.now() - seed.daysAgo * DAY);
+  const at = (hours: number) => new Date(createdAt.getTime() + hours * HOUR);
 
   const fields = {
     categoryId: categoryIds.get(seed.category)!,
@@ -292,35 +327,48 @@ async function convergeTicket(
     itPriority: seed.itPriority,
     currentStatus: seed.status,
     ownerId: seed.owner === null ? null : userIds.get(seed.owner)!,
-    requesterResolvedAt: seed.requesterSaysResolved ? new Date(createdAt.getTime() + 26 * HOUR) : null,
+    requesterResolvedAt: seed.requesterSaysResolved ? at(RESOLVED_SIGNAL_HOURS) : null,
   };
 
-  // A seeded ticket is identified by its Requester and summary, which are
-  // unique within this file. Its Ticket Number comes from the real generator,
-  // so seeded tickets look exactly like ones raised through the app.
-  const existing = await prisma.ticket.findFirst({
-    where: { requesterId, summary: seed.summary },
-    select: { id: true, createdAt: true },
-  });
+  // "Last Updated" is the ticket's last seeded activity, not the moment the
+  // seed ran, so the queue's Last Updated column reads like real history.
+  const lastActivityHours = Math.max(
+    0,
+    ...(seed.comments ?? []).map((c) => c.hoursAfter),
+    ...(seed.notes ?? []).map((n) => n.hoursAfter),
+    seed.requesterSaysResolved ? RESOLVED_SIGNAL_HOURS : 0,
+  );
+  const updatedAt = at(lastActivityHours);
 
   let ticketId: number;
-  let ticketCreatedAt: Date;
 
   if (existing) {
-    await prisma.ticket.update({ where: { id: existing.id }, data: fields });
     ticketId = existing.id;
-    ticketCreatedAt = existing.createdAt;
+    const drifted =
+      existing.categoryId !== fields.categoryId ||
+      existing.relatedSystemId !== fields.relatedSystemId ||
+      existing.description !== fields.description ||
+      existing.requestedPriority !== fields.requestedPriority ||
+      existing.itPriority !== fields.itPriority ||
+      existing.currentStatus !== fields.currentStatus ||
+      existing.ownerId !== fields.ownerId ||
+      !sameTime(existing.requesterResolvedAt, fields.requesterResolvedAt);
+    // Untouched rows stay untouched, updatedAt included.
+    if (drifted) {
+      await prisma.ticket.update({ where: { id: existing.id }, data: { ...fields, updatedAt } });
+    }
   } else {
     const ticket = await prisma.$transaction(async (tx) => {
       const ticketNumber = await nextTicketNumber(tx, new Date().getFullYear());
       return tx.ticket.create({
-        data: { ticketNumber, requesterId, summary: seed.summary, createdAt, ...fields },
-        select: { id: true, createdAt: true },
+        data: { ticketNumber, requesterId, summary: seed.summary, createdAt, updatedAt, ...fields },
+        select: { id: true },
       });
     });
     ticketId = ticket.id;
-    ticketCreatedAt = ticket.createdAt;
   }
+
+  const ticketCreatedAt = createdAt;
 
   // Comments and notes are append-only (BR-42), so the seed only adds the ones
   // that are missing and never removes anything a demo added.

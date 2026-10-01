@@ -31,6 +31,14 @@ ALTER TYPE "RequestedPriority" RENAME TO "Priority";
 -- because every "active Requester" query now filters by role as well.
 DROP INDEX "RequesterUser_isActive_idx";
 
+-- BR-45 — emails are stored lowercased and compared case-insensitively. Lab 2
+-- never normalised them, and User_email_key is case-sensitive, so a migrated
+-- "Name@Example.com" would sit beside a later "name@example.com". If two Lab 2
+-- emails differ only by case or surrounding spaces, this UPDATE violates
+-- User_email_key and the whole migration rolls back rather than merging two
+-- accounts silently. New rows are normalised by the API (Issues 3 and 10).
+UPDATE "User" SET "email" = lower(trim("email"));
+
 
 -- ---------------------------------------------------------------------------
 -- 2. New enums and widened status (BR-17, BR-31)

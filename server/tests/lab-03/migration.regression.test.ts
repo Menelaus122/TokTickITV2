@@ -131,7 +131,7 @@ describe("the migration", () => {
       await run(`INSERT INTO "RelatedSystem" ("name") VALUES ('Printer'), ('VPN')`);
       await run(`INSERT INTO "RequesterUser" ("fullName", "email", "department", "isActive", "updatedAt") VALUES
         ('Requester One', 'one@example.test', 'Library', true, now()),
-        ('Requester Two', 'two@example.test', NULL, true, now()),
+        ('Requester Two', '  Two.Mixed@Example.TEST ', NULL, true, now()),
         ('Requester Three', 'three@example.test', 'Finance', false, now())`);
       await run(`INSERT INTO "Ticket" ("ticketNumber", "requesterId", "categoryId", "relatedSystemId",
           "summary", "description", "requestedPriority", "updatedAt") VALUES
@@ -229,8 +229,9 @@ describe("the migration", () => {
   });
 
   it("MIG-03 turns each Lab 2 Requester into a locked REQUESTER user", () => {
+    // Emails are compared normalised here; MIG-12 checks the normalisation.
     expect(after.users.map(({ id, email, fullName, department, isActive }) => ({ id, email, fullName, department, isActive })))
-      .toEqual(before.requesters);
+      .toEqual(before.requesters.map((r) => ({ ...r, email: r.email.trim().toLowerCase() })));
     for (const user of after.users) {
       expect(user.role).toBe("REQUESTER");
       expect(user.mustChangePassword).toBe(true);
@@ -265,6 +266,14 @@ describe("the migration", () => {
     ]);
   });
 
+  it("MIG-12 lowercases and trims every migrated email (BR-45)", () => {
+    const mixed = before.requesters.find((r) => r.email !== r.email.trim().toLowerCase());
+    // The fixture really does contain a mixed-case, padded email.
+    expect(mixed).toBeDefined();
+    expect(after.users.find((u) => u.id === mixed!.id)!.email).toBe("two.mixed@example.test");
+    for (const user of after.users) expect(user.email).toBe(user.email.trim().toLowerCase());
+  });
+
   it("MIG-08 a migrated account cannot authenticate before the seed runs", async () => {
     // The login endpoint arrives in Issue 3 and is covered there by API-67; this
     // asserts the primitive it relies on, against the real migrated state.
@@ -290,25 +299,25 @@ describe("the seed", () => {
     await prisma.$disconnect();
   });
 
+  // Whole rows, timestamps included. Comparing only a few columns once hid the
+  // seed rewriting updatedAt on every run.
   async function snapshot() {
     return {
       users: await prisma.user.findMany({ orderBy: { id: "asc" } }),
-      tickets: await prisma.ticket.findMany({ orderBy: { id: "asc" }, select: { id: true, ticketNumber: true, currentStatus: true, ownerId: true, itPriority: true } }),
-      comments: await prisma.publicComment.count(),
-      notes: await prisma.internalNote.count(),
+      tickets: await prisma.ticket.findMany({ orderBy: { id: "asc" } }),
+      comments: await prisma.publicComment.findMany({ orderBy: { id: "asc" } }),
+      notes: await prisma.internalNote.findMany({ orderBy: { id: "asc" } }),
+      sessions: await prisma.session.findMany({ orderBy: { id: "asc" } }),
     };
   }
 
-  it("MIG-06 runs twice and ends in the same database", async () => {
+  it("MIG-06 runs twice and ends in the same database, every column included", async () => {
     await runSeed(prisma);
     const first = await snapshot();
     await runSeed(prisma);
     const second = await snapshot();
 
-    expect(second.users.map(({ updatedAt, ...rest }) => rest)).toEqual(first.users.map(({ updatedAt, ...rest }) => rest));
-    expect(second.tickets).toEqual(first.tickets);
-    expect(second.comments).toBe(first.comments);
-    expect(second.notes).toBe(first.notes);
+    expect(second).toEqual(first);
   });
 
   it("MIG-07 provides the accounts and tickets §7.5 requires", async () => {
@@ -333,6 +342,21 @@ describe("the seed", () => {
     expect(seeded.some((t) => t.ownerId !== null)).toBe(true);
     expect(await prisma.publicComment.count()).toBeGreaterThan(0);
     expect(await prisma.internalNote.count()).toBeGreaterThan(0);
+  });
+
+  it("MIG-07 gives seeded tickets a believable timeline rather than the moment the seed ran", async () => {
+    const seeded = await prisma.ticket.findMany({
+      where: { OR: TICKETS.map((t) => ({ summary: t.summary })) },
+      select: { createdAt: true, updatedAt: true, requesterResolvedAt: true },
+    });
+    const now = Date.now();
+    for (const t of seeded) {
+      expect(t.updatedAt.getTime()).toBeGreaterThanOrEqual(t.createdAt.getTime());
+      expect(t.updatedAt.getTime()).toBeLessThan(now);
+      if (t.requesterResolvedAt) expect(t.requesterResolvedAt.getTime()).toBeLessThan(now);
+    }
+    // Spread across days, so a Last Updated sort means something.
+    expect(new Set(seeded.map((t) => t.updatedAt.toISOString())).size).toBe(seeded.length);
   });
 
   it("seeds resolved, closed, cancelled, and reopened tickets the way BR-35 to BR-37 would leave them", async () => {

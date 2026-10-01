@@ -491,7 +491,10 @@ with it. The rename is therefore performed by hand-edited SQL (D-21):
    `REQUESTER`, `mustChangePassword` with default `true`, and `lastLoginAt`
    nullable. Every column either is nullable or has a default, because the table
    already holds rows and a `NOT NULL` column without a default would abort the
-   migration.
+   migration. In the same step, every migrated email becomes `lower(trim(email))`
+   (BR-45): Lab 2 never normalised them and the unique index is case-sensitive.
+   Two Lab 2 emails that differ only by case would collide here and abort the
+   migration, which is the intended outcome rather than a silent merge.
 3. Widen `TicketStatus` with `ALTER TYPE ... ADD VALUE`, then add
    `Ticket.ownerId` nullable, `Ticket.itPriority` nullable for now, and
    `Ticket.requesterResolvedAt` nullable.

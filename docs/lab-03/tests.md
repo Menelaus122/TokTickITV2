@@ -177,12 +177,13 @@ Principles carried over from Lab 2:
 | MIG-03 | AC-35 | migrated Requesters immediately after the migration, before the seed | role `REQUESTER`, `mustChangePassword` true, `passwordHash` null (BR-61, D-22) | 2 | Planned |
 | MIG-04 | AC-35 | ids preserved across the rename | every `Ticket.requesterId` still resolves (BR-60) | 2 | Planned |
 | MIG-05 | AC-36 | Lab 1 and Lab 2 suites after migration | all pass (BR-64) | 6 | Planned |
-| MIG-06 | BR-61 | seed run twice | no duplicate users or tickets (labsheet §5.3) | 2 | Planned |
-| MIG-07 | §7.5 | seed account counts | ≥ 4 active Requesters + 1 inactive, ≥ 3 active IT Staff + 1 inactive, ≥ 2 active Administrators | 2 | Planned |
+| MIG-06 | BR-61 | seed run twice | the database is identical after the second run, every column of users, tickets, comments, notes, and sessions included — timestamps too, so no row is rewritten when nothing drifted (labsheet §5.3) | 2 | Planned |
+| MIG-07 | §7.5 | seed account counts, ticket spread, and timeline | ≥ 4 active Requesters + 1 inactive, ≥ 3 active IT Staff + 1 inactive, ≥ 2 active Administrators; tickets in all 8 statuses and 4 priorities; each seeded ticket's Last Updated follows its own seeded history and is never the moment the seed ran | 2 | Planned |
 | MIG-08 | D-22 | migrated Requester after the migration but before the seed, then after it | before: `passwordHash` null, so the documented password cannot verify (BR-66) — the login endpoint's own answer is API-67 in Issue 3; after: the documented password works with no forced change, and `first.login@toktickit.local` is the only seeded account that must change (BR-61, §7.5) | 2 | Planned |
 | MIG-09 | §7.5 | change a documented account's password and set its flag, then re-run the seed | the documented password works again and the flag is back to its documented value; an account created through User Management is untouched | 2 | Planned |
 | MIG-10 | BR-28 | create a ticket through the Lab 2 endpoint after the migration | `itPriority` equals `requestedPriority` and the ticket is unassigned | 2 | Planned |
 | MIG-11 | BR-03 | send an IT Staff id as `X-Requester-Id`, and read the Lab 2 selector, while the header still exists | refused as `REQUESTER_INVALID`, exactly like an unknown id; the selector lists Requesters only | 2 | Planned |
+| MIG-12 | BR-45 | migrate a Lab 2 Requester whose email has capitals and surrounding spaces | stored as `lower(trim(email))`, and every migrated email is lowercase | 2 | Planned |
 
 ### 2.10 UI component — `client/tests/lab-03/`
 
@@ -295,7 +296,7 @@ alone.
 | AC-32 | API-62, UI-23 |
 | AC-33 | API-63, UI-24, E2E-09 |
 | AC-34 | API-64, UI-25, E2E-08 |
-| AC-35 | MIG-01 – MIG-04, MIG-08, MIG-11 |
+| AC-35 | MIG-01 – MIG-04, MIG-08, MIG-11, MIG-12 |
 | AC-36 | MIG-05 |
 | AC-37 | RESP-01 – RESP-06, STYLE-01, STYLE-03, STYLE-04, STYLE-05 |
 | AC-38 | UI-04, UI-14, STYLE-06 |
@@ -305,7 +306,7 @@ alone.
 
 | Issue | Tests |
 | :--- | :--- |
-| 2 — User model, migration, seed | MIG-01 – MIG-04, MIG-06 – MIG-11 |
+| 2 — User model, migration, seed | MIG-01 – MIG-04, MIG-06 – MIG-12 |
 | 3 — Authentication API | UNIT-01 – UNIT-05, API-01 – API-14, API-67 |
 | 4 — Authorization | SEC-01 – SEC-04, SEC-06, SEC-07, SEC-09 – SEC-11 |
 | 5 — Login and shell | UI-01 – UI-08 |
