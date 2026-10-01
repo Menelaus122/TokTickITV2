@@ -621,3 +621,6 @@ html, body { overflow-x: hidden; }
 @media (min-width: 768px) {
   .tt-shell__mobile-nav .tt-shell__user { display: none; }
 }
+
+/* A failed Logout is said out loud under the header (FR-06). */
+.tt-shell__alert { margin: var(--tt-space-3) var(--tt-space-6) 0; }

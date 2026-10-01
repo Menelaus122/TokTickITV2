@@ -31,15 +31,31 @@ export interface ChangePasswordProps {
   onChange: (change: PasswordChange) => Promise<void>;
   /** Where to go once a mandatory change succeeds. */
   onDone?: () => void;
+  /** The mandatory screen's way out for someone who signed in to the wrong account. */
+  onSignOut?: () => Promise<void>;
 }
 
-export function ChangePassword({ email, mandatory, onChange, onDone }: ChangePasswordProps) {
+export function ChangePassword({ email, mandatory, onChange, onDone, onSignOut }: ChangePasswordProps) {
   const [values, setValues] = useState<PasswordChange>({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [errors, setErrors] = useState<Errors>({});
   const [problem, setProblem] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
+
+  async function signOut() {
+    if (!onSignOut) return;
+    setSigningOut(true);
+    setProblem(null);
+    try {
+      await onSignOut();
+    } catch {
+      setProblem("Could not sign out. Please try again.");
+    } finally {
+      setSigningOut(false);
+    }
+  }
 
   // A mandatory redirect moves focus to the heading, so a screen-reader user is
   // told where they are and why instead of being relocated silently (ui-spec §10).
@@ -103,17 +119,25 @@ export function ChangePassword({ email, mandatory, onChange, onDone }: ChangePas
           <div>{problem}</div>
         </div>
       )}
+      {/* The rules are stated before the fields, not tucked under one of them
+          where a validation message would hide them (ui-spec §4). */}
+      <p className="tt-field__help">{PASSWORD_RULES}</p>
       <form onSubmit={submit} noValidate>
         <TextInput label="Current password" type="password" name="currentPassword" autoComplete="current-password" required
           value={values.currentPassword} onChange={set("currentPassword")} error={errors.currentPassword} />
         <TextInput label="New password" type="password" name="newPassword" autoComplete="new-password" required
-          help={PASSWORD_RULES} value={values.newPassword} onChange={set("newPassword")} error={errors.newPassword} />
+          value={values.newPassword} onChange={set("newPassword")} error={errors.newPassword} />
         <TextInput label="Confirm new password" type="password" name="confirmPassword" autoComplete="new-password" required
           value={values.confirmPassword} onChange={set("confirmPassword")} error={errors.confirmPassword} />
         <Button type="submit" variant="primary" busy={busy} busyLabel="Saving…">
           Save password
         </Button>
       </form>
+      {mandatory && onSignOut && (
+        <Button variant="tertiary" onClick={() => void signOut()} busy={signingOut} busyLabel="Logging out…">
+          Logout
+        </Button>
+      )}
     </Card>
   );
 

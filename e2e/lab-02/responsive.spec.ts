@@ -155,7 +155,7 @@ test.describe("RESP-03 screenshots for the visual checklist", () => {
     }
   });
 
-  test("capture the selection screen and the states that matter", async ({ page }) => {
+  test("capture the states that matter", async ({ page }) => {
     // The Requester Selection screenshots are Lab 2 evidence of a screen Lab 3
     // removed; they are not retaken. Lab 3's Login is captured by e2e/lab-03.
 

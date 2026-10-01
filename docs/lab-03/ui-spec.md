@@ -164,8 +164,9 @@ the shell.
 | :--- | :--- |
 | Validation | Beneath each field: too short, too long, mismatch, same as the email, same as the current password |
 | Wrong current password | Error callout, fields retained except the current-password field, which is cleared |
-| Success | Success callout "Password updated", then straight to the role's landing page |
+| Success | On the mandatory path, straight to the role's landing page. On the voluntary path, the success callout "Password updated" and the user stays on the page they chose to open |
 | Blocked navigation | On the mandatory path, every other route redirects here (AC-02) |
+| Logout | On the mandatory path only, a tertiary Logout under the form, for someone who signed in to an account they do not mean to finish setting up. A failed logout keeps them signed in and says so |
 
 ---
 

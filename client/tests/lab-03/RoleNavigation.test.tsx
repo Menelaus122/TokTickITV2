@@ -103,6 +103,28 @@ describe("UI-08 the shell shows who is signed in, and Logout ends it", () => {
     expect(screen.queryByLabelText(/^Ticket Summary/)).not.toBeInTheDocument();
   });
 
+  it("keeps the user signed in, and says so, when the logout request fails (FR-06)", async () => {
+    // The HttpOnly cookie can only be ended by the server. If that request
+    // fails, the session is still alive, and the screen must not pretend.
+    signedInAs("REQUESTER");
+    const logout = vi.spyOn(api, "logout").mockRejectedValueOnce(new TypeError("Failed to fetch")).mockResolvedValueOnce(undefined);
+    render(<TokTickITApp initialEntries={["/tickets"]} />);
+
+    const banner = await screen.findByRole("banner");
+    await userEvent.click(within(banner).getByRole("button", { name: "Logout" }));
+
+    expect(await screen.findByText("Could not sign out. Please try again.")).toBeInTheDocument();
+    expect(screen.getByTestId("current-user")).toHaveTextContent("Anucha Wongsawat");
+    expect(screen.queryByRole("button", { name: "Sign in" })).not.toBeInTheDocument();
+    const retry = within(banner).getByRole("button", { name: "Logout" });
+    expect(retry).toBeEnabled();
+
+    // Trying again succeeds and only then leaves.
+    await userEvent.click(retry);
+    expect(await screen.findByRole("button", { name: "Sign in" })).toBeInTheDocument();
+    expect(logout).toHaveBeenCalledTimes(2);
+  });
+
   it("returns to the page asked for after signing in", async () => {
     vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(null);
     vi.spyOn(api, "login").mockResolvedValue(USERS.REQUESTER);

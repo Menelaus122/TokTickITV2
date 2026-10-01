@@ -22,16 +22,23 @@ async function fill(current: string, next: string, confirm = next) {
 }
 
 describe("UI-05 the rules, field by field", () => {
-  it("states the rules above the user's input", () => {
+  it("states the rules above the fields, where a validation message cannot hide them", async () => {
     render(<ChangePassword email={EMAIL} mandatory={false} onChange={vi.fn()} />);
-    expect(screen.getByText(PASSWORD_RULES)).toBeInTheDocument();
+    const rules = screen.getByText(PASSWORD_RULES);
+    const firstField = screen.getByLabelText(/^Current password/);
+    // DOCUMENT_POSITION_FOLLOWING: the first field comes after the rules.
+    expect(rules.compareDocumentPosition(firstField) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    // Still visible with every field in error.
+    await userEvent.click(screen.getByRole("button", { name: "Save password" }));
+    expect(screen.getByText(PASSWORD_RULES)).toBeVisible();
   });
 
   it.each([
     ["too short", "Toktickit#2026", "short-7", undefined, /^New password/, /at least 8/],
     ["too long", "Toktickit#2026", "a".repeat(73), undefined, /^New password/, /at most 72/],
     ["over 72 bytes in Thai", "Toktickit#2026", "ก".repeat(25), undefined, /^New password/, /too long/],
-    ["equal to the email", "Toktickit#2026", EMAIL, undefined, /^New password/, /email/],
+    ["equal to the email", "Toktickit#2026", EMAIL, undefined, /^New password/, /^Password must not be your email/],
     ["equal to the current one", "Toktickit#2026", "Toktickit#2026", undefined, /^New password/, /different/],
     ["a mismatched confirmation", "Toktickit#2026", "Brand-new-horse-9", "Brand-new-horse-8", /^Confirm new password/, /do not match/],
   ])("rejects %s beneath its field and sends nothing", async (_label, current, next, confirm, field, message) => {
@@ -98,6 +105,16 @@ describe("UI-06 a mandatory change blocks the application (BR-02)", () => {
     render(<TokTickITApp initialEntries={["/tickets"]} />);
     const heading = await screen.findByRole("heading", { name: "Change password" });
     expect(heading).toHaveFocus();
+  });
+
+  it("offers Logout, for someone who signed in to the wrong account", async () => {
+    const logout = vi.spyOn(api, "logout").mockResolvedValue(undefined);
+    render(<TokTickITApp initialEntries={["/tickets"]} />);
+    await screen.findByText("Set your own password before continuing.");
+
+    await userEvent.click(screen.getByRole("button", { name: "Logout" }));
+    expect(logout).toHaveBeenCalledTimes(1);
+    expect(await screen.findByRole("button", { name: "Sign in" })).toBeInTheDocument();
   });
 
   it("lets the user into the application once the password is saved", async () => {

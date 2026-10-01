@@ -31,6 +31,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const menuId = useId();
   const [menuOpen, setMenuOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
 
   // Navigating closes the mobile menu, otherwise it stays open over the screen
   // the user just asked for.
@@ -58,11 +59,15 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   async function handleSignOut() {
     setSigningOut(true);
+    setSignOutError(null);
     try {
       await signOut();
+      navigate(ROUTES.login, { replace: true });
+    } catch {
+      // Still signed in, and saying so; the button is enabled again to retry.
+      setSignOutError("Could not sign out. Please try again.");
     } finally {
       setSigningOut(false);
-      navigate(ROUTES.login, { replace: true });
     }
   }
 
@@ -110,6 +115,13 @@ export function AppShell({ children }: { children: ReactNode }) {
           ☰
         </button>
       </header>
+
+      {signOutError && (
+        <div className="tt-callout tt-callout--error tt-shell__alert" role="alert">
+          <span aria-hidden="true">⚠</span>
+          <div>{signOutError}</div>
+        </div>
+      )}
 
       {menuOpen && (
         <div className="tt-shell__mobile-nav" id={menuId}>

@@ -15,6 +15,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   /** Signs in; throws api.ApiError on refusal so the screen can show why. */
   signIn: (email: string, password: string) => Promise<AuthUser>;
+  /** Throws when the server did not end the session; the user stays signed in. */
   signOut: () => Promise<void>;
   changePassword: (change: PasswordChange) => Promise<void>;
   /** Asks the API again, e.g. after "Try again" on an unavailable API. */
@@ -66,15 +67,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return signedIn;
   }, []);
 
+  // Only a logout the server confirmed signs the user out here. The session
+  // cookie is HttpOnly, so the client cannot remove it itself: if the request
+  // fails, the session is still alive, and pretending otherwise would leave
+  // someone on a shared computer believing they had signed out (FR-06).
   const signOut = useCallback(async () => {
-    try {
-      await api.logout();
-    } finally {
-      // Whatever the server said, this browser no longer treats anyone as
-      // signed in; the next protected request would be refused anyway.
-      setUser(null);
-      setStatus("anonymous");
-    }
+    await api.logout();
+    setUser(null);
+    setStatus("anonymous");
   }, []);
 
   const changePassword = useCallback(async (change: PasswordChange) => {

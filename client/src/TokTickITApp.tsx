@@ -70,7 +70,8 @@ function RequireAuth({ roles, children }: { roles: Role[]; children: ReactNode }
   if (status === "unavailable") return <Unavailable />;
   if (!user) {
     // `state.from` carries the page asked for, so sign-in can return to it.
-    return <Navigate to={ROUTES.login} replace state={{ from: location.pathname }} />;
+    // The query string travels too, so a filtered list survives the detour.
+    return <Navigate to={ROUTES.login} replace state={{ from: location.pathname + location.search }} />;
   }
   if (user.mustChangePassword) return <Navigate to={ROUTES.password} replace />;
   if (!roles.includes(user.role)) {
@@ -130,7 +131,7 @@ function LoginRoute() {
 }
 
 function PasswordRoute() {
-  const { status, user, changePassword } = useAuth();
+  const { status, user, changePassword, signOut } = useAuth();
   const navigate = useNavigate();
 
   if (status === "loading") return <Loading />;
@@ -144,6 +145,10 @@ function PasswordRoute() {
         mandatory
         onChange={changePassword}
         onDone={() => navigate(LANDING[user.role], { replace: true })}
+        onSignOut={async () => {
+          await signOut();
+          navigate(ROUTES.login, { replace: true });
+        }}
       />
     );
   }
