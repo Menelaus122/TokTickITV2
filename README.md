@@ -144,6 +144,36 @@ Every requester-scoped endpoint requires the current Development Requester in an
 string, and a ticket or attachment belonging to another Requester returns `404` —
 the same answer as one that does not exist, so the API never discloses it.
 
+### Authentication (Lab 3)
+
+Signing in sets an `HttpOnly`, `SameSite=Lax` cookie named `tt_sid` that lasts 8
+hours. The server keeps only a SHA-256 of it, so logging out deletes the session
+for real. There is no signing secret to configure. The full contract is in
+[`docs/lab-03/api-spec.md`](docs/lab-03/api-spec.md) §2.
+
+| Method | Endpoint | Session | Description |
+|--------|----------|:--:|-------------|
+| POST | `/api/auth/login` | — | Sign in with email and password; sets the session cookie |
+| POST | `/api/auth/logout` | optional | End the session; harmless without one |
+| GET | `/api/auth/me` | ✔ | The signed-in user |
+| POST | `/api/auth/password` | ✔ | Change the password (8–72 characters, at most 72 bytes) |
+
+While an account must change its password, its session can reach only these
+four endpoints and `/api/health`; everything else answers
+`403 PASSWORD_CHANGE_REQUIRED`. Until Issues 4 and 6 move the Lab 2 endpoints
+below onto the session, they still work exactly as in Lab 2 for a request that
+carries no session cookie.
+
+The browser client runs on another port, so the API names the allowed origins
+instead of answering `*`; a cookie is never sent to a wildcard. The default is
+Vite's `http://localhost:5173`. Set `CLIENT_ORIGINS` (comma-separated) in
+`server/.env` to replace it, for example for an E2E stack on different ports.
+Open the app on the same host name the API uses — `localhost` for both, or
+`127.0.0.1` for both. Across the two, the browser treats the request as
+cross-site and never sends the session cookie, so sign-in fails.
+
+### Lab 2 endpoints
+
 | Method | Endpoint | Requester context | Description |
 |--------|----------|:--:|-------------|
 | GET | `/api/health` | — | Backend health/liveness check |

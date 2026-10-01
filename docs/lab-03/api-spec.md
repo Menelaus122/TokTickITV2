@@ -208,6 +208,15 @@ Any session, permitted even while `mustChangePassword` is set (BR-14).
 **401 `AUTH_REQUIRED`** when there is no cookie, the token is unknown, or the
 session has expired.
 
+### 2.3a While a password change is required
+
+A session whose user has `mustChangePassword` set reaches only `GET /api/auth/me`,
+`POST /api/auth/password`, and `POST /api/auth/logout`. Every other request it
+makes is answered `403 PASSWORD_CHANGE_REQUIRED` before any handler runs (BR-14).
+`POST /api/auth/login` and `GET /api/health` stay reachable because they are
+public and do not act through the session; logging in as someone else simply
+replaces it.
+
 ### 2.4 `POST /api/auth/password`
 
 Any session, permitted while `mustChangePassword` is set.
@@ -225,7 +234,7 @@ session alive, and deletes every other session for that user (BR-15, AC-06).
 
 | Condition | Response |
 | :--- | :--- |
-| `newPassword` shorter than 8 or longer than 72 characters | `400 VALIDATION_FAILED` on `newPassword` (BR-07) |
+| `newPassword` shorter than 8 or longer than 72 characters, or longer than 72 bytes in UTF-8 | `400 VALIDATION_FAILED` on `newPassword` (BR-07) |
 | `newPassword` equal to the user's email | `400 VALIDATION_FAILED` on `newPassword` |
 | `confirmPassword` different | `400 VALIDATION_FAILED` on `confirmPassword` |
 | `currentPassword` wrong | `401 INVALID_CREDENTIALS` |

@@ -212,14 +212,14 @@ implemented, not even partially:
 | ID | Rule |
 | :--- | :--- |
 | BR-06 | Passwords are stored only as a `bcrypt` hash. No plaintext password is ever written to the database, a log, or a response. |
-| BR-07 | A password must be 8–72 characters and must not equal the user's email. The upper bound is bcrypt's own input limit, made explicit so a silently truncated password is impossible. |
+| BR-07 | A password must be 8–72 characters, at most 72 bytes in UTF-8, and must not equal the user's email. The byte limit is bcrypt's own input limit, made explicit so a silently truncated password is impossible: bcrypt reads 72 **bytes**, and a Thai character takes three, so a 25-character Thai password already exceeds it. Characters are counted as code points, and passwords are never trimmed. |
 | BR-08 | Login verifies the password **before** considering activation state, so a wrong password and a disabled account cannot be told apart by someone guessing passwords. Only a caller who proved the password learns that the account is inactive. |
 | BR-09 | A session is a server-side row. The browser receives an opaque 32-byte random token in an `HttpOnly`, `SameSite=Lax`, `Path=/` cookie named `tt_sid`, marked `Secure` outside local development. |
 | BR-10 | The database stores only the SHA-256 hash of the session token, so a leaked database cannot be replayed as a live session. |
 | BR-11 | A session expires 8 hours after it is created. An expired session is treated exactly as no session at all. |
 | BR-12 | Logout deletes the session row. The same cookie can never be used again, which is what makes logout a real invalidation rather than a client-side gesture. |
 | BR-13 | Session identity is read from the cookie only. No endpoint accepts a user id, role, or session token in a body, query string, or custom header. |
-| BR-14 | While `mustChangePassword` is set, the only endpoints the session may call are current-user, change-password, and logout. Everything else returns a password-change-required error. |
+| BR-14 | While `mustChangePassword` is set, the only endpoints the session may call are current-user, change-password, and logout. The public endpoints — login and the health check — also stay reachable, because they do not act through the session; logging in as someone else simply replaces it. Everything else returns a password-change-required error. |
 | BR-15 | Changing a password clears `mustChangePassword` and deletes every **other** session for that user, so a stolen session cannot outlive the password it was created with. |
 | BR-16 | Login failures return one generic message for both an unknown email and a wrong password, so the API never reveals which emails exist. |
 | BR-65 | Every state-changing request (anything other than `GET`) that carries an `Origin` header must carry the configured client origin, or it is refused. This is the second CSRF control alongside `SameSite=Lax`, and it is needed because the attachment-upload endpoint accepts `multipart/form-data`, which a cross-site HTML form can produce (D-13). |

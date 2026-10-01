@@ -1,6 +1,8 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import { getPrisma } from "./prisma.js";
+import { attachSession, authRouter, enforcePasswordChange } from "./auth.js";
 import { resolveRequester, REQUESTER_HEADER } from "./requesterContext.js";
 import { validateTicketInput } from "./validation.js";
 import { nextTicketNumber } from "./ticketNumber.js";
@@ -26,8 +28,30 @@ export const app = express();
 // in the way (a browser reload of /api/health should be a clean 200, not 304).
 app.set("etag", false);
 
-app.use(cors());          // already wired: lets the Vite dev server call this API
+// Lab 3 — the session lives in a cookie, and a browser only sends a cookie on a
+// cross-origin request when the API names the origin and allows credentials;
+// the wildcard Lab 2 used cannot be combined with credentials. The client runs
+// on Vite's port by default; CLIENT_ORIGINS (comma-separated) replaces the
+// default, for example for an E2E stack on non-default ports.
+//
+// Only localhost by default: a page on 127.0.0.1 calling the API on localhost
+// is cross-site, so the SameSite=Lax cookie would never be sent and sign-in
+// would silently fail even though CORS let the request through.
+const CLIENT_ORIGINS = (process.env.CLIENT_ORIGINS ?? "http://localhost:5173")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter((origin) => origin.length > 0);
+
+app.use(cors({ origin: CLIENT_ORIGINS, credentials: true }));
 app.use(express.json());
+app.use(cookieParser());
+
+// Lab 3, Issue 3 — who is asking (docs/lab-03/api-spec.md §1.1, §2). The order
+// matters: the session is resolved first, then BR-14 decides whether this
+// session may reach anything other than the auth endpoints.
+app.use(attachSession);
+app.use(enforcePasswordChange);
+app.use("/api/auth", authRouter);
 
 // ---------------------------------------------------------------------------
 // Issue 2 — API health check
