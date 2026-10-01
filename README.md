@@ -160,7 +160,14 @@ for real. There is no signing secret to configure. The full contract is in
 
 While an account must change its password, its session can reach only these
 four endpoints and `/api/health`; everything else answers
-`403 PASSWORD_CHANGE_REQUIRED`. Until Issues 4 and 6 move the Lab 2 endpoints
+`403 PASSWORD_CHANGE_REQUIRED`.
+
+Five failed sign-ins for one email within 15 minutes lock that email for 15
+minutes: every attempt, the correct password included, answers
+`429 TOO_MANY_ATTEMPTS` with a `Retry-After` header. Emails with no account are
+locked the same way, so a lock reveals nothing. The counter lives in the server's
+memory, so **restarting the server clears every lock**, which is also the quickest
+way out if you lock yourself out while testing. Until Issues 4 and 6 move the Lab 2 endpoints
 below onto the session, they still work exactly as in Lab 2 for a request that
 carries no session cookie.
 

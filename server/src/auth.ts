@@ -1,5 +1,6 @@
 import express, { type NextFunction, type Request, type Response } from "express";
 import { getPrisma } from "./prisma.js";
+import { loginThrottle } from "./loginThrottle.js";
 import { checkNewPassword, hashPassword, verifyPasswordForLogin } from "./password.js";
 import {
   SESSION_COOKIE,
@@ -113,9 +114,32 @@ authRouter.post("/login", async (req: Request, res: Response) => {
   else if (!EMAIL_PATTERN.test(email)) fields.email = "Enter a valid email address.";
   if (password === "") fields.password = "Enter your password.";
   if (Object.keys(fields).length > 0) {
+    // A malformed request is not a guess at a password, so it is not counted.
     return sendError(res, 400, "VALIDATION_FAILED", "One or more fields are invalid.", fields);
   }
 
+  // BR-67 — reserve this attempt BEFORE the first await. A locked email, or one
+  // whose failures plus attempts already in flight reach the limit, is refused
+  // here, the right password included; otherwise a burst of simultaneous
+  // guesses would all pass the check before any was counted. The reservation
+  // never touches the database, so a refused unknown email and a refused real
+  // one are answered identically.
+  const attempt = loginThrottle.beginAttempt(email, Date.now());
+  if (!attempt.allowed) {
+    const minutes = Math.ceil(attempt.retryAfterSeconds / 60);
+    res.set("Retry-After", String(attempt.retryAfterSeconds));
+    return sendError(
+      res,
+      429,
+      "TOO_MANY_ATTEMPTS",
+      `Too many sign-in attempts. Try again in ${minutes} ${minutes === 1 ? "minute" : "minutes"}.`,
+    );
+  }
+
+  // Every reserved attempt reports exactly one outcome, in the finally block:
+  // a failure counts, a success clears, and anything else (an inactive
+  // account's correct password, a server error) just gives the slot back.
+  let outcome: "failure" | "success" | "neutral" = "neutral";
   try {
     const prisma = getPrisma();
     const user = await prisma.user.findUnique({
@@ -127,11 +151,17 @@ authRouter.post("/login", async (req: Request, res: Response) => {
     // so only someone who already knows it can learn the account is inactive.
     const passwordMatches = await verifyPasswordForLogin(password, user?.passwordHash ?? null);
     if (!user || !passwordMatches) {
+      // Counted the same whether or not the email exists (BR-16, BR-67).
+      outcome = "failure";
       return sendError(res, 401, "INVALID_CREDENTIALS", INVALID_CREDENTIALS);
     }
+    // The right password for an inactive account is not a failed guess, so it
+    // is not counted either.
     if (!user.isActive) {
       return sendError(res, 403, "ACCOUNT_INACTIVE", "This account is not active. Contact an administrator.");
     }
+
+    outcome = "success";
 
     // One browser holds one session: a login replaces whatever it held before.
     const previous = sessionToken(req);
@@ -145,6 +175,8 @@ authRouter.post("/login", async (req: Request, res: Response) => {
     return res.status(201).json({ user: permitted });
   } catch {
     return sendError(res, 500, "INTERNAL_ERROR", "Sign-in failed. Please try again.");
+  } finally {
+    loginThrottle.endAttempt(email, outcome, Date.now());
   }
 });
 

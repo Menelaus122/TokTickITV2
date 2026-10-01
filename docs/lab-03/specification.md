@@ -111,6 +111,7 @@ implemented, not even partially:
 | FR-05 | The API exposes the current authenticated user, so a page reload restores the session without asking for credentials again. |
 | FR-06 | Logout ends the session server-side; afterwards every protected endpoint and every protected route refuses access. |
 | FR-07 | An attempt to open a protected route without a session redirects to Login; an attempt to call a protected endpoint without a session returns an unauthenticated error. |
+| FR-49 | Repeated failed sign-ins for one email lock that email out for a period, as BR-67 sets out, and the Login screen says how long to wait. *(Added by Issue 13, which closed a labsheet §4.4 gap found while reviewing Issue 3.)* |
 
 ### 4.2 Authorization
 
@@ -224,6 +225,7 @@ implemented, not even partially:
 | BR-16 | Login failures return one generic message for both an unknown email and a wrong password, so the API never reveals which emails exist. |
 | BR-65 | Every state-changing request (anything other than `GET`) that carries an `Origin` header must carry the configured client origin, or it is refused. This is the second CSRF control alongside `SameSite=Lax`, and it is needed because the attachment-upload endpoint accepts `multipart/form-data`, which a cross-site HTML form can produce (D-13). |
 | BR-66 | A user whose `passwordHash` is null cannot authenticate; login answers exactly as it does for a wrong password. The migration leaves the column null until the seed fills it (BR-61), and this rule makes that intermediate state a locked door rather than an open one. |
+| BR-67 | **Login attempts.** Failed sign-ins are counted per email, normalised as BR-45 does, and never per IP address. Five failures for one email within 15 minutes lock that email for 15 minutes from the fifth failure. While it is locked, every sign-in for that email, **the correct password included**, is refused with `429 TOO_MANY_ATTEMPTS` and a `Retry-After` header, and no session is created; letting the correct password through would leave guessing unlimited. An email that matches no account is counted and locked in exactly the same way, so a lock never reveals whether an account exists (BR-16). A successful sign-in clears the email's count. A malformed request (a `400` validation error) and the correct password for an inactive account are not failed guesses and are not counted. The lock expires on its own; there is no unlock action, since account unlocking is excluded from Lab 3 (§3.2). The limit holds for **concurrent** attempts too: an attempt is reserved before its password is checked, and one is refused when the email's failures plus the attempts still being checked reach five, so a burst of simultaneous guesses gets no more tries than five sequential ones. |
 
 ### 5.3 Roles and authorization
 
@@ -572,6 +574,7 @@ Every criterion is observable and maps to at least one planned test in
 | AC-04 | Given an unknown email or a wrong password, when login is attempted, then the message is identical in both cases. |
 | AC-05 | Given a logged-in session, when the user logs out, then the same cookie is refused by every protected endpoint afterwards. |
 | AC-06 | Given a changed password, when the user's other sessions are used, then they are refused. |
+| AC-40 | Given five failed sign-ins for one email within 15 minutes, when anyone signs in with that email, then it is refused with `429` for the next 15 minutes even with the correct password, and the answer is identical whether or not the email belongs to an account. |
 
 ### 9.2 Authorization
 
@@ -693,3 +696,4 @@ with its reason in the same cell.
 | D-19 | Deactivating a user keeps their ticket ownership (BR-26). Reassignment is an explicit IT Staff decision, not a side effect of an account change. |
 | D-20 | Lab 4 will add Actions Taken and the rule that blocks resolution until they are complete. `RESOLVED` therefore requires only a reason in Lab 3, and the reason is already a Public Comment so Lab 4 can add its own gate without changing the comment thread. |
 | D-23 | BR-04's "Internal Notes are visible to Administrators" is satisfied at the **API level only**; Lab 3 ships no Administrator ticket screen. An Administrator has no queue, no ticket detail screen, and no ticket list (BR-19, ui-spec §2), so there is no route by which they reach a ticket in the UI. The permission exists for Lab 4, when an Administrator may get a read-only ticket view. Tests assert it through the API with a known ticket id, and no UI test looks for a screen that does not exist. |
+| D-24 | BR-67's counter is **in memory, keyed by email, and capped at 10,000 emails.** Per-email rather than per-IP, because behind one campus proxy or NAT every user shares an address and an IP limit would lock out a whole building. In memory rather than in PostgreSQL, because a counter that resets when the server restarts is an acceptable loss for a local lab and saves a table plus a write on every failed sign-in. The costs are accepted and recorded: a restart clears every lock; two server processes would count separately; and anyone who knows an email can lock it for 15 minutes, a deliberate trade against unlimited guessing with no unlock flow in scope. When the cap is reached, the least recently failed **unlocked** email is forgotten first, so flooding the counter with other emails cannot lift a lock early. Only when every tracked email is locked or mid-attempt is the oldest forgotten, so lifting a target's lock this way means first locking 10,000 other emails, about 50,000 failed sign-ins; that cost is accepted. Tests reset the counter before each test. |

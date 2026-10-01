@@ -53,6 +53,10 @@ Principles carried over from Lab 2:
 | UNIT-08 | `transitions.test.ts` | reason requirement per target status | required for Resolved, Cancelled, Reopened only (BR-36, BR-37) | 9 | Planned |
 | UNIT-09 | `queue-query.test.ts` | query parsing: defaults, permitted sorts, page sizes | defaults applied; unknown values rejected, never corrected (BR-55, BR-58) | 8 | Planned |
 | UNIT-10 | `queue-query.test.ts` | blank `q` after trimming | treated as absent (BR-53) | 8 | Planned |
+| UNIT-11 | `login-throttle.test.ts` | four, then five failures for one email, against an explicit clock | no lock after four; the fifth locks for 15 minutes from itself; the lock lifts exactly at expiry with a clean count (BR-67) | 13 | Pass |
+| UNIT-12 | `login-throttle.test.ts` | failures spread across more than 15 minutes | a failure leaves the count once it is 15 minutes old; five inside the window lock (BR-67) | 13 | Pass |
+| UNIT-13 | `login-throttle.test.ts` | key normalisation, separate emails, success, and the size cap | case and spaces share one count; emails are independent; success clears; the cap holds, and unlocked emails are forgotten before locked ones (BR-67, D-24) | 13 | Pass |
+| UNIT-14 | `login-throttle.test.ts` | attempts reserved but not yet finished | a sixth is refused while five are in flight; in-flight attempts add to earlier failures; failures returned lock; neutral outcomes give the slot back; a success keeps other reservations (BR-67) | 13 | Pass |
 
 ### 2.2 API — authentication, `server/tests/lab-03/auth.api.test.ts`
 
@@ -73,6 +77,11 @@ Principles carried over from Lab 2:
 | API-13 | AC-02 | `mustChangePassword` session calling a normal endpoint | 403 `PASSWORD_CHANGE_REQUIRED`; `/me`, `/password`, `/logout` still work (BR-14) | 3 | Pass |
 | API-14 | AC-01 | expired session | 401 `AUTH_REQUIRED` (BR-11) | 3 | Pass |
 | API-67 | BR-66 | login as a user whose `passwordHash` is null | 401 `INVALID_CREDENTIALS`, identical to a wrong password, no session created | 3 | Pass |
+| API-69 | AC-40 | five wrong passwords, then the correct one (`login-throttle.api.test.ts`) | 429 `TOO_MANY_ATTEMPTS` with `Retry-After` of about 15 minutes; no cookie, no session (BR-67) | 13 | Pass |
+| API-70 | AC-40 | the same against an email with no account | the same 429 body and `Retry-After` as a real email, so a lock reveals nothing (BR-16) | 13 | Pass |
+| API-71 | AC-40 | one email locked while another signs in; four failures, a success, four more; mixed-case spellings | only the locked email is refused; a success clears the count; spellings share one count (BR-45) | 13 | Pass |
+| API-73 | AC-40 | twenty wrong passwords at once, and nineteen wrong plus the correct one at once, with `Promise.all` | at most five passwords evaluated (401 or 201), the rest 429, and a session only if the correct one was among the five (BR-67) | 13 | Pass |
+| API-72 | BR-67 | six malformed requests, then six correct passwords for an inactive account | never 429: validation errors and an inactive account's correct password are not counted | 13 | Pass |
 
 ### 2.3 API — authorization, `server/tests/lab-03/authorization.api.test.ts`
 
@@ -301,6 +310,7 @@ alone.
 | AC-37 | RESP-01 – RESP-06, STYLE-01, STYLE-03, STYLE-04, STYLE-05 |
 | AC-38 | UI-04, UI-14, STYLE-06 |
 | AC-39 | UI-19, STYLE-02, STYLE-07 |
+| AC-40 | API-69, API-70, API-71, API-73, UNIT-11, UNIT-12, UNIT-13, UNIT-14 |
 
 ### 3.1 Planned test distribution by issue
 
@@ -316,6 +326,7 @@ alone.
 | 9 — Staff Ticket Detail | UNIT-06 – UNIT-08, API-40 – API-52, API-68, UI-15 – UI-19, STYLE-03, STYLE-07 |
 | 10 — User Management | API-53 – API-66, UI-20 – UI-25 |
 | 11 — E2E and visual evidence | RESP-01 – RESP-06, E2E-01 – E2E-10, STYLE-01, STYLE-02, STYLE-04 – STYLE-06 |
+| 13 — Login attempt throttling | UNIT-11 – UNIT-14, API-69 – API-73 |
 
 ---
 
@@ -414,3 +425,4 @@ from memory.
 | Actions Taken | Deferred to Lab 4, so no test covers resolution being blocked by incomplete Actions Taken. |
 | Concurrency | API-41 covers the claim race with two sequential requests plus a conditional update; true parallel load is not tested. |
 | Accessibility | Checked by assertions on roles, labels, and focus order plus the manual checklist; no automated axe audit runs in Lab 3. |
+| Login throttling | The 15-minute lock and window are tested with an explicit clock (UNIT-11, UNIT-12) rather than by waiting. The counter is in memory (D-24), so the API tests cannot observe a lock surviving a restart, because it does not. |
