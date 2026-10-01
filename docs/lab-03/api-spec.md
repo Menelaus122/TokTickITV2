@@ -41,6 +41,12 @@ is not an error to send it; it simply has no effect.
 The client sends `credentials: "include"` on every request. The server sets
 `cors({ origin: <client origin>, credentials: true })`.
 
+Any request other than `GET` that arrives with an `Origin` header not equal to the
+configured client origin is refused with **403 `FORBIDDEN`** before any handler
+runs (BR-65). This is the companion control to `SameSite=Lax`: the attachment
+upload endpoint accepts `multipart/form-data`, which a cross-site HTML form can
+produce, so the content type is not a defence (D-13).
+
 ### 1.2 Error shape
 
 Unchanged from Lab 2 — one envelope for every failure:
@@ -92,7 +98,7 @@ user: no stack traces, SQL, file paths, internal ids, or password material
 | `EMAIL_IN_USE` | 409 | another user already has this email (BR-45) |
 | `TICKET_ALREADY_OWNED` | 409 | claim lost the race (BR-25) |
 | `INVALID_TRANSITION` | 409 | the status change is not in the BR-33 matrix, or repeats the current status (BR-38) |
-| `OWNER_REQUIRED` | 409 | resolve, close, or cancel attempted on an unowned ticket (BR-35) |
+| `OWNER_REQUIRED` | 409 | resolve or close attempted on an unowned ticket; cancelling one is permitted (BR-35) |
 | `OWNER_NOT_ASSIGNABLE` | 409 | the proposed owner is not an active IT Staff member or Administrator (BR-24) |
 | `SELF_DEACTIVATION` | 409 | an Administrator targeted their own account (BR-48) |
 | `LAST_ADMINISTRATOR` | 409 | the change would leave zero active Administrators (BR-49) |
@@ -319,6 +325,10 @@ IT Staff and Administrator only.
 **403 `FORBIDDEN`** for a Requester, with no body field revealing whether notes
 exist (BR-23, AC-08). No Requester-facing response anywhere carries a note count.
 
+An Administrator may call this endpoint and §4.1–§4.2 for any ticket, but has no
+queue, no ticket list, and no ticket screen to find one through: in Lab 3 the
+permission is reachable through the API with a known ticket id only (D-23).
+
 ### 4.4 `POST /api/tickets/:id/notes`
 
 IT Staff and Administrator only. `{ "body": "..." }` → **201**. Same validation as
@@ -451,7 +461,8 @@ AC-24). An unknown value is `400 VALIDATION_FAILED`.
 | Target status not reachable from the current one | `409 INVALID_TRANSITION` (AC-25) |
 | Target status equals the current one | `409 INVALID_TRANSITION` (BR-38) |
 | `RESOLVED`, `CANCELLED`, or `REOPENED` without a 5–2000 character `reason` | `400 VALIDATION_FAILED` (BR-36, BR-37, AC-26) |
-| `RESOLVED`, `CLOSED`, or `CANCELLED` on a ticket with no owner | `409 OWNER_REQUIRED` (BR-35) |
+| `RESOLVED` or `CLOSED` on a ticket with no owner | `409 OWNER_REQUIRED` (BR-35) |
+| `CANCELLED` on a ticket with no owner | permitted — a ticket that should never have been opened is cancelled without claiming it first (BR-35) |
 
 A successful transition clears `requesterResolvedAt` (BR-30) and, where a reason
 was required, creates the Public Comment in the same transaction (D-08).

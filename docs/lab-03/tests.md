@@ -72,6 +72,7 @@ Principles carried over from Lab 2:
 | API-12 | AC-06 | after a change, a second session for the same user | refused with 401 (BR-15) | 3 | Planned |
 | API-13 | AC-02 | `mustChangePassword` session calling a normal endpoint | 403 `PASSWORD_CHANGE_REQUIRED`; `/me`, `/password`, `/logout` still work (BR-14) | 3 | Planned |
 | API-14 | AC-01 | expired session | 401 `AUTH_REQUIRED` (BR-11) | 3 | Planned |
+| API-67 | BR-66 | login as a user whose `passwordHash` is null | 401 `INVALID_CREDENTIALS`, identical to a wrong password, no session created | 3 | Planned |
 
 ### 2.3 API — authorization, `server/tests/lab-03/authorization.api.test.ts`
 
@@ -87,6 +88,7 @@ Principles carried over from Lab 2:
 | SEC-08 | AC-07 | `POST /api/tickets` with a body `ticketNumber` and `currentStatus` | both ignored, backend values win (Lab 2 BR-01) | 6 | Planned |
 | SEC-09 | AC-10 | guard order: no session **and** wrong role | 401 wins over 403 (api-spec §7) | 4 | Planned |
 | SEC-10 | AC-28 | every user-carrying response across the whole API | no `passwordHash`, no `tokenHash`, no `initialPassword` field (BR-52) | 4, 10 | Planned |
+| SEC-11 | BR-65 | `POST`, `PATCH`, and a `multipart/form-data` upload carrying a foreign `Origin` header | 403 `FORBIDDEN` before the handler runs; the same requests with the configured origin, and a `GET` with a foreign origin, succeed | 4 | Planned |
 
 ### 2.4 API — Requester regression, `server/tests/lab-03/requester-regression.api.test.ts`
 
@@ -141,7 +143,8 @@ Principles carried over from Lab 2:
 | API-46 | AC-25 | refused transitions, including `CANCELLED` → anything | 409 `INVALID_TRANSITION`, status unchanged | 9 | Planned |
 | API-47 | AC-26 | Resolved, Cancelled, Reopened without a reason | 400 `VALIDATION_FAILED` | 9 | Planned |
 | API-48 | AC-26 | Resolved with a reason | 200 and a Public Comment created in the same transaction (D-08) | 9 | Planned |
-| API-49 | BR-35 | Resolve a ticket with no owner | 409 `OWNER_REQUIRED` (BR-35) | 9 | Planned |
+| API-49 | BR-35 | Resolve and close a ticket with no owner | 409 `OWNER_REQUIRED` on both | 9 | Planned |
+| API-68 | BR-35 | cancel an unassigned `NEW` ticket with a reason | 200 — cancelling needs no owner, unlike resolve and close | 9 | Planned |
 | API-50 | BR-30 | any successful transition on a ticket flagged by its Requester | `requesterResolvedAt` cleared (BR-30) | 9 | Planned |
 | API-51 | AC-27 | `permittedTransitions` in the detail response | matches the matrix for the current status (FR-34) | 9 | Planned |
 | API-52 | AC-27 | attachments on the staff detail response | active ones downloadable, removed ones present as marked metadata | 9 | Planned |
@@ -176,6 +179,7 @@ Principles carried over from Lab 2:
 | MIG-05 | AC-36 | Lab 1 and Lab 2 suites after migration | all pass (BR-64) | 6 | Planned |
 | MIG-06 | BR-61 | seed run twice | no duplicate users or tickets (labsheet §5.3) | 2 | Planned |
 | MIG-07 | §7.5 | seed account counts | ≥ 4 active Requesters + 1 inactive, ≥ 3 active IT Staff + 1 inactive, ≥ 2 active Administrators | 2 | Planned |
+| MIG-08 | D-22 | migrated Requester after the migration but before the seed, then after it | `passwordHash` null and login refused; after seeding, the documented initial password works and forces a change (BR-61, BR-66) | 2 | Planned |
 
 ### 2.10 UI component — `client/tests/lab-03/`
 
@@ -257,7 +261,7 @@ alone.
 | AC-01 | API-01, API-05, API-14, UNIT-03, UI-01, E2E-01 |
 | AC-02 | API-09, API-10, API-11, API-13, UNIT-01, UNIT-02, UI-05, UI-06, E2E-02 |
 | AC-03 | API-04, UI-03, E2E-03 |
-| AC-04 | API-02, API-03, UI-02, E2E-03 |
+| AC-04 | API-02, API-03, API-67, UI-02, E2E-03 |
 | AC-05 | API-06, API-07, API-08, UI-08, E2E-01 |
 | AC-06 | API-12, UNIT-04 |
 | AC-07 | SEC-07, SEC-08 |
@@ -278,7 +282,7 @@ alone.
 | AC-22 | API-40, API-42, UI-15, E2E-04 |
 | AC-23 | API-41 |
 | AC-24 | API-44, UI-16, E2E-05 |
-| AC-25 | API-45, API-46, UNIT-06, UNIT-07, UI-17 |
+| AC-25 | API-45, API-46, API-68, UNIT-06, UNIT-07, UI-17 |
 | AC-26 | API-47, API-48, UNIT-08, UI-18, E2E-05 |
 | AC-27 | API-51, API-52 |
 | AC-28 | API-53, API-60, SEC-10, UI-20 |
@@ -288,7 +292,7 @@ alone.
 | AC-32 | API-62, UI-23 |
 | AC-33 | API-63, UI-24, E2E-09 |
 | AC-34 | API-64, UI-25, E2E-08 |
-| AC-35 | MIG-01 – MIG-04 |
+| AC-35 | MIG-01 – MIG-04, MIG-08 |
 | AC-36 | MIG-05 |
 | AC-37 | RESP-01 – RESP-06, STYLE-01, STYLE-03, STYLE-04, STYLE-05 |
 | AC-38 | UI-04, UI-14, STYLE-06 |
@@ -298,14 +302,14 @@ alone.
 
 | Issue | Tests |
 | :--- | :--- |
-| 2 — User model, migration, seed | MIG-01 – MIG-04, MIG-06, MIG-07 |
-| 3 — Authentication API | UNIT-01 – UNIT-05, API-01 – API-14 |
-| 4 — Authorization | SEC-01 – SEC-04, SEC-06, SEC-07, SEC-09, SEC-10 |
+| 2 — User model, migration, seed | MIG-01 – MIG-04, MIG-06 – MIG-08 |
+| 3 — Authentication API | UNIT-01 – UNIT-05, API-01 – API-14, API-67 |
+| 4 — Authorization | SEC-01 – SEC-04, SEC-06, SEC-07, SEC-09 – SEC-11 |
 | 5 — Login and shell | UI-01 – UI-08 |
 | 6 — Requester regression | API-15 – API-18, SEC-08, UI-09, MIG-05 |
 | 7 — Comments and notes | API-19 – API-29, SEC-05, UI-10, UI-11 |
 | 8 — Ticket Queue | UNIT-09, UNIT-10, API-30 – API-39, UI-12 – UI-14 |
-| 9 — Staff Ticket Detail | UNIT-06 – UNIT-08, API-40 – API-52, UI-15 – UI-19, STYLE-03, STYLE-07 |
+| 9 — Staff Ticket Detail | UNIT-06 – UNIT-08, API-40 – API-52, API-68, UI-15 – UI-19, STYLE-03, STYLE-07 |
 | 10 — User Management | API-53 – API-66, UI-20 – UI-25 |
 | 11 — E2E and visual evidence | RESP-01 – RESP-06, E2E-01 – E2E-10, STYLE-01, STYLE-02, STYLE-04 – STYLE-06 |
 
@@ -400,7 +404,7 @@ from memory.
 
 | Area | Limitation |
 | :--- | :--- |
-| CSRF | No CSRF-token test exists, because Lab 3 relies on `SameSite=Lax` and a JSON-only API instead of tokens (D-13). |
+| CSRF | No CSRF-token test exists, because Lab 3 relies on `SameSite=Lax` plus the `Origin` check instead of tokens (D-13). SEC-11 covers the `Origin` check; the cookie policy itself is a browser behaviour and is not exercised by Supertest. |
 | Session expiry | UNIT-05 and API-14 test expiry with a clock-shifted session row rather than by waiting 8 hours. |
 | Password cost | Tests run bcrypt at cost 10 (D-10); production cost is not exercised. |
 | Actions Taken | Deferred to Lab 4, so no test covers resolution being blocked by incomplete Actions Taken. |

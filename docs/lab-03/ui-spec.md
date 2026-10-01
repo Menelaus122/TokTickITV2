@@ -9,8 +9,14 @@ validation placement beneath the field, the five button variants, the five share
 states, shadows, and the 1120 px centred content width. No Lab 3 screen
 introduces a new colour, a new font size, or a second visual system (FR-46).
 
-Lab 3 adds exactly two things to the shared vocabulary — a **Role badge** and an
-**Owner presentation** — plus five screens and one new region type.
+Lab 3 adds four things to the shared vocabulary — a **Role badge**, an **Owner
+presentation**, the seven further **status badges** Lab 2 never needed, and an
+**internal region** type — across six screens, five of them new and one an
+extension of a Lab 2 screen.
+
+An Administrator has no ticket screen in Lab 3: their navigation is User
+Management alone, so the comment and note permissions BR-04 grants them are
+reachable through the API only (D-23).
 
 ---
 

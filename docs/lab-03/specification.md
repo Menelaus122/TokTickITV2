@@ -1,7 +1,7 @@
 # Lab 3 — Sprint Engineering Specification
 
 **Project:** TokTickIT · **Sprint:** Lab 3 — Users, Roles, IT Staff Ticketing, and Admin Screens
-**Status:** Approved before implementation · **Owner:** Menelaus122
+**Status:** Draft — under review in PR #46; flipped to "Approved before implementation" when that PR merges · **Owner:** Menelaus122
 
 > This document is the engineering contract for Sprint 3. Implementation may not
 > begin on a feature branch until the section covering it is approved here, and
@@ -222,6 +222,8 @@ implemented, not even partially:
 | BR-14 | While `mustChangePassword` is set, the only endpoints the session may call are current-user, change-password, and logout. Everything else returns a password-change-required error. |
 | BR-15 | Changing a password clears `mustChangePassword` and deletes every **other** session for that user, so a stolen session cannot outlive the password it was created with. |
 | BR-16 | Login failures return one generic message for both an unknown email and a wrong password, so the API never reveals which emails exist. |
+| BR-65 | Every state-changing request (anything other than `GET`) that carries an `Origin` header must carry the configured client origin, or it is refused. This is the second CSRF control alongside `SameSite=Lax`, and it is needed because the attachment-upload endpoint accepts `multipart/form-data`, which a cross-site HTML form can produce (D-13). |
+| BR-66 | A user whose `passwordHash` is null cannot authenticate; login answers exactly as it does for a wrong password. The migration leaves the column null until the seed fills it (BR-61), and this rule makes that intermediate state a locked door rather than an open one. |
 
 ### 5.3 Roles and authorization
 
@@ -249,7 +251,7 @@ implemented, not even partially:
 
 | ID | Rule |
 | :--- | :--- |
-| BR-19 | An Administrator does **not** inherit IT Staff ticket operations. The matrix grants an Administrator only user management, comments, and notes; the labsheet permits the separation and §11 records why we chose it. |
+| BR-19 | An Administrator does **not** inherit IT Staff ticket operations. The matrix grants an Administrator only user management, comments, and notes; the labsheet permits the separation and §11 records why we chose it. Because an Administrator also has no queue, no ticket list, and no ticket screen, their comment and note permissions are reachable **through the API only** in Lab 3 (D-23). |
 | BR-20 | An Administrator may still be set as a Ticket Owner (labsheet §4.5), which is an assignment made by IT Staff, not an operation the Administrator performs. |
 | BR-21 | A role check failure returns **403**; a missing session returns **401**. The two are never conflated, because a client must be able to tell "log in" from "you may not". |
 | BR-22 | Ownership failures are the exception: a Requester asking for someone else's ticket gets **404**, never 403, so the API never confirms that the ticket exists (carried over from Lab 2 BR-16). |
@@ -259,7 +261,7 @@ implemented, not even partially:
 
 | ID | Rule |
 | :--- | :--- |
-| BR-24 | A ticket has at most one Ticket Owner, and that owner must be an **active** IT Staff member or Administrator. A ticket may be unassigned, which is how it arrives. |
+| BR-24 | A ticket has at most one Ticket Owner. The proposed owner must be an IT Staff member or Administrator who is active **at the time of assignment**; an owner who is deactivated later stays the owner (BR-26). A ticket may be unassigned, which is how it arrives. |
 | BR-25 | Claiming is only permitted on an unassigned ticket, and the claim is rejected with a conflict if another IT Staff member claimed it first. Reassignment is a separate operation on an owned ticket. |
 | BR-26 | Deactivating a user does not silently unassign their tickets; the tickets keep the owner and the queue shows the owner as inactive, so work in flight is never lost by an account change. |
 | BR-27 | Requested Priority is the Requester's value, set at creation, and immutable for every role. |
@@ -289,7 +291,7 @@ implemented, not even partially:
 | ID | Rule |
 | :--- | :--- |
 | BR-34 | Claiming a ticket that is still `NEW` moves it to `OPEN` in the same transaction, because "someone owns it" and "work has started" arriving separately is a state nobody maintains by hand. |
-| BR-35 | A ticket may only be claimed, reassigned, or moved out of `NEW`/`OPEN` by an owner or a claimer; `RESOLVED`, `CLOSED`, and `CANCELLED` require the ticket to have an owner, so nothing is closed anonymously. |
+| BR-35 | Acting on a ticket does not require owning it: any IT Staff member may claim an unassigned ticket, reassign an owned one, change IT Priority, or perform a permitted transition (BR-18). Ownership restricts **outcomes**, not actors: `RESOLVED` and `CLOSED` require the ticket to have an owner, so nothing is resolved or closed anonymously. `CANCELLED` deliberately does **not** require an owner, because a ticket that should never have been opened is cancelled straight from `NEW` without anyone claiming it first (BR-33). |
 | BR-36 | `CANCELLED` and `RESOLVED` each require a reason of 5–2000 characters, which is stored as a Public Comment posted in the same transaction. The Requester therefore always learns why. |
 | BR-37 | `REOPENED` requires a reason too, stored the same way. |
 | BR-38 | A transition request naming the status the ticket already has is a conflict, not a silent success, so a double-click cannot look like progress. |
@@ -335,7 +337,7 @@ implemented, not even partially:
 | ID | Rule |
 | :--- | :--- |
 | BR-60 | The Lab 2 `RequesterUser` table is **evolved** into `User`, not replaced: the table is renamed and columns are added, so every existing row keeps its id and every `Ticket.requesterId` stays valid. |
-| BR-61 | Each migrated Requester becomes a `REQUESTER` user with `mustChangePassword` set and the documented local-development initial password from §7.5. No production-like secret is introduced by the migration. |
+| BR-61 | Each migrated Requester becomes a `REQUESTER` user with `mustChangePassword` set. The SQL migration leaves `passwordHash` **null** — SQL cannot compute a bcrypt hash and a hash literal has no business being in a migration file — and the seed assigns the documented local-development initial password from §7.5 to every user who has none. Until the seed runs, those accounts simply cannot log in (BR-66). |
 | BR-62 | Existing Tickets keep their Requester, their Ticket Number, their Requested Priority, their `NEW` status, and all attachment rows and files. |
 | BR-63 | `Ticket.itPriority` is backfilled from `Ticket.requestedPriority` for every existing row, so no ticket exists without an IT Priority. |
 | BR-64 | Every Lab 1 and Lab 2 test keeps passing. Lab 2 Requester tests are updated only where they must log in instead of sending `X-Requester-Id`; their assertions about behaviour do not change. |
@@ -426,7 +428,7 @@ Enums:
 | D-02 | Store SHA-256 of the session token, keep the raw token only in the cookie | a database dump then contains no usable session (BR-10). |
 | D-03 | Seven queue columns, Created Date and Category demoted to filters and detail | labsheet §8.3 explicitly warns against an unreadable mega-grid, and tablet width cannot hold nine columns without compromise. |
 | D-04 | `PublicComment` and `InternalNote` as two tables | visibility becomes structural instead of a boolean that one missing `WHERE` clause can defeat (BR-39). |
-| D-05 | Rename `RequesterUser` → `User` and `RequestedPriority` → `Priority` instead of creating new models | Lab 2 BR-46 planned for this. A rename keeps every id and foreign key, so no Ticket or Attachment is touched by the migration. |
+| D-05 | Rename `RequesterUser` → `User` and `RequestedPriority` → `Priority` instead of creating new models | Lab 2 BR-46 planned for this. A rename keeps every id and foreign key, so no Ticket or Attachment is touched by the migration — provided the SQL really is a rename, which is why D-21 exists. |
 | D-06 | `itPriority` stored separately from `requestedPriority` | both must be displayed (labsheet §8.3), and a single mutable column would destroy the Requester's original request. |
 | D-07 | Claim moves `NEW` → `OPEN` automatically | otherwise every claim needs a second click that nobody reliably makes, and the queue fills with owned-but-`NEW` tickets. |
 | D-08 | `RESOLVED`, `CANCELLED`, and `REOPENED` reasons are stored as Public Comments | the Requester needs the reason, and a separate reason column would duplicate the comment thread. |
@@ -457,22 +459,44 @@ password or production secret is committed.
 
 ### 7.6 Migration plan
 
-1. Rename `RequesterUser` to `User` and `RequestedPriority` to `Priority` in one
-   Prisma migration, using `@@map`-free renames so Postgres performs
-   `ALTER TABLE ... RENAME` rather than a drop and create.
-2. Add `passwordHash`, `role` (default `REQUESTER`), `mustChangePassword`
-   (default `true`), and `lastLoginAt` to `User`.
-3. Widen `TicketStatus`, then add `Ticket.ownerId`, `Ticket.itPriority`, and
-   `Ticket.requesterResolvedAt`.
-4. Backfill: `itPriority = requestedPriority` for every existing ticket (BR-63),
-   and set each migrated Requester's `passwordHash` to the hash of the documented
-   initial password with `mustChangePassword = true` (BR-61).
-5. Create `Session`, `PublicComment`, and `InternalNote`.
-6. Verify with the migration/regression tests in `tests.md`: ticket count,
-   attachment count, and requester bindings are identical before and after.
+**Prisma Migrate does not detect renames.** Renaming the model in
+`schema.prisma` and running `prisma migrate dev` would emit `DROP TABLE` plus
+`CREATE TABLE`, destroying every Requester row and every `Ticket.requesterId`
+with it. The rename is therefore performed by hand-edited SQL (D-21):
 
-Rollback is `prisma migrate resolve` plus the previous migration; because every
-step is additive or a rename, no Lab 2 data is destroyed at any point.
+1. Edit `schema.prisma` (rename the model and the enum, add the new fields), then
+   generate the migration with `npx prisma migrate dev --create-only`, **inspect
+   the generated SQL**, and replace the drop-and-create statements with:
+
+   ```sql
+   ALTER TABLE "RequesterUser" RENAME TO "User";
+   ALTER TYPE "RequestedPriority" RENAME TO "Priority";
+   ```
+
+   Index and constraint names that Postgres carries along are renamed in the same
+   file so later migrations do not drift from Prisma's expectations.
+2. Add to `User`: `passwordHash` **nullable** (BR-61, BR-66), `role` with default
+   `REQUESTER`, `mustChangePassword` with default `true`, and `lastLoginAt`
+   nullable. Every column either is nullable or has a default, because the table
+   already holds rows and a `NOT NULL` column without a default would abort the
+   migration.
+3. Widen `TicketStatus` with `ALTER TYPE ... ADD VALUE`, then add
+   `Ticket.ownerId` nullable, `Ticket.itPriority` nullable for now, and
+   `Ticket.requesterResolvedAt` nullable.
+4. Backfill inside the same migration: `UPDATE "Ticket" SET "itPriority" =
+   "requestedPriority"` (BR-63), then `ALTER COLUMN "itPriority" SET NOT NULL`
+   once no row is null. `passwordHash` stays nullable permanently; the seed fills
+   it (BR-61).
+5. Create `Session`, `PublicComment`, and `InternalNote`.
+6. Run `npm run prisma:seed`, which assigns the documented initial password to
+   every user without one and adds the Lab 3 accounts from §7.5.
+7. Verify with the migration/regression tests in `tests.md`: ticket count,
+   attachment count, and requester bindings are identical before and after, and
+   every ticket has an IT Priority.
+
+Steps 1–5 are one migration, reviewed as SQL before it is applied. Rollback is
+the previous migration plus `prisma migrate resolve`; because every statement is
+a rename, an addition, or a backfill, no Lab 2 row is destroyed at any point.
 
 ### 7.7 New dependencies
 
@@ -640,7 +664,7 @@ Every criterion is observable and maps to at least one planned test in
 | ID | Assumption or decision |
 | :--- | :--- |
 | D-12 | Session lifetime is 8 hours with no sliding renewal. A lab session is shorter than that, and a fixed window is one fewer moving part to test. |
-| D-13 | CSRF is handled by `SameSite=Lax` plus a JSON-only API: no endpoint accepts form encoding, so a cross-site form post cannot reach one. No CSRF token is introduced, and §11 records this as a deliberate scope choice for a local lab. |
+| D-13 | CSRF rests on `SameSite=Lax`, which keeps the session cookie off cross-site requests, plus the `Origin` check in BR-65. No CSRF token is introduced, and this is recorded as a deliberate scope choice for a local lab. An earlier draft justified this with "the API is JSON-only", which was **wrong**: attachment upload uses `multer` with `multipart/form-data` (`server/src/app.ts`), and a cross-site HTML form can send exactly that. The cookie policy is what protects that endpoint, not the content type. |
 | D-14 | Password rules are length-only (8–72) with no composition requirements, because composition rules push people toward predictable substitutions and the labsheet leaves the rules to us. |
 | D-15 | The Administrator's own account cannot be edited for role or activation from the list (BR-48); name, email, and password changes still work through the normal screens. |
 | D-16 | "Department" stays on `User` as the optional Lab 2 field. It is displayed read-only and is not editable in Lab 3, since extended profile management is excluded. |
@@ -648,3 +672,6 @@ Every criterion is observable and maps to at least one planned test in
 | D-18 | The queue's ownership filter offers `any`, `unassigned`, and `me` plus a specific owner, because "what is nobody holding" and "what am I holding" are the two questions an IT Staff member actually opens the queue to answer. |
 | D-19 | Deactivating a user keeps their ticket ownership (BR-26). Reassignment is an explicit IT Staff decision, not a side effect of an account change. |
 | D-20 | Lab 4 will add Actions Taken and the rule that blocks resolution until they are complete. `RESOLVED` therefore requires only a reason in Lab 3, and the reason is already a Public Comment so Lab 4 can add its own gate without changing the comment thread. |
+| D-21 | The table and enum renames are written as hand-edited SQL after `prisma migrate dev --create-only`, not left to Prisma | Prisma Migrate has no rename detection; left alone it emits `DROP` + `CREATE`, which would delete every Requester and orphan every Ticket. The generated SQL is read before it is applied, every time. |
+| D-22 | `User.passwordHash` is nullable and filled by the seed, not by the migration | SQL cannot compute a bcrypt hash, and embedding a hash literal in a migration puts a credential in version control. The cost is an intermediate state where migrated accounts cannot log in, which BR-66 makes explicit and safe. |
+| D-23 | BR-04's "Internal Notes are visible to Administrators" is satisfied at the **API level only**; Lab 3 ships no Administrator ticket screen | An Administrator has no queue, no ticket detail screen, and no ticket list (BR-19, ui-spec §2), so there is no route by which they reach a ticket in the UI. The permission exists for Lab 4, when an Administrator may get a read-only ticket view. Tests assert it through the API with a known ticket id, and no UI test looks for a screen that does not exist. |
