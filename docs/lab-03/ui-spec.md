@@ -134,6 +134,7 @@ Route `/login`. No shell, like Lab 2's selection screen. One centred card,
 | Validation | Message beneath the offending field, Lab 2 placement |
 | Invalid credentials | Error callout above the fields: "Email or password is incorrect." Identical for an unknown email and a wrong password (AC-04). Both fields keep their values; the password is kept so a typo can be corrected |
 | Inactive account | Error callout: "This account is not active. Contact an administrator." (AC-03) |
+| Too many attempts | Warning callout showing the API's message, which names the wait: "Too many sign-in attempts. Try again in 15 minutes." Both fields keep their values. Sign in stays enabled, because the server is the authority on when the lock ends; a retry inside the lock simply gets the same callout (BR-67, AC-40) |
 | API failure | Error callout with a **Try again** action, no raw status code |
 
 ### 3.2 Responsive

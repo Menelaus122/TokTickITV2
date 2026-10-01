@@ -80,6 +80,7 @@ user: no stack traces, SQL, file paths, internal ids, or password material
 | `404` | resource missing **or** owned by another Requester (BR-22) |
 | `409` | conflict — duplicate email, already claimed, invalid transition, last Administrator, self-deactivation |
 | `410` | download of a soft-removed Attachment (Lab 2) |
+| `429` | sign-in refused because the email is locked after repeated failures (BR-67) |
 | `413` / `415` | attachment too large / unsupported type (Lab 2) |
 | `500` | unexpected server error, no internal detail in the body |
 
@@ -102,6 +103,7 @@ user: no stack traces, SQL, file paths, internal ids, or password material
 | `OWNER_NOT_ASSIGNABLE` | 409 | the proposed owner is not an active IT Staff member or Administrator (BR-24) |
 | `SELF_DEACTIVATION` | 409 | an Administrator targeted their own account (BR-48) |
 | `LAST_ADMINISTRATOR` | 409 | the change would leave zero active Administrators (BR-49) |
+| `TOO_MANY_ATTEMPTS` | 429 | five failed sign-ins for this email within 15 minutes; locked for 15 minutes (BR-67) |
 | `INTERNAL_ERROR` | 500 | unexpected failure |
 
 Lab 2's `ATTACHMENT_*`, `FILE_TOO_LARGE`, and `UNSUPPORTED_FILE_TYPE` codes are
@@ -172,11 +174,27 @@ Public. Creates a session (AC-01).
 | Wrong password | `401 INVALID_CREDENTIALS` — byte-identical to the line above (AC-04) |
 | Correct password, inactive account | `403 ACCOUNT_INACTIVE`, no session created (AC-03) |
 | Already holding a valid session | the old session row is deleted and replaced, so one browser holds one session |
+| Email locked after five failures within 15 minutes, **any** password | `429 TOO_MANY_ATTEMPTS` with `Retry-After: <seconds>`, no session created (BR-67, AC-40) |
 
-Order of operations is fixed by BR-08: look up the email, compare the hash, and
-only then check `isActive`. An unknown email still runs a bcrypt comparison
-against a dummy hash so the response time does not reveal whether the email
-exists.
+Order of operations: validate the body; refuse a locked email (BR-67); look up
+the email, compare the hash, and only then check `isActive` (BR-08). An unknown
+email still runs a bcrypt comparison against a dummy hash so the response time
+does not reveal whether the email exists.
+
+**Throttling (BR-67).** Only a `401 INVALID_CREDENTIALS` counts as a failure, and
+it counts the same for an email with no account. A `400` and a `403
+ACCOUNT_INACTIVE` do not count. A `201` clears the email's count. The lock is
+checked before the database is read, so a locked real email and a locked unknown
+one get byte-identical answers:
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 900
+```
+
+```json
+{ "error": { "code": "TOO_MANY_ATTEMPTS", "message": "Too many sign-in attempts. Try again in 15 minutes." } }
+```
 
 `lastLoginAt` is stamped on success.
 
