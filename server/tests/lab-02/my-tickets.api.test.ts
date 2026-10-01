@@ -27,8 +27,8 @@ function list(requesterId: number | null, query = "") {
 }
 
 beforeAll(async () => {
-  const [a, b] = await prisma.requesterUser.findMany({
-    where: { isActive: true },
+  const [a, b] = await prisma.user.findMany({
+    where: { isActive: true, role: "REQUESTER" },
     orderBy: { id: "asc" },
     take: 2,
   });
@@ -53,6 +53,7 @@ beforeAll(async () => {
         summary: i === 0 ? "Laptop battery drains quickly" : `Seeded list ticket ${i}`,
         description: "Created by the my-tickets API test suite for list behaviour.",
         requestedPriority: i % 2 === 0 ? "MEDIUM" : "HIGH",
+        itPriority: i % 2 === 0 ? "MEDIUM" : "HIGH",
       },
     });
     createdIds.push(ticket.id);
@@ -67,6 +68,7 @@ beforeAll(async () => {
       summary: "Requester B private ticket",
       description: "This row must never appear in requester A's list.",
       requestedPriority: "URGENT",
+      itPriority: "URGENT",
     },
   });
   createdIds.push(bTicket.id);

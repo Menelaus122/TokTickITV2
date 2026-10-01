@@ -33,8 +33,8 @@ describe("GET /api/requesters", () => {
   });
 
   it("excludes inactive requesters so they can never be selected", async () => {
-    const inactive = await prisma.requesterUser.findMany({
-      where: { isActive: false },
+    const inactive = await prisma.user.findMany({
+      where: { isActive: false, role: "REQUESTER" },
       select: { id: true, fullName: true },
     });
     // The seed guarantees at least one, which is the point of this test.
@@ -49,8 +49,8 @@ describe("GET /api/requesters", () => {
   });
 
   it("returns exactly the requesters marked active in the database", async () => {
-    const active = await prisma.requesterUser.findMany({
-      where: { isActive: true },
+    const active = await prisma.user.findMany({
+      where: { isActive: true, role: "REQUESTER" },
       select: { id: true },
     });
 
@@ -86,13 +86,13 @@ describe("GET /api/requesters", () => {
   it("returns an empty array when no requester is active", async () => {
     // Drives the selection screen's empty state (BR-13). The active flags are
     // restored in the finally block so the suite leaves the seed untouched.
-    const active = await prisma.requesterUser.findMany({
-      where: { isActive: true },
+    const active = await prisma.user.findMany({
+      where: { isActive: true, role: "REQUESTER" },
       select: { id: true },
     });
 
     try {
-      await prisma.requesterUser.updateMany({
+      await prisma.user.updateMany({
         where: { id: { in: active.map((row) => row.id) } },
         data: { isActive: false },
       });
@@ -101,7 +101,7 @@ describe("GET /api/requesters", () => {
       expect(res.status).toBe(200);
       expect(res.body).toEqual([]);
     } finally {
-      await prisma.requesterUser.updateMany({
+      await prisma.user.updateMany({
         where: { id: { in: active.map((row) => row.id) } },
         data: { isActive: true },
       });

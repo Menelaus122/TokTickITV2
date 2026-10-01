@@ -39,12 +39,15 @@ export async function resolveRequester(
     };
   }
 
-  const requester = await prisma.requesterUser.findUnique({
+  const requester = await prisma.user.findUnique({
     where: { id },
-    select: { id: true, isActive: true },
+    select: { id: true, isActive: true, role: true },
   });
 
-  if (!requester) {
+  // Lab 3: an IT Staff or Administrator id is not a Requester, so it is answered
+  // exactly like an id that does not exist. Otherwise X-Requester-Id would let
+  // any staff account create tickets as a Requester until Issue 6 removes it.
+  if (!requester || requester.role !== "REQUESTER") {
     return {
       ok: false,
       status: 400,
