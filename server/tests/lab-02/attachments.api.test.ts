@@ -61,6 +61,7 @@ async function makeTicket(requesterId: number, number: string, summary: string) 
       summary,
       description: "Created by the attachments API suite.",
       requestedPriority: "MEDIUM",
+      itPriority: "MEDIUM",
     },
   });
   createdTicketIds.push(ticket.id);
@@ -68,8 +69,8 @@ async function makeTicket(requesterId: number, number: string, summary: string) 
 }
 
 beforeAll(async () => {
-  const [a, b] = await prisma.requesterUser.findMany({
-    where: { isActive: true },
+  const [a, b] = await prisma.user.findMany({
+    where: { isActive: true, role: "REQUESTER" },
     orderBy: { id: "asc" },
     take: 2,
   });

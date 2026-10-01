@@ -79,8 +79,10 @@ app.get("/api/categories", async (_req: Request, res: Response) => {
 app.get("/api/requesters", async (_req: Request, res: Response) => {
   res.set("Cache-Control", "no-store");
   try {
-    const requesters = await getPrisma().requesterUser.findMany({
-      where: { isActive: true },
+    const requesters = await getPrisma().user.findMany({
+      // Lab 3: IT Staff and Administrators live in the same table now, so the
+      // selector must ask for Requesters explicitly or it would offer them too.
+      where: { isActive: true, role: "REQUESTER" },
       // Sorted by name because this list is read by a human scanning a dropdown.
       orderBy: { fullName: "asc" },
       select: { id: true, fullName: true, email: true, department: true },
@@ -211,6 +213,9 @@ app.post("/api/tickets", async (req: Request, res: Response) => {
               summary: input.summary,
               description: input.description,
               requestedPriority: input.requestedPriority,
+              // Lab 3 BR-28 — IT Priority starts as a copy of the Requester's
+              // choice and is IT Staff's to change from then on.
+              itPriority: input.requestedPriority,
               // currentStatus is left to its NEW default (BR-02).
             },
             select: TICKET_DETAIL_SELECT,

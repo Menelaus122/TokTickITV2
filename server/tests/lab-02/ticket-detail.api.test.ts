@@ -22,8 +22,8 @@ function detail(requesterId: number | null, id: number | string) {
 }
 
 beforeAll(async () => {
-  const [a, b] = await prisma.requesterUser.findMany({
-    where: { isActive: true },
+  const [a, b] = await prisma.user.findMany({
+    where: { isActive: true, role: "REQUESTER" },
     orderBy: { id: "asc" },
     take: 2,
   });
@@ -44,6 +44,7 @@ beforeAll(async () => {
       summary: "Detail suite ticket for requester A",
       description: "Created by the ticket-detail API suite.",
       requestedPriority: "MEDIUM",
+      itPriority: "MEDIUM",
     },
   });
 
@@ -56,6 +57,7 @@ beforeAll(async () => {
       summary: "Detail suite ticket for requester B",
       description: "Requester A must never be able to read this row.",
       requestedPriority: "URGENT",
+      itPriority: "URGENT",
     },
   });
 

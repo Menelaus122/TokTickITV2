@@ -38,8 +38,8 @@ async function createTicket(body: Record<string, unknown>, requesterId: number |
 }
 
 beforeAll(async () => {
-  const active = await prisma.requesterUser.findFirstOrThrow({ where: { isActive: true } });
-  const inactive = await prisma.requesterUser.findFirstOrThrow({ where: { isActive: false } });
+  const active = await prisma.user.findFirstOrThrow({ where: { isActive: true, role: "REQUESTER" } });
+  const inactive = await prisma.user.findFirstOrThrow({ where: { isActive: false, role: "REQUESTER" } });
   const category = await prisma.category.findFirstOrThrow({ where: { isActive: true } });
   const system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true } });
 
@@ -175,8 +175,8 @@ describe("POST /api/tickets — client-supplied system fields are ignored", () =
   });
 
   it("never accepts a requester id from the body", async () => {
-    const other = await prisma.requesterUser.findFirstOrThrow({
-      where: { isActive: true, id: { not: activeRequesterId } },
+    const other = await prisma.user.findFirstOrThrow({
+      where: { isActive: true, role: "REQUESTER", id: { not: activeRequesterId } },
     });
 
     const res = await createTicket(

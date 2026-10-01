@@ -70,7 +70,7 @@ manage its attachments from Ticket Detail.
 ```bash
 docker compose up --build                              # start db + server + client
 docker compose exec server npx prisma migrate deploy   # apply migrations
-docker compose exec server npm run prisma:seed         # seed reference data and requesters
+docker compose exec server npm run prisma:seed         # seed reference data, accounts, and sample tickets
 ```
 
 Then open:
@@ -93,6 +93,47 @@ You can also run **just the database** in Docker and the apps on your host:
 ```bash
 docker compose up -d db
 ```
+
+### Seeded accounts (local development only)
+
+Lab 3 adds real accounts. **Every seeded account uses the password
+`Toktickit#2026`.** These are local-development credentials, documented here on
+purpose; they are not anyone's real password and must never be reused outside a
+local database.
+
+| Role | Accounts | Notes |
+| :--- | :--- | :--- |
+| Requester | `anucha.wong@kmutt.ac.th`, `kanya.sris@kmutt.ac.th`, `pornchai.than@kmutt.ac.th`, `suchada.mees@kmutt.ac.th` | The four Lab 2 Development Requesters, carried over by the migration |
+| Requester, inactive | `wichai.boon@kmutt.ac.th` | Cannot sign in |
+| Requester, must change password | `first.login@toktickit.local` | The only account that is forced to set a new password at first sign-in |
+| IT Staff | `nattapong.it@toktickit.local`, `siriporn.it@toktickit.local`, `thanakorn.it@toktickit.local` | |
+| IT Staff, inactive | `prasert.it@toktickit.local` | Still owns a ticket, which shows that ownership survives deactivation |
+| Administrator | `malee.admin@toktickit.local`, `kittisak.admin@toktickit.local` | Two, so the last-Administrator rule can be tested |
+
+The seed also creates 16 sample tickets — two in each of the eight statuses —
+with Public Comments and Internal Notes.
+
+**The seed converges.** Every run puts each account above back to this password
+and its documented must-change setting, and resets the sample tickets' status,
+owner, and priorities. Running it after a demo or an E2E run therefore restores
+the documented state. Accounts you create yourself and tickets you raise through
+the app are never touched.
+
+> **Upgrading a Lab 2 database:** `prisma migrate deploy` renames
+> `RequesterUser` to `User` in place, so existing tickets and attachments keep
+> their Requesters. Migrated accounts have **no password** until the seed runs —
+> run `npm run prisma:seed` straight after migrating.
+>
+> The server container keeps `node_modules` in its own volume, so after pulling
+> Lab 3 it still has the Lab 2 Prisma client and answers `500`. Refresh it once:
+>
+> ```bash
+> docker compose exec server npm install
+> docker compose exec server npx prisma generate
+> docker compose exec server npx prisma migrate deploy
+> docker compose exec server npm run prisma:seed
+> docker compose restart server
+> ```
 
 ---
 
@@ -239,18 +280,26 @@ Screenshots are written to `artifacts/lab-02/screenshots/`. Point the suite at a
 stack on non-default ports with `E2E_BASE_URL` and `E2E_API_URL`.
 
 The E2E suite creates tickets it cannot delete — Lab 2 exposes no delete
-endpoint by design. Reset afterwards with:
+endpoint by design. Note the highest ticket id **before** the run, then delete
+only what came after it:
 
 ```bash
-docker exec toktickit-db psql -U toktickit -d toktickit -c 'DELETE FROM "Ticket";'
+docker exec toktickit-db psql -U toktickit -d toktickit -c 'SELECT max(id) FROM "Ticket";'   # before the run, e.g. 2351
+# ... run the E2E suite ...
+docker exec toktickit-db psql -U toktickit -d toktickit -c 'DELETE FROM "Ticket" WHERE id > 2351;'
 ```
 
-> This deletes **every** ticket, including any you created by hand in the
-> running app. The suite prints the ids it created, but that line is printed
-> before the responsive spec has finished creating its own, so it is not the
-> full list. To keep tickets of your own, delete by id range instead and remove
-> the matching files from `/app/uploads` in the server container — the cascade
-> clears the `Attachment` rows but not the uploaded files.
+> **Since Lab 3, never run `DELETE FROM "Ticket";`.** Lab 2's instructions used
+> it when the suite's tickets were the only ones in the database. The database
+> now also holds the tickets migrated from Lab 2 and the 16 sample tickets the
+> seed creates, and a blanket delete removes all of them. Re-running the seed
+> brings the sample tickets back; only a backup brings back the migrated ones.
+>
+> The suite prints the ids it created, but that line is printed before the
+> responsive spec has finished creating its own, so it is not the full list,
+> which is why the reset uses the id noted before the run. The cascade clears the
+> `Attachment` rows but not the uploaded files; remove those from `/app/uploads`
+> in the server container.
 
 ### Everything
 
