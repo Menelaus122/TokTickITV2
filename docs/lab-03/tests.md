@@ -43,11 +43,11 @@ Principles carried over from Lab 2:
 
 | ID | File | What it tests | Expected | Issue | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| UNIT-01 | `password.test.ts` | password rules at 7, 8, 72, 73 characters | 7 and 73 rejected, 8 and 72 accepted (BR-07) | 3 | Planned |
-| UNIT-02 | `password.test.ts` | password equal to the user's email | rejected | 3 | Planned |
-| UNIT-03 | `password.test.ts` | hash then verify; a wrong password fails | bcrypt round-trip holds, hash never equals input (BR-06) | 3 | Planned |
-| UNIT-04 | `session.test.ts` | token generation and SHA-256 derivation | 32 bytes, URL-safe, never stored raw (BR-09, BR-10) | 3 | Planned |
-| UNIT-05 | `session.test.ts` | expiry arithmetic at 8 hours | a session one second past expiry is invalid (BR-11) | 3 | Planned |
+| UNIT-01 | `password.test.ts` | password rules at 7, 8, 72, 73 characters, and at bcrypt's 72-byte limit | 7 and 73 rejected, 8 and 72 accepted; 25 Thai characters (75 bytes) rejected, 24 (72 bytes) accepted (BR-07) | 3 | Pass |
+| UNIT-02 | `password.test.ts` | password equal to the user's email | rejected | 3 | Pass |
+| UNIT-03 | `password.test.ts` | hash then verify; a wrong password fails | bcrypt round-trip holds, hash never equals input (BR-06) | 3 | Pass |
+| UNIT-04 | `session.test.ts` | token generation and SHA-256 derivation | 32 bytes, URL-safe, never stored raw (BR-09, BR-10) | 3 | Pass |
+| UNIT-05 | `session.test.ts` | expiry arithmetic at 8 hours | a session one second past expiry is invalid (BR-11) | 3 | Pass |
 | UNIT-06 | `transitions.test.ts` | every pair in the BR-33 matrix | exactly the permitted pairs allowed, all 56 others refused | 9 | Planned |
 | UNIT-07 | `transitions.test.ts` | same-status transition | refused (BR-38) | 9 | Planned |
 | UNIT-08 | `transitions.test.ts` | reason requirement per target status | required for Resolved, Cancelled, Reopened only (BR-36, BR-37) | 9 | Planned |
@@ -58,21 +58,21 @@ Principles carried over from Lab 2:
 
 | ID | AC | What it tests | Expected | Issue | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| API-01 | AC-01 | valid login for an active user | 201, session cookie set, permitted user shape, no hash or token in the body | 3 | Planned |
-| API-02 | AC-04 | unknown email | 401 `INVALID_CREDENTIALS` | 3 | Planned |
-| API-03 | AC-04 | wrong password | 401 `INVALID_CREDENTIALS`, byte-identical body to API-02 | 3 | Planned |
-| API-04 | AC-03 | correct password, inactive account | 403 `ACCOUNT_INACTIVE`, no session created | 3 | Planned |
-| API-05 | AC-01 | malformed email and empty password | 400 `VALIDATION_FAILED` with `fields` | 3 | Planned |
-| API-06 | AC-05 | `/api/auth/me` with a valid cookie | 200 with the current user | 3 | Planned |
-| API-07 | AC-05 | logout, then reuse the same cookie | 204, then 401 `AUTH_REQUIRED` on every protected endpoint | 3 | Planned |
-| API-08 | AC-05 | logout with no session | 204, not an error | 3 | Planned |
-| API-09 | AC-02 | change password: too short, too long, mismatch, equal to email, equal to current | 400 on each, per-field messages | 3 | Planned |
-| API-10 | AC-02 | change password with a wrong current password | 401 `INVALID_CREDENTIALS` | 3 | Planned |
-| API-11 | AC-02 | successful change clears `mustChangePassword` | 200, `/api/auth/me` reports false | 3 | Planned |
-| API-12 | AC-06 | after a change, a second session for the same user | refused with 401 (BR-15) | 3 | Planned |
-| API-13 | AC-02 | `mustChangePassword` session calling a normal endpoint | 403 `PASSWORD_CHANGE_REQUIRED`; `/me`, `/password`, `/logout` still work (BR-14) | 3 | Planned |
-| API-14 | AC-01 | expired session | 401 `AUTH_REQUIRED` (BR-11) | 3 | Planned |
-| API-67 | BR-66 | login as a user whose `passwordHash` is null | 401 `INVALID_CREDENTIALS`, identical to a wrong password, no session created | 3 | Planned |
+| API-01 | AC-01 | valid login for an active user | 201, session cookie set, permitted user shape, no hash or token in the body | 3 | Pass |
+| API-02 | AC-04 | unknown email | 401 `INVALID_CREDENTIALS` | 3 | Pass |
+| API-03 | AC-04 | wrong password | 401 `INVALID_CREDENTIALS`, byte-identical body to API-02 | 3 | Pass |
+| API-04 | AC-03 | correct password, inactive account | 403 `ACCOUNT_INACTIVE`, no session created | 3 | Pass |
+| API-05 | AC-01 | malformed email and empty password | 400 `VALIDATION_FAILED` with `fields` | 3 | Pass |
+| API-06 | AC-05 | `/api/auth/me` with a valid cookie | 200 with the current user | 3 | Pass |
+| API-07 | AC-05 | logout, then reuse the same cookie | 204, then 401 `AUTH_REQUIRED` on every protected endpoint | 3 | Pass |
+| API-08 | AC-05 | logout with no session | 204, not an error | 3 | Pass |
+| API-09 | AC-02 | change password: too short, too long, mismatch, equal to email, equal to current | 400 on each, per-field messages | 3 | Pass |
+| API-10 | AC-02 | change password with a wrong current password | 401 `INVALID_CREDENTIALS` | 3 | Pass |
+| API-11 | AC-02 | successful change clears `mustChangePassword` | 200, `/api/auth/me` reports false | 3 | Pass |
+| API-12 | AC-06 | after a change, a second session for the same user | refused with 401 (BR-15) | 3 | Pass |
+| API-13 | AC-02 | `mustChangePassword` session calling a normal endpoint | 403 `PASSWORD_CHANGE_REQUIRED`; `/me`, `/password`, `/logout` still work (BR-14) | 3 | Pass |
+| API-14 | AC-01 | expired session | 401 `AUTH_REQUIRED` (BR-11) | 3 | Pass |
+| API-67 | BR-66 | login as a user whose `passwordHash` is null | 401 `INVALID_CREDENTIALS`, identical to a wrong password, no session created | 3 | Pass |
 
 ### 2.3 API — authorization, `server/tests/lab-03/authorization.api.test.ts`
 
@@ -172,18 +172,18 @@ Principles carried over from Lab 2:
 
 | ID | AC | What it tests | Expected | Issue | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| MIG-01 | AC-35 | ticket count, attachment count, and requester bindings before and after migrating | identical (BR-62) | 2 | Planned |
-| MIG-02 | AC-35 | `itPriority` on every pre-existing ticket | equals `requestedPriority` (BR-63) | 2 | Planned |
-| MIG-03 | AC-35 | migrated Requesters immediately after the migration, before the seed | role `REQUESTER`, `mustChangePassword` true, `passwordHash` null (BR-61, D-22) | 2 | Planned |
-| MIG-04 | AC-35 | ids preserved across the rename | every `Ticket.requesterId` still resolves (BR-60) | 2 | Planned |
+| MIG-01 | AC-35 | ticket count, attachment count, and requester bindings before and after migrating | identical (BR-62) | 2 | Pass |
+| MIG-02 | AC-35 | `itPriority` on every pre-existing ticket | equals `requestedPriority` (BR-63) | 2 | Pass |
+| MIG-03 | AC-35 | migrated Requesters immediately after the migration, before the seed | role `REQUESTER`, `mustChangePassword` true, `passwordHash` null (BR-61, D-22) | 2 | Pass |
+| MIG-04 | AC-35 | ids preserved across the rename | every `Ticket.requesterId` still resolves (BR-60) | 2 | Pass |
 | MIG-05 | AC-36 | Lab 1 and Lab 2 suites after migration | all pass (BR-64) | 6 | Planned |
-| MIG-06 | BR-61 | seed run twice | the database is identical after the second run, every column of users, tickets, comments, notes, and sessions included — timestamps too, so no row is rewritten when nothing drifted (labsheet §5.3) | 2 | Planned |
-| MIG-07 | §7.5 | seed account counts, ticket spread, and timeline | ≥ 4 active Requesters + 1 inactive, ≥ 3 active IT Staff + 1 inactive, ≥ 2 active Administrators; tickets in all 8 statuses and 4 priorities; each seeded ticket's Last Updated follows its own seeded history and is never the moment the seed ran | 2 | Planned |
-| MIG-08 | D-22 | migrated Requester after the migration but before the seed, then after it | before: `passwordHash` null, so the documented password cannot verify (BR-66) — the login endpoint's own answer is API-67 in Issue 3; after: the documented password works with no forced change, and `first.login@toktickit.local` is the only seeded account that must change (BR-61, §7.5) | 2 | Planned |
-| MIG-09 | §7.5 | change a documented account's password and set its flag, then re-run the seed | the documented password works again and the flag is back to its documented value; an account created through User Management is untouched | 2 | Planned |
-| MIG-10 | BR-28 | create a ticket through the Lab 2 endpoint after the migration | `itPriority` equals `requestedPriority` and the ticket is unassigned | 2 | Planned |
-| MIG-11 | BR-03 | send an IT Staff id as `X-Requester-Id`, and read the Lab 2 selector, while the header still exists | refused as `REQUESTER_INVALID`, exactly like an unknown id; the selector lists Requesters only | 2 | Planned |
-| MIG-12 | BR-45 | migrate a Lab 2 Requester whose email has capitals and surrounding spaces | stored as `lower(trim(email))`, and every migrated email is lowercase | 2 | Planned |
+| MIG-06 | BR-61 | seed run twice | the database is identical after the second run, every column of users, tickets, comments, notes, and sessions included — timestamps too, so no row is rewritten when nothing drifted (labsheet §5.3) | 2 | Pass |
+| MIG-07 | §7.5 | seed account counts, ticket spread, and timeline | ≥ 4 active Requesters + 1 inactive, ≥ 3 active IT Staff + 1 inactive, ≥ 2 active Administrators; tickets in all 8 statuses and 4 priorities; each seeded ticket's Last Updated follows its own seeded history and is never the moment the seed ran | 2 | Pass |
+| MIG-08 | D-22 | migrated Requester after the migration but before the seed, then after it | before: `passwordHash` null, so the documented password cannot verify (BR-66) — the login endpoint's own answer is API-67 in Issue 3; after: the documented password works with no forced change, and `first.login@toktickit.local` is the only seeded account that must change (BR-61, §7.5) | 2 | Pass |
+| MIG-09 | §7.5 | change a documented account's password and set its flag, then re-run the seed | the documented password works again and the flag is back to its documented value; an account created through User Management is untouched | 2 | Pass |
+| MIG-10 | BR-28 | create a ticket through the Lab 2 endpoint after the migration | `itPriority` equals `requestedPriority` and the ticket is unassigned | 2 | Pass |
+| MIG-11 | BR-03 | send an IT Staff id as `X-Requester-Id`, and read the Lab 2 selector, while the header still exists | refused as `REQUESTER_INVALID`, exactly like an unknown id; the selector lists Requesters only | 2 | Pass |
+| MIG-12 | BR-45 | migrate a Lab 2 Requester whose email has capitals and surrounding spaces | stored as `lower(trim(email))`, and every migrated email is lowercase | 2 | Pass |
 
 ### 2.10 UI component — `client/tests/lab-03/`
 

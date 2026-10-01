@@ -212,7 +212,7 @@ implemented, not even partially:
 | ID | Rule |
 | :--- | :--- |
 | BR-06 | Passwords are stored only as a `bcrypt` hash. No plaintext password is ever written to the database, a log, or a response. |
-| BR-07 | A password must be 8–72 characters and must not equal the user's email. The upper bound is bcrypt's own input limit, made explicit so a silently truncated password is impossible. |
+| BR-07 | A password must be 8–72 characters, at most 72 bytes in UTF-8, and must not equal the user's email. The byte limit is bcrypt's own input limit, made explicit so a silently truncated password is impossible: bcrypt reads 72 **bytes**, and a Thai character takes three, so a 25-character Thai password already exceeds it. Characters are counted as code points, and passwords are never trimmed. |
 | BR-08 | Login verifies the password **before** considering activation state, so a wrong password and a disabled account cannot be told apart by someone guessing passwords. Only a caller who proved the password learns that the account is inactive. |
 | BR-09 | A session is a server-side row. The browser receives an opaque 32-byte random token in an `HttpOnly`, `SameSite=Lax`, `Path=/` cookie named `tt_sid`, marked `Secure` outside local development. |
 | BR-10 | The database stores only the SHA-256 hash of the session token, so a leaked database cannot be replayed as a live session. |
