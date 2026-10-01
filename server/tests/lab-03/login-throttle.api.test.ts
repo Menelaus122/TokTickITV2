@@ -106,6 +106,38 @@ describe("POST /api/auth/login throttling (BR-67)", () => {
     expect((await login(emails.victim, PASSWORD)).status).toBe(429);
   });
 
+  it("API-73 holds the limit when twenty wrong passwords arrive at once", async () => {
+    const responses = await Promise.all(Array.from({ length: 20 }, () => login(emails.victim, WRONG)));
+    const statuses = responses.map((r) => r.status);
+
+    // At most five guesses are evaluated; every other request is refused.
+    expect(statuses.filter((s) => s === 401).length).toBeLessThanOrEqual(5);
+    expect(statuses.filter((s) => s === 429).length).toBeGreaterThanOrEqual(15);
+    expect(statuses.every((s) => s === 401 || s === 429)).toBe(true);
+
+    // And the email ends up locked.
+    expect((await login(emails.victim, PASSWORD)).status).toBe(429);
+  });
+
+  it("API-73 never evaluates more than five passwords in a burst that hides the right one", async () => {
+    // The reviewer's case: nineteen wrong and the correct one, all at once.
+    const passwords = [...Array.from({ length: 19 }, () => WRONG), PASSWORD];
+    const before = await prisma.session.count({ where: { userId: ids[0] } });
+    const responses = await Promise.all(passwords.map((p) => login(emails.victim, p)));
+
+    // Requests that got past the throttle are the ones that saw a 401 or 201.
+    // Whichever five they were, no more than five passwords were tried — the
+    // same as five sequential guesses — and everything else was refused.
+    const evaluated = responses.filter((r) => r.status === 401 || r.status === 201);
+    expect(evaluated.length).toBeLessThanOrEqual(5);
+    expect(responses.filter((r) => r.status === 429).length).toBeGreaterThanOrEqual(15);
+
+    // Arrival order is not guaranteed, so the correct password may or may not
+    // be among the five evaluated; either way a session exists only if it was.
+    const signedIn = responses.filter((r) => r.status === 201).length;
+    expect(await prisma.session.count({ where: { userId: ids[0] } })).toBe(before + signedIn);
+  });
+
   it("API-72 does not count malformed requests or an inactive account's correct password", async () => {
     for (let i = 0; i < 6; i++) {
       expect((await login(emails.victim, "")).status).toBe(400);

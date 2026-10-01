@@ -54,6 +54,50 @@ describe("UNIT-12 only failures inside the window count", () => {
   });
 });
 
+describe("UNIT-14 attempts in flight count against the limit (BR-67)", () => {
+  it("refuses a sixth attempt while five are still being checked", () => {
+    const t = new LoginThrottle();
+    for (let i = 0; i < 5; i++) expect(t.beginAttempt(EMAIL, 0).allowed).toBe(true);
+
+    const sixth = t.beginAttempt(EMAIL, 0);
+    expect(sixth).toEqual({ allowed: false, retryAfterSeconds: 15 * 60 });
+  });
+
+  it("counts in-flight attempts together with earlier failures", () => {
+    const t = new LoginThrottle();
+    failTimes(t, EMAIL, [0, 0, 0]);
+    expect(t.beginAttempt(EMAIL, 1).allowed).toBe(true);
+    expect(t.beginAttempt(EMAIL, 1).allowed).toBe(true);
+    expect(t.beginAttempt(EMAIL, 1).allowed).toBe(false);
+  });
+
+  it("locks when the reserved attempts come back as failures", () => {
+    const t = new LoginThrottle();
+    for (let i = 0; i < 5; i++) t.beginAttempt(EMAIL, 0);
+    for (let i = 0; i < 5; i++) t.endAttempt(EMAIL, "failure", 1);
+    expect(t.retryAfterSeconds(EMAIL, 1)).toBe(15 * 60);
+  });
+
+  it("gives the slot back for a neutral outcome without counting it", () => {
+    const t = new LoginThrottle();
+    for (let i = 0; i < 5; i++) t.beginAttempt(EMAIL, 0);
+    for (let i = 0; i < 5; i++) t.endAttempt(EMAIL, "neutral", 0);
+    expect(t.size).toBe(0);
+    expect(t.beginAttempt(EMAIL, 0).allowed).toBe(true);
+  });
+
+  it("clears failures on success without losing other attempts still in flight", () => {
+    const t = new LoginThrottle();
+    failTimes(t, EMAIL, [0, 0, 0]);
+    t.beginAttempt(EMAIL, 1); // a guess still being checked
+    t.beginAttempt(EMAIL, 1); // the correct password
+    t.endAttempt(EMAIL, "success", 2);
+    // One attempt is still in flight, so four more fit, not five.
+    for (let i = 0; i < 4; i++) expect(t.beginAttempt(EMAIL, 3).allowed).toBe(true);
+    expect(t.beginAttempt(EMAIL, 3).allowed).toBe(false);
+  });
+});
+
 describe("UNIT-13 the counter's key, reset, and size limit", () => {
   it("treats case and surrounding spaces as the same email", () => {
     const t = new LoginThrottle();
