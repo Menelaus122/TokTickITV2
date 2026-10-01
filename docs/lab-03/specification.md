@@ -515,7 +515,7 @@ a rename, an addition, or a backfill, no Lab 2 row is destroyed at any point.
 
 | Package | Where | Why |
 | :--- | :--- | :--- |
-| `bcryptjs` (+ `@types/bcryptjs`) | server | password hashing (D-10) |
+| `bcryptjs` 3.x | server | password hashing (D-10). Version 3 ships its own TypeScript types, so `@types/bcryptjs` is not needed |
 | `cookie-parser` (+ `@types/cookie-parser`) | server | reading the `tt_sid` cookie |
 
 `cors` is reconfigured with `credentials: true` and an explicit origin so the

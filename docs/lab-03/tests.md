@@ -179,8 +179,10 @@ Principles carried over from Lab 2:
 | MIG-05 | AC-36 | Lab 1 and Lab 2 suites after migration | all pass (BR-64) | 6 | Planned |
 | MIG-06 | BR-61 | seed run twice | no duplicate users or tickets (labsheet §5.3) | 2 | Planned |
 | MIG-07 | §7.5 | seed account counts | ≥ 4 active Requesters + 1 inactive, ≥ 3 active IT Staff + 1 inactive, ≥ 2 active Administrators | 2 | Planned |
-| MIG-08 | D-22 | migrated Requester after the migration but before the seed, then after it | before: `passwordHash` null and login refused (BR-66); after: the documented password works with no forced change, and `first.login@toktickit.local` is the only seeded account that must change (BR-61, §7.5) | 2 | Planned |
+| MIG-08 | D-22 | migrated Requester after the migration but before the seed, then after it | before: `passwordHash` null, so the documented password cannot verify (BR-66) — the login endpoint's own answer is API-67 in Issue 3; after: the documented password works with no forced change, and `first.login@toktickit.local` is the only seeded account that must change (BR-61, §7.5) | 2 | Planned |
 | MIG-09 | §7.5 | change a documented account's password and set its flag, then re-run the seed | the documented password works again and the flag is back to its documented value; an account created through User Management is untouched | 2 | Planned |
+| MIG-10 | BR-28 | create a ticket through the Lab 2 endpoint after the migration | `itPriority` equals `requestedPriority` and the ticket is unassigned | 2 | Planned |
+| MIG-11 | BR-03 | send an IT Staff id as `X-Requester-Id`, and read the Lab 2 selector, while the header still exists | refused as `REQUESTER_INVALID`, exactly like an unknown id; the selector lists Requesters only | 2 | Planned |
 
 ### 2.10 UI component — `client/tests/lab-03/`
 
@@ -282,7 +284,7 @@ alone.
 | AC-21 | API-32 – API-38, UNIT-09, UNIT-10, UI-12 |
 | AC-22 | API-40, API-42, UI-15, E2E-04 |
 | AC-23 | API-41 |
-| AC-24 | API-44, UI-16, E2E-05 |
+| AC-24 | API-44, MIG-10, UI-16, E2E-05 |
 | AC-25 | API-45, API-46, API-68, UNIT-06, UNIT-07, UI-17 |
 | AC-26 | API-47, API-48, UNIT-08, UI-18, E2E-05 |
 | AC-27 | API-51, API-52 |
@@ -293,7 +295,7 @@ alone.
 | AC-32 | API-62, UI-23 |
 | AC-33 | API-63, UI-24, E2E-09 |
 | AC-34 | API-64, UI-25, E2E-08 |
-| AC-35 | MIG-01 – MIG-04, MIG-08 |
+| AC-35 | MIG-01 – MIG-04, MIG-08, MIG-11 |
 | AC-36 | MIG-05 |
 | AC-37 | RESP-01 – RESP-06, STYLE-01, STYLE-03, STYLE-04, STYLE-05 |
 | AC-38 | UI-04, UI-14, STYLE-06 |
@@ -303,7 +305,7 @@ alone.
 
 | Issue | Tests |
 | :--- | :--- |
-| 2 — User model, migration, seed | MIG-01 – MIG-04, MIG-06 – MIG-09 |
+| 2 — User model, migration, seed | MIG-01 – MIG-04, MIG-06 – MIG-11 |
 | 3 — Authentication API | UNIT-01 – UNIT-05, API-01 – API-14, API-67 |
 | 4 — Authorization | SEC-01 – SEC-04, SEC-06, SEC-07, SEC-09 – SEC-11 |
 | 5 — Login and shell | UI-01 – UI-08 |
