@@ -1,5 +1,12 @@
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
+// Lab 3 — every request carries the session cookie. The client runs on another
+// port, so without credentials: "include" the browser would not send tt_sid to
+// the API at all, and every call would arrive unauthenticated (api-spec §1.1).
+function apiFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(url, { ...init, credentials: "include" });
+}
+
 export interface Category {
   id: number;
   name: string;
@@ -25,7 +32,7 @@ export interface Requester {
 // active ones (BR-09), so the client never has to decide who is selectable.
 // Throws on any failure so the screen can show one safe error state.
 export async function fetchRequesters(): Promise<Requester[]> {
-  const response = await fetch(`${API_URL}/api/requesters`);
+  const response = await apiFetch(`${API_URL}/api/requesters`);
   if (!response.ok) {
     throw new Error(`Failed to load development requesters (HTTP ${response.status})`);
   }
@@ -74,13 +81,13 @@ export class TicketValidationError extends Error {
 }
 
 export async function fetchCategories(): Promise<Category[]> {
-  const response = await fetch(`${API_URL}/api/categories`);
+  const response = await apiFetch(`${API_URL}/api/categories`);
   if (!response.ok) throw new Error(`Failed to load categories (HTTP ${response.status})`);
   return (await response.json()) as Category[];
 }
 
 export async function fetchRelatedSystems(): Promise<RelatedSystem[]> {
-  const response = await fetch(`${API_URL}/api/related-systems`);
+  const response = await apiFetch(`${API_URL}/api/related-systems`);
   if (!response.ok) throw new Error(`Failed to load related systems (HTTP ${response.status})`);
   return (await response.json()) as RelatedSystem[];
 }
@@ -89,7 +96,7 @@ export async function fetchRelatedSystems(): Promise<RelatedSystem[]> {
 // travels in the X-Requester-Id header, never in the body (BR-14), and the
 // server owns the ticket number, date, and status.
 export async function createTicket(requesterId: number, ticket: NewTicket): Promise<Ticket> {
-  const response = await fetch(`${API_URL}/api/tickets`, {
+  const response = await apiFetch(`${API_URL}/api/tickets`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -172,7 +179,7 @@ export async function fetchMyTickets(
   }
 
   const suffix = search.toString() ? `?${search.toString()}` : "";
-  const response = await fetch(`${API_URL}/api/tickets${suffix}`, {
+  const response = await apiFetch(`${API_URL}/api/tickets${suffix}`, {
     headers: { "X-Requester-Id": String(requesterId) },
   });
 
@@ -222,7 +229,7 @@ export async function fetchTicketDetail(
   requesterId: number,
   ticketId: number,
 ): Promise<TicketDetail> {
-  const response = await fetch(`${API_URL}/api/tickets/${ticketId}`, {
+  const response = await apiFetch(`${API_URL}/api/tickets/${ticketId}`, {
     headers: requesterHeaders(requesterId),
   });
 
@@ -237,7 +244,7 @@ export async function fetchAttachments(
   requesterId: number,
   ticketId: number,
 ): Promise<Attachment[]> {
-  const response = await fetch(`${API_URL}/api/tickets/${ticketId}/attachments`, {
+  const response = await apiFetch(`${API_URL}/api/tickets/${ticketId}/attachments`, {
     headers: requesterHeaders(requesterId),
   });
   if (!response.ok) throw new Error(`Failed to load attachments (HTTP ${response.status})`);
@@ -262,7 +269,7 @@ export async function uploadAttachment(
   const form = new FormData();
   form.append("file", file);
 
-  const response = await fetch(`${API_URL}/api/tickets/${ticketId}/attachments`, {
+  const response = await apiFetch(`${API_URL}/api/tickets/${ticketId}/attachments`, {
     method: "POST",
     headers: requesterHeaders(requesterId),
     body: form,
@@ -285,7 +292,7 @@ export async function downloadAttachment(
   requesterId: number,
   attachment: Pick<Attachment, "id" | "originalFilename">,
 ): Promise<void> {
-  const response = await fetch(`${API_URL}/api/attachments/${attachment.id}/download`, {
+  const response = await apiFetch(`${API_URL}/api/attachments/${attachment.id}/download`, {
     headers: requesterHeaders(requesterId),
   });
 
@@ -311,7 +318,7 @@ export async function removeAttachment(
   attachmentId: number,
   removalReason: string,
 ): Promise<Attachment> {
-  const response = await fetch(`${API_URL}/api/attachments/${attachmentId}/remove`, {
+  const response = await apiFetch(`${API_URL}/api/attachments/${attachmentId}/remove`, {
     method: "PATCH",
     headers: { ...requesterHeaders(requesterId), "Content-Type": "application/json" },
     body: JSON.stringify({ removalReason }),
@@ -326,17 +333,91 @@ export async function removeAttachment(
 // Throwing on any failure lets the UI show a single Offline/error state.
 export async function checkSystem(): Promise<SystemStatus> {
   // Issue 2 — confirm the backend is reachable and healthy.
-  const health = await fetch(`${API_URL}/api/health`);
+  const health = await apiFetch(`${API_URL}/api/health`);
   if (!health.ok) {
     throw new Error(`Health check failed (HTTP ${health.status})`);
   }
 
   // Issue 4 — load the supported request categories from the API.
-  const categoriesRes = await fetch(`${API_URL}/api/categories`);
+  const categoriesRes = await apiFetch(`${API_URL}/api/categories`);
   if (!categoriesRes.ok) {
     throw new Error(`Failed to load categories (HTTP ${categoriesRes.status})`);
   }
   const categories: Category[] = await categoriesRes.json();
 
   return { online: true, categories };
+}
+
+// --- Lab 3, Issue 5 — authentication (api-spec §2) --------------------------
+
+export type Role = "REQUESTER" | "IT_STAFF" | "ADMINISTRATOR";
+
+// The permitted user shape (api-spec §1.6). No password or token ever.
+export interface AuthUser {
+  id: number;
+  fullName: string;
+  email: string;
+  role: Role;
+  isActive: boolean;
+  mustChangePassword: boolean;
+}
+
+// A failure the screens can show safely: the API's own message and code, plus
+// any field-level messages. Never a status line or stack trace (FR-47).
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly code: string,
+    message: string,
+    public readonly fields: Record<string, string> = {},
+  ) {
+    super(message);
+  }
+}
+
+async function failure(response: Response, fallback: string): Promise<ApiError> {
+  try {
+    const body = (await response.json()) as { error?: { code?: string; message?: string; fields?: Record<string, string> } };
+    return new ApiError(response.status, body.error?.code ?? "UNKNOWN", body.error?.message ?? fallback, body.error?.fields ?? {});
+  } catch {
+    return new ApiError(response.status, "UNKNOWN", fallback);
+  }
+}
+
+/** The signed-in user, or null when there is no session (a 401). */
+export async function fetchCurrentUser(): Promise<AuthUser | null> {
+  const response = await apiFetch(`${API_URL}/api/auth/me`);
+  if (response.status === 401) return null;
+  if (!response.ok) throw await failure(response, "Cannot reach TokTickIT right now.");
+  return ((await response.json()) as { user: AuthUser }).user;
+}
+
+export async function login(email: string, password: string): Promise<AuthUser> {
+  const response = await apiFetch(`${API_URL}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!response.ok) throw await failure(response, "Sign-in failed. Please try again.");
+  return ((await response.json()) as { user: AuthUser }).user;
+}
+
+export async function logout(): Promise<void> {
+  const response = await apiFetch(`${API_URL}/api/auth/logout`, { method: "POST" });
+  if (!response.ok) throw await failure(response, "Sign-out failed. Please try again.");
+}
+
+export interface PasswordChange {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+export async function changePassword(change: PasswordChange): Promise<void> {
+  const response = await apiFetch(`${API_URL}/api/auth/password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(change),
+  });
+  if (!response.ok) throw await failure(response, "The password could not be changed. Please try again.");
 }

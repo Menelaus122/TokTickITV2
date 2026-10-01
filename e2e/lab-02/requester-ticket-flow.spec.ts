@@ -206,7 +206,7 @@ test.describe("E2E-04 changing Requester", () => {
 
     await switchRequester(page, REQUESTER_B);
 
-    await expect(page.getByTestId("current-requester")).toHaveText(REQUESTER_B);
+    await expect(page.getByTestId("current-user")).toHaveText(REQUESTER_B);
     await expect(page.getByText(summary)).toHaveCount(0);
   });
 
@@ -214,7 +214,7 @@ test.describe("E2E-04 changing Requester", () => {
     await selectRequester(page, REQUESTER_A);
     await page.reload();
 
-    await expect(page.getByTestId("current-requester")).toHaveText(REQUESTER_A);
+    await expect(page.getByTestId("current-user")).toHaveText(REQUESTER_A);
   });
 });
 test.describe("E2E-05 attaching while creating the ticket", () => {

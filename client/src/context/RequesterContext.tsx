@@ -65,9 +65,17 @@ export function RequesterProvider({
    * chance to answer.
    */
   available,
+  /**
+   * Lab 3, Issue 5 — the signed-in Requester. When given, it IS the current
+   * Requester: nothing is read from or written to localStorage, and it cannot
+   * be changed from inside the application. The Development selector path
+   * (available + localStorage) is removed in Issue 6.
+   */
+  signedIn,
 }: {
   children: ReactNode;
   available?: Requester[];
+  signedIn?: Requester;
 }) {
   const [requester, setRequester] = useState<Requester | null>(null);
   const [generation, setGeneration] = useState(0);
@@ -105,8 +113,11 @@ export function RequesterProvider({
   }, []);
 
   const value = useMemo(
-    () => ({ requester, ready: restored, selectRequester, changeRequester, generation }),
-    [requester, restored, selectRequester, changeRequester, generation],
+    () =>
+      signedIn
+        ? { requester: signedIn, ready: true, selectRequester, changeRequester, generation: 0 }
+        : { requester, ready: restored, selectRequester, changeRequester, generation },
+    [signedIn, requester, restored, selectRequester, changeRequester, generation],
   );
 
   return <RequesterContext.Provider value={value}>{children}</RequesterContext.Provider>;

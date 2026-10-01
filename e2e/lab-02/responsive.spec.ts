@@ -35,9 +35,10 @@ test.describe("RESP-01 no horizontal overflow", () => {
     test(`every screen fits at ${name}`, async ({ page }) => {
       await page.setViewportSize(VIEWPORTS[name]);
 
-      await page.goto("/select-requester");
-      await expect(page.getByLabel(/Development Requester/)).toBeVisible();
-      expect(await hasHorizontalOverflow(page), "selection screen").toBe(false);
+      // Lab 3: Login replaces the Development Requester selector.
+      await page.goto("/login");
+      await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+      expect(await hasHorizontalOverflow(page), "login screen").toBe(false);
 
       const ticketId = await seedSession(page);
       expect(await hasHorizontalOverflow(page), "ticket detail").toBe(false);
@@ -155,13 +156,8 @@ test.describe("RESP-03 screenshots for the visual checklist", () => {
   });
 
   test("capture the selection screen and the states that matter", async ({ page }) => {
-    // Requester Selection, before any identity exists.
-    for (const name of VIEWPORT_NAMES) {
-      await page.setViewportSize(VIEWPORTS[name]);
-      await page.goto("/select-requester");
-      await expect(page.getByLabel(/Development Requester/)).toBeVisible();
-      await shoot(page, "requester-selection", name);
-    }
+    // The Requester Selection screenshots are Lab 2 evidence of a screen Lab 3
+    // removed; they are not retaken. Lab 3's Login is captured by e2e/lab-03.
 
     await page.setViewportSize(VIEWPORTS.desktop);
 

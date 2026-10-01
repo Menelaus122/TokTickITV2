@@ -6,7 +6,7 @@
 // user. All three badge kinds share the same class names, which is what keeps
 // them identical across the list, the cards, and the detail screen.
 
-type Tone = "neutral" | "green" | "amber" | "red";
+type Tone = "neutral" | "green" | "amber" | "red" | "readonly" | "solid";
 
 function BadgeBase({ tone, text, kind }: { tone: Tone; text: string; kind: string }) {
   return (
@@ -55,4 +55,25 @@ export function AttachmentBadge({ removed }: { removed: boolean }) {
       text={removed ? "Removed" : "Active"}
     />
   );
+}
+
+// --- Role (Lab 3, ui-spec §1.1) ---------------------------------------------
+
+export type RoleValue = "REQUESTER" | "IT_STAFF" | "ADMINISTRATOR";
+
+const ROLE_TONE: Record<RoleValue, Tone> = {
+  REQUESTER: "readonly",
+  IT_STAFF: "green",
+  ADMINISTRATOR: "solid",
+};
+
+const ROLE_TEXT: Record<RoleValue, string> = {
+  REQUESTER: "Requester",
+  IT_STAFF: "IT Staff",
+  ADMINISTRATOR: "Administrator",
+};
+
+// The role is always spelled out; the shade is never the only signal.
+export function RoleBadge({ value }: { value: RoleValue }) {
+  return <BadgeBase kind="role" tone={ROLE_TONE[value]} text={ROLE_TEXT[value]} />;
 }

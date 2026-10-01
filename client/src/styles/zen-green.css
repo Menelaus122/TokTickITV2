@@ -257,6 +257,10 @@ textarea.tt-field__control {
 .tt-badge--green   { background: var(--tt-green-pale); color: var(--tt-green-primary); border-color: var(--tt-green-pale); }
 .tt-badge--amber   { background: var(--tt-warning-bg); color: var(--tt-warning); border-color: var(--tt-warning-bg); }
 .tt-badge--red     { background: var(--tt-error-bg); color: var(--tt-error); border-color: var(--tt-error); }
+/* Lab 3 role badges (ui-spec §1.1): Requester on the read-only tone, IT Staff on
+   pale green, Administrator solid green. */
+.tt-badge--readonly { background: var(--tt-readonly-bg); color: var(--tt-text); border-color: var(--tt-border); }
+.tt-badge--solid    { background: var(--tt-green-primary); color: #fff; border-color: var(--tt-green-primary); }
 
 /* --- States (ui-spec.md 6) ----------------------------------------------- */
 
@@ -331,7 +335,7 @@ textarea.tt-field__control {
   color: #fff;
 }
 
-.tt-shell__brand { font-size: var(--tt-font-h2); font-weight: 700; }
+.tt-shell__brand { font-size: var(--tt-font-h2); font-weight: 700; color: #fff; text-decoration: none; }
 .tt-shell__nav { display: flex; gap: var(--tt-space-4); }
 
 .tt-shell__link {
@@ -575,3 +579,45 @@ textarea.tt-field__control {
 
 /* Nothing may push the page sideways at any width. */
 html, body { overflow-x: hidden; }
+
+/* --- Lab 3: Login and Change Password (ui-spec §3, §4) --------------------- */
+
+.tt-auth {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--tt-space-4);
+}
+
+.tt-auth__card { width: 100%; max-width: 420px; }
+.tt-auth__card .tt-btn--primary { width: 100%; }
+.tt-auth__brand { font-size: var(--tt-font-h2); font-weight: 700; color: var(--tt-green-primary); margin: 0; }
+.tt-auth__lede { color: var(--tt-text-muted); margin: 0 0 var(--tt-space-4); }
+
+/* --- Lab 3: the signed-in user in the shell (ui-spec §2) ------------------- */
+
+.tt-shell__user {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--tt-space-3);
+}
+
+.tt-shell__user-name { font-weight: 600; }
+.tt-shell__action { color: #fff; text-decoration: underline; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+
+/* Below 768px the user block moves into the hamburger menu with the
+   navigation; the menu's background is the dark green, so its text stays white. */
+@media (max-width: 767px) {
+  .tt-shell__header .tt-shell__user { display: none; }
+  /* Stacked: who is signed in on one row, then each action as its own
+     touch-height row, so nothing wraps into an awkward half-row. */
+  .tt-shell__mobile-nav .tt-shell__user { display: flex; flex-direction: column; align-items: flex-start; gap: 0; margin: var(--tt-space-3) 0 var(--tt-space-2); color: #fff; }
+  .tt-shell__mobile-nav .tt-shell__action { min-height: 44px; line-height: 44px; }
+}
+/* From 768px the header's user block shows and the menu's copy does not. */
+@media (min-width: 768px) {
+  .tt-shell__mobile-nav .tt-shell__user { display: none; }
+}
