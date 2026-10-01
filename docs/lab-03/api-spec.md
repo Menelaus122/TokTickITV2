@@ -35,8 +35,15 @@ The server stores only `sha256(token)` (BR-10). Every authenticated request is o
 indexed lookup on `Session.tokenHash`, joined to `User`; an expired row is treated
 as no session at all.
 
-`X-Requester-Id` from Lab 2 is **ignored** wherever it appears (FR-18, AC-14). It
-is not an error to send it; it simply has no effect.
+`X-Requester-Id` from Lab 2 is **ignored** whenever a session is present (FR-18,
+AC-14); it is not an error to send it. Until Issue 6 replaces the Lab 2
+selector with sign-in, a Requester endpoint called with **no** session cookie
+still falls back to the header, so the Lab 2 screens keep working in between.
+Issue 6 removes that fallback, and from then on those endpoints answer `401`
+without a session like every other protected route.
+
+A session whose role is not `REQUESTER` gets `403 FORBIDDEN` from every Requester
+endpoint, header or not (BR-18).
 
 The client sends `credentials: "include"` on every request. The server sets
 `cors({ origin: <client origin>, credentials: true })`.
@@ -81,7 +88,7 @@ user: no stack traces, SQL, file paths, internal ids, or password material
 | `409` | conflict — duplicate email, already claimed, invalid transition, last Administrator, self-deactivation |
 | `410` | download of a soft-removed Attachment (Lab 2) |
 | `429` | sign-in refused because the email is locked after repeated failures (BR-67) |
-| `413` / `415` | attachment too large / unsupported type (Lab 2) |
+| `413` / `415` | attachment too large / unsupported type (Lab 2); a request body over the JSON limit / in an unsupported charset or encoding |
 | `500` | unexpected server error, no internal detail in the body |
 
 ### 1.4 Error codes
@@ -104,7 +111,9 @@ user: no stack traces, SQL, file paths, internal ids, or password material
 | `SELF_DEACTIVATION` | 409 | an Administrator targeted their own account (BR-48) |
 | `LAST_ADMINISTRATOR` | 409 | the change would leave zero active Administrators (BR-49) |
 | `TOO_MANY_ATTEMPTS` | 429 | five failed sign-ins for this email within 15 minutes; locked for 15 minutes (BR-67) |
-| `INTERNAL_ERROR` | 500 | unexpected failure |
+| `REQUEST_TOO_LARGE` | 413 | the request body is over the JSON body limit |
+| `UNSUPPORTED_MEDIA_TYPE` | 415 | the request body's charset or encoding is not supported |
+| `INTERNAL_ERROR` | 500 | unexpected failure, including a database that cannot be reached; the body carries no detail and the server keeps serving |
 
 Lab 2's `ATTACHMENT_*`, `FILE_TOO_LARGE`, and `UNSUPPORTED_FILE_TYPE` codes are
 unchanged. `REQUESTER_CONTEXT_REQUIRED`, `REQUESTER_INVALID`, and
@@ -622,8 +631,12 @@ requires knowing the current one.
 | `PATCH` | `/api/admin/users/:id` | yes | Administrator |
 | `POST` | `/api/admin/users/:id/initial-password` | yes | Administrator |
 
-Guard order on every request: session → `mustChangePassword` → role → ownership →
-input validation → business rules. A caller therefore learns "log in" before "you
+Guard order on every request: `Origin` (BR-65) → session → `mustChangePassword` →
+role → ownership → input validation → business rules. The role guard is mounted
+on the `/api/staff` and `/api/admin` prefixes, so it covers every route under them,
+including ones not written yet. An `/api` path that matches no route answers
+`404 NOT_FOUND` in the usual envelope, and a body that is not valid JSON answers
+`400 VALIDATION_FAILED`. A caller therefore learns "log in" before "you
 may not", and "you may not" before anything about the resource.
 
 ---

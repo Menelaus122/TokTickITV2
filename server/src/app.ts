@@ -3,7 +3,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import { getPrisma } from "./prisma.js";
 import { attachSession, authRouter, enforcePasswordChange } from "./auth.js";
-import { resolveRequester, REQUESTER_HEADER } from "./requesterContext.js";
+import { apiNotFound, rejectForeignOrigin, requireRole, resolveRequesterIdentity, safeErrors } from "./authorization.js";
 import { validateTicketInput } from "./validation.js";
 import { nextTicketNumber } from "./ticketNumber.js";
 import { parseTicketListQuery, buildPageMeta } from "./listQuery.js";
@@ -43,6 +43,9 @@ const CLIENT_ORIGINS = (process.env.CLIENT_ORIGINS ?? "http://localhost:5173")
   .filter((origin) => origin.length > 0);
 
 app.use(cors({ origin: CLIENT_ORIGINS, credentials: true }));
+// Lab 3, Issue 4 — BR-65: a state-changing request from a foreign Origin is
+// refused before anything else reads it.
+app.use(rejectForeignOrigin(CLIENT_ORIGINS));
 app.use(express.json());
 app.use(cookieParser());
 
@@ -52,6 +55,12 @@ app.use(cookieParser());
 app.use(attachSession);
 app.use(enforcePasswordChange);
 app.use("/api/auth", authRouter);
+
+// Lab 3, Issue 4 — the BR-18 matrix by route family. Administrators are not
+// IT Staff (BR-19), so each family admits exactly one role. Mounted here, the
+// guard covers every route Issues 8 to 10 add under these prefixes.
+app.use("/api/staff", requireRole("IT_STAFF"));
+app.use("/api/admin", requireRole("ADMINISTRATOR"));
 
 // ---------------------------------------------------------------------------
 // Issue 2 — API health check
@@ -181,7 +190,7 @@ app.post("/api/tickets", async (req: Request, res: Response) => {
   res.set("Cache-Control", "no-store");
   const prisma = getPrisma();
 
-  const context = await resolveRequester(prisma, req.headers[REQUESTER_HEADER]);
+  const context = await resolveRequesterIdentity(prisma, req);
   if (!context.ok) {
     return res
       .status(context.status)
@@ -292,7 +301,7 @@ app.get("/api/tickets", async (req: Request, res: Response) => {
   res.set("Cache-Control", "no-store");
   const prisma = getPrisma();
 
-  const context = await resolveRequester(prisma, req.headers[REQUESTER_HEADER]);
+  const context = await resolveRequesterIdentity(prisma, req);
   if (!context.ok) {
     return res
       .status(context.status)
@@ -422,7 +431,7 @@ app.get("/api/tickets/:id", async (req: Request, res: Response) => {
   res.set("Cache-Control", "no-store");
   const prisma = getPrisma();
 
-  const context = await resolveRequester(prisma, req.headers[REQUESTER_HEADER]);
+  const context = await resolveRequesterIdentity(prisma, req);
   if (!context.ok) {
     return res
       .status(context.status)
@@ -468,7 +477,7 @@ app.get("/api/tickets/:id/attachments", async (req: Request, res: Response) => {
   res.set("Cache-Control", "no-store");
   const prisma = getPrisma();
 
-  const context = await resolveRequester(prisma, req.headers[REQUESTER_HEADER]);
+  const context = await resolveRequesterIdentity(prisma, req);
   if (!context.ok) {
     return res
       .status(context.status)
@@ -524,7 +533,7 @@ app.post("/api/tickets/:id/attachments", (req: Request, res: Response) => {
 
     const prisma = getPrisma();
 
-    const context = await resolveRequester(prisma, req.headers[REQUESTER_HEADER]);
+    const context = await resolveRequesterIdentity(prisma, req);
     if (!context.ok) {
       return res
         .status(context.status)
@@ -618,7 +627,7 @@ app.get("/api/attachments/:id/download", async (req: Request, res: Response) => 
   res.set("Cache-Control", "no-store");
   const prisma = getPrisma();
 
-  const context = await resolveRequester(prisma, req.headers[REQUESTER_HEADER]);
+  const context = await resolveRequesterIdentity(prisma, req);
   if (!context.ok) {
     return res
       .status(context.status)
@@ -685,7 +694,7 @@ app.patch("/api/attachments/:id/remove", async (req: Request, res: Response) => 
   res.set("Cache-Control", "no-store");
   const prisma = getPrisma();
 
-  const context = await resolveRequester(prisma, req.headers[REQUESTER_HEADER]);
+  const context = await resolveRequesterIdentity(prisma, req);
   if (!context.ok) {
     return res
       .status(context.status)
@@ -751,5 +760,9 @@ app.patch("/api/attachments/:id/remove", async (req: Request, res: Response) => 
       .json({ error: { code: "INTERNAL_ERROR", message: "Failed to remove the attachment." } });
   }
 });
+
+// Lab 3, Issue 4 — safe errors to the very end (FR-47, api-spec §6.2).
+app.use("/api", apiNotFound);
+app.use(safeErrors);
 
 export default app;
