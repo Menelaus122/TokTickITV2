@@ -35,8 +35,15 @@ The server stores only `sha256(token)` (BR-10). Every authenticated request is o
 indexed lookup on `Session.tokenHash`, joined to `User`; an expired row is treated
 as no session at all.
 
-`X-Requester-Id` from Lab 2 is **ignored** wherever it appears (FR-18, AC-14). It
-is not an error to send it; it simply has no effect.
+`X-Requester-Id` from Lab 2 is **ignored** whenever a session is present (FR-18,
+AC-14); it is not an error to send it. Until Issue 6 replaces the Lab 2
+selector with sign-in, a Requester endpoint called with **no** session cookie
+still falls back to the header, so the Lab 2 screens keep working in between.
+Issue 6 removes that fallback, and from then on those endpoints answer `401`
+without a session like every other protected route.
+
+A session whose role is not `REQUESTER` gets `403 FORBIDDEN` from every Requester
+endpoint, header or not (BR-18).
 
 The client sends `credentials: "include"` on every request. The server sets
 `cors({ origin: <client origin>, credentials: true })`.
@@ -622,8 +629,12 @@ requires knowing the current one.
 | `PATCH` | `/api/admin/users/:id` | yes | Administrator |
 | `POST` | `/api/admin/users/:id/initial-password` | yes | Administrator |
 
-Guard order on every request: session → `mustChangePassword` → role → ownership →
-input validation → business rules. A caller therefore learns "log in" before "you
+Guard order on every request: `Origin` (BR-65) → session → `mustChangePassword` →
+role → ownership → input validation → business rules. The role guard is mounted
+on the `/api/staff` and `/api/admin` prefixes, so it covers every route under them,
+including ones not written yet. An `/api` path that matches no route answers
+`404 NOT_FOUND` in the usual envelope, and a body that is not valid JSON answers
+`400 VALIDATION_FAILED`. A caller therefore learns "log in" before "you
 may not", and "you may not" before anything about the resource.
 
 ---

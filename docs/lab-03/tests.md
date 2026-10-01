@@ -87,17 +87,17 @@ Principles carried over from Lab 2:
 
 | ID | AC | What it tests | Expected | Issue | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| SEC-01 | AC-10 | every protected endpoint with no cookie | 401 `AUTH_REQUIRED`, never 403 | 4 | Planned |
-| SEC-02 | AC-09 | Requester calls each `/api/staff/*` endpoint | 403 `FORBIDDEN` | 4 | Planned |
-| SEC-03 | AC-09 | Administrator calls each `/api/staff/*` endpoint | 403 `FORBIDDEN` (BR-19) | 4 | Planned |
-| SEC-04 | AC-09 | IT Staff and Requester call each `/api/admin/*` endpoint | 403 `FORBIDDEN` | 4 | Planned |
+| SEC-01 | AC-10 | every session-only endpoint with no cookie: `/api/auth/me`, `/api/auth/password`, and every `/api/staff/*` and `/api/admin/*` route | 401 `AUTH_REQUIRED`, never 403. The Lab 2 Requester endpoints join this list in Issue 6, when their `X-Requester-Id` fallback is removed (API-15 – API-18) | 4 | Pass |
+| SEC-02 | AC-09 | Requester calls each `/api/staff/*` endpoint | 403 `FORBIDDEN` | 4 | Pass |
+| SEC-03 | AC-09 | Administrator calls each `/api/staff/*` endpoint | 403 `FORBIDDEN` (BR-19) | 4 | Pass |
+| SEC-04 | AC-09 | IT Staff and Requester call each `/api/admin/*` endpoint | 403 `FORBIDDEN` | 4 | Pass |
 | SEC-05 | AC-08 | Requester reads and posts Internal Notes | 403, no note body, author, or count anywhere in the response | 7 | Planned |
-| SEC-06 | AC-11 | Requester opens another Requester's ticket, attachments, download, comments | 404 on every route, identical to a nonexistent id | 4 | Planned |
-| SEC-07 | AC-07 | body carries another user's `requesterId`; header carries `X-Requester-Id` | both ignored, session identity used, no cross-Requester data returned | 4, 6 | Planned |
+| SEC-06 | AC-11 | Requester opens another Requester's ticket, attachment list, upload, download, and removal | 404 on every route, identical to a nonexistent id. Comments are covered by API-23 when Issue 7 adds them | 4 | Pass |
+| SEC-07 | AC-07 | body carries another user's `requesterId`; header carries `X-Requester-Id` | both ignored, session identity used, no cross-Requester data returned | 4, 6 | Pass |
 | SEC-08 | AC-07 | `POST /api/tickets` with a body `ticketNumber` and `currentStatus` | both ignored, backend values win (Lab 2 BR-01) | 6 | Planned |
-| SEC-09 | AC-10 | guard order: no session **and** wrong role | 401 wins over 403 (api-spec §7) | 4 | Planned |
-| SEC-10 | AC-28 | every user-carrying response across the whole API | no `passwordHash`, no `tokenHash`, no `initialPassword` field (BR-52) | 4, 10 | Planned |
-| SEC-11 | BR-65 | `POST`, `PATCH`, and a `multipart/form-data` upload carrying a foreign `Origin` header | 403 `FORBIDDEN` before the handler runs; the same requests with the configured origin, and a `GET` with a foreign origin, succeed | 4 | Planned |
+| SEC-09 | AC-10 | guard order: no session **and** wrong role | 401 wins over 403 (api-spec §7) | 4 | Pass |
+| SEC-10 | AC-28 | every user-carrying response across the whole API | no `passwordHash`, no `tokenHash`, no `initialPassword` field (BR-52) | 4, 10 | Pass |
+| SEC-11 | BR-65 | `POST`, `PATCH`, and a `multipart/form-data` upload carrying a foreign `Origin` header | 403 `FORBIDDEN` before the handler runs; the same requests with the configured origin, and a `GET` with a foreign origin, succeed | 4 | Pass |
 
 ### 2.4 API — Requester regression, `server/tests/lab-03/requester-regression.api.test.ts`
 
