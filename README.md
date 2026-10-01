@@ -79,8 +79,8 @@ Then open:
 - Backend health check: <http://localhost:3000/api/health>
 - PostgreSQL: `localhost:5432` (user `toktickit`, password `toktickit`, db `toktickit`)
 
-The app opens on the **Development Requester Selection** screen. Pick one of the
-four seeded Requesters and press **Continue** to enter the application.
+The app opens on the **Login** screen. Sign in with any seeded account below;
+each role lands on its own home page and sees only its own navigation.
 
 Stop the stack (keeps the database volume):
 
@@ -134,6 +134,10 @@ the app are never touched.
 > docker compose exec server npm run prisma:seed
 > docker compose restart server
 > ```
+>
+> The client container's Vite server does not always see file changes made on a
+> Windows host, so after pulling, restart it as well (`docker compose restart
+> client`) or the browser keeps getting the previous screens.
 
 ---
 
