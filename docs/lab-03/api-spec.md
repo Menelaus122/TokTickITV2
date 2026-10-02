@@ -35,12 +35,11 @@ The server stores only `sha256(token)` (BR-10). Every authenticated request is o
 indexed lookup on `Session.tokenHash`, joined to `User`; an expired row is treated
 as no session at all.
 
-`X-Requester-Id` from Lab 2 is **ignored** whenever a session is present (FR-18,
-AC-14); it is not an error to send it. Until Issue 6 replaces the Lab 2
-selector with sign-in, a Requester endpoint called with **no** session cookie
-still falls back to the header, so the Lab 2 screens keep working in between.
-Issue 6 removes that fallback, and from then on those endpoints answer `401`
-without a session like every other protected route.
+`X-Requester-Id` from Lab 2 is **ignored** (FR-18, AC-14); it is not an error to
+send it, and it never stands in for a session. A Requester endpoint called
+without a session cookie answers `401 AUTH_REQUIRED` like every other protected
+route — header or not. (Issues 4 and 5 kept a header-only fallback so the Lab 2
+screens worked in between; Issue 6 removed it with the selector.)
 
 A session whose role is not `REQUESTER` gets `403 FORBIDDEN` from every Requester
 endpoint, header or not (BR-18).

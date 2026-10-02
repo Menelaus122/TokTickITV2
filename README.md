@@ -34,10 +34,11 @@ manage its attachments from Ticket Detail.
 - [x] **Issue 10** — Create Ticket completion (attachments, success state, Cancel)
 - [x] **Issue 11** — Staging integration, documentation, and delivery
 
-> **Note on Lab 2 authentication.** There is none, by design. A Development
-> Requester selector stands in for login so requester-specific behaviour can be
-> tested. It is not authentication and is labelled as such throughout the app.
-> Real authentication arrives in Lab 3.
+> **Note on Lab 2 authentication.** Lab 2 had none, by design: a Development
+> Requester selector stood in for login. Lab 3 replaced it with real sign-in;
+> since Lab 3 Issue 6 the selector, its `X-Requester-Id` header, and
+> `GET /api/requesters` are gone, and the Lab 2 screens act as the signed-in
+> Requester.
 
 ## Project layout
 
@@ -143,10 +144,14 @@ the app are never touched.
 
 ## API
 
-Every requester-scoped endpoint requires the current Development Requester in an
-`X-Requester-Id` header. Identity is never read from a request body or query
-string, and a ticket or attachment belonging to another Requester returns `404` —
-the same answer as one that does not exist, so the API never discloses it.
+Every endpoint except login, logout, and health requires a signed-in session
+(the `tt_sid` cookie below); without one it answers `401 AUTH_REQUIRED`. The
+Requester endpoints act for the session's user only. Identity is never read from
+a request body, query string, or header — Lab 2's `X-Requester-Id` is ignored —
+and a ticket or attachment belonging to another Requester returns `404`, the same
+answer as one that does not exist, so the API never discloses it. IT Staff and
+Administrators get `403` from the Requester endpoints: they have no tickets of
+their own.
 
 ### Authentication (Lab 3)
 
@@ -171,9 +176,7 @@ minutes: every attempt, the correct password included, answers
 `429 TOO_MANY_ATTEMPTS` with a `Retry-After` header. Emails with no account are
 locked the same way, so a lock reveals nothing. The counter lives in the server's
 memory, so **restarting the server clears every lock**, which is also the quickest
-way out if you lock yourself out while testing. Until Issues 4 and 6 move the Lab 2 endpoints
-below onto the session, they still work exactly as in Lab 2 for a request that
-carries no session cookie.
+way out if you lock yourself out while testing.
 
 The browser client runs on another port, so the API names the allowed origins
 instead of answering `*`; a cookie is never sent to a wildcard. The default is
@@ -185,33 +188,37 @@ cross-site and never sends the session cookie, so sign-in fails.
 
 ### Lab 2 endpoints
 
-| Method | Endpoint | Requester context | Description |
+| Method | Endpoint | Session | Description |
 |--------|----------|:--:|-------------|
 | GET | `/api/health` | — | Backend health/liveness check |
-| GET | `/api/categories` | — | Active ticket categories |
-| GET | `/api/related-systems` | — | Active related systems |
-| GET | `/api/requesters` | — | Active Development Requesters for the selector |
-| POST | `/api/tickets` | ✔ | Create one validated ticket; the server generates the Ticket Number |
-| GET | `/api/tickets` | ✔ | The requester's tickets, with search, filters, sorting, and pagination |
-| GET | `/api/tickets/:id` | ✔ | One owned ticket, with its attachments |
-| POST | `/api/tickets/:id/attachments` | ✔ | Upload one permitted file (JPG/JPEG/PNG/WEBP/PDF, ≤ 5 MB, 5 active max) |
-| GET | `/api/tickets/:id/attachments` | ✔ | Attachment metadata, active and removed |
-| GET | `/api/attachments/:id/download` | ✔ | Download an active attachment |
-| PATCH | `/api/attachments/:id/remove` | ✔ | Soft-remove an attachment, with a required reason |
+| GET | `/api/categories` | any role | Active ticket categories |
+| GET | `/api/related-systems` | any role | Active related systems |
+| POST | `/api/tickets` | Requester | Create one validated ticket; the server generates the Ticket Number |
+| GET | `/api/tickets` | Requester | The signed-in Requester's tickets, with search, filters (any of the eight statuses), sorting, and pagination |
+| GET | `/api/tickets/:id` | Requester | One owned ticket, with its attachments |
+| POST | `/api/tickets/:id/attachments` | Requester | Upload one permitted file (JPG/JPEG/PNG/WEBP/PDF, ≤ 5 MB, 5 active max) |
+| GET | `/api/tickets/:id/attachments` | Requester | Attachment metadata, active and removed |
+| GET | `/api/attachments/:id/download` | Requester | Download an active attachment |
+| PATCH | `/api/attachments/:id/remove` | Requester | Soft-remove an attachment, with a required reason |
 
 ```bash
 curl http://localhost:3000/api/health
 # {"status":"ok","service":"TokTickIT API"}
 
-curl http://localhost:3000/api/requesters
-# [{"id":1,"fullName":"Anucha Wongsawat","email":"…","department":"Civil Engineering"}, …]
+# Sign in once, keeping the session cookie in a jar, then use it.
+curl -c jar.txt -H "Content-Type: application/json" \
+  -d '{"email":"anucha.wong@kmutt.ac.th","password":"Toktickit#2026"}' \
+  http://localhost:3000/api/auth/login
+curl -b jar.txt http://localhost:3000/api/tickets
+# {"data":[ … ],"meta":{"page":1,"pageSize":10,"totalItems":…,"totalPages":…,…}}
 
-curl http://localhost:3000/api/tickets -H "X-Requester-Id: 1"
-# {"data":[ … ],"meta":{"page":1,"pageSize":10,"totalItems":0,"totalPages":0,…}}
+curl http://localhost:3000/api/tickets
+# {"error":{"code":"AUTH_REQUIRED","message":"Sign in to continue."}}
 ```
 
 The full contract — request and response shapes, query parameters, error codes,
-and status codes — is in [`docs/lab-02/api-spec.md`](docs/lab-02/api-spec.md).
+and status codes — is in [`docs/lab-02/api-spec.md`](docs/lab-02/api-spec.md),
+with the Lab 3 changes in [`docs/lab-03/api-spec.md`](docs/lab-03/api-spec.md) §3.
 
 ---
 
@@ -367,7 +374,7 @@ PostgreSQL via `DATABASE_URL`.
 
 | Model | Purpose |
 |-------|---------|
-| `RequesterUser` | The temporary Lab 2 Development Requester. No password, role, or session column — it is a testing identity, not an account. |
+| `User` | Every account — Requester, IT Staff, or Administrator — with a bcrypt password hash and a role. Lab 2's `RequesterUser`, renamed in place by the Lab 3 migration. |
 | `Category` | Ticket classification (from Lab 1; Lab 2 adds `isActive`) |
 | `RelatedSystem` | The service, application, device, or platform a ticket is about |
 | `Ticket` | Unique backend-generated `ticketNumber`, `NEW` status, and foreign keys to requester, category, and related system |
@@ -385,7 +392,7 @@ running it repeatedly never creates duplicates:
 
 - 4 ticket categories — Account and Access, Hardware, Software, Network
 - 7 related systems — Email, Campus Wi-Fi, VPN, LEB2 App, Grade Submission App, Printer, Corporate Laptop
-- 4 **active** Development Requesters, plus 1 **inactive** one that must never appear in the selector
+- the seeded accounts listed above, including 1 **inactive** Requester that cannot sign in
 
 ### Migrate & seed (via Docker)
 
