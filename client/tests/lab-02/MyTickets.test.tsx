@@ -4,8 +4,6 @@ import userEvent from "@testing-library/user-event";
 import { MyTickets } from "../../src/screens/MyTickets.js";
 import {
   RequesterProvider,
-  STORAGE_KEY,
-  useRequester,
 } from "../../src/context/RequesterContext.js";
 import * as api from "../../src/api.js";
 import type { Requester, TicketListItem, TicketListResponse } from "../../src/api.js";
@@ -61,19 +59,13 @@ afterEach(() => {
   window.localStorage.clear();
 });
 
-// Mirrors how the app mounts the screen: behind the requester gate.
-function Gate({ children }: { children: React.ReactNode }) {
-  const { requester } = useRequester();
-  return requester ? <>{children}</> : null;
-}
-
+// Mirrors how the application mounts these screens since Lab 3, Issue 6: the
+// signed-in Requester is handed to RequesterProvider by the route guard.
+// There is no selector and nothing in localStorage.
 function renderScreen(props: Parameters<typeof MyTickets>[0] = {}) {
-  window.localStorage.setItem(STORAGE_KEY, String(REQUESTER.id));
   return render(
-    <RequesterProvider available={[REQUESTER]}>
-      <Gate>
+    <RequesterProvider requester={REQUESTER}>
         <MyTickets {...props} />
-      </Gate>
     </RequesterProvider>,
   );
 }
@@ -85,12 +77,15 @@ async function settled() {
 }
 
 describe("requester scoping", () => {
-  it("asks the API only for the current requester's tickets", async () => {
+  it("asks the API only for the current requester's tickets, naming no requester", async () => {
+    // Lab 3, Issue 6 — the session decides whose tickets these are. The call
+    // carries list parameters only, never an id that could name someone else.
     const fetchSpy = vi.spyOn(api, "fetchMyTickets").mockResolvedValue(response([ticket()]));
     renderScreen();
     await settled();
 
-    expect(fetchSpy.mock.calls[0][0]).toBe(REQUESTER.id);
+    expect(fetchSpy.mock.calls[0]).toHaveLength(1);
+    expect(JSON.stringify(fetchSpy.mock.calls[0][0])).not.toMatch(/requester/i);
   });
 
   it("renders only what the API returned for that requester", async () => {
@@ -122,7 +117,7 @@ describe("list rendering", () => {
     await screen.findAllByText("TT-2026-00041");
     const table = container.querySelector("table")!;
     expect(within(table as HTMLElement).getByText("HIGH")).toBeInTheDocument();
-    expect(within(table as HTMLElement).getByText("NEW")).toBeInTheDocument();
+    expect(within(table as HTMLElement).getByText("New")).toBeInTheDocument();
   });
 
   it("renders both a desktop table and mobile cards from one data set", async () => {
@@ -155,7 +150,7 @@ describe("search", () => {
     await userEvent.type(screen.getByLabelText("Search tickets"), "  laptop  ");
 
     await waitFor(() => {
-      const last = fetchSpy.mock.calls.at(-1)![1];
+      const last = fetchSpy.mock.calls.at(-1)![0];
       expect(last).toMatchObject({ search: "laptop", page: 1 });
     });
   });
@@ -183,7 +178,7 @@ describe("filters and sorting", () => {
     await userEvent.selectOptions(await screen.findByLabelText("Filter by Category"), "4");
 
     await waitFor(() =>
-      expect(fetchSpy.mock.calls.at(-1)![1]).toMatchObject({ categoryId: 4, page: 1 }),
+      expect(fetchSpy.mock.calls.at(-1)![0]).toMatchObject({ categoryId: 4, page: 1 }),
     );
   });
 
@@ -195,7 +190,7 @@ describe("filters and sorting", () => {
     await userEvent.selectOptions(screen.getByLabelText("Filter by Requested Priority"), "HIGH");
 
     await waitFor(() =>
-      expect(fetchSpy.mock.calls.at(-1)![1]).toMatchObject({ requestedPriority: "HIGH" }),
+      expect(fetchSpy.mock.calls.at(-1)![0]).toMatchObject({ requestedPriority: "HIGH" }),
     );
   });
 
@@ -207,7 +202,7 @@ describe("filters and sorting", () => {
     await userEvent.selectOptions(screen.getByLabelText("Sort tickets"), "updatedAt:desc");
 
     await waitFor(() =>
-      expect(fetchSpy.mock.calls.at(-1)![1]).toMatchObject({
+      expect(fetchSpy.mock.calls.at(-1)![0]).toMatchObject({
         sortBy: "updatedAt",
         sortDir: "desc",
       }),
@@ -265,7 +260,7 @@ describe("pagination", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Next" }));
 
-    await waitFor(() => expect(fetchSpy.mock.calls.at(-1)![1]).toMatchObject({ page: 2 }));
+    await waitFor(() => expect(fetchSpy.mock.calls.at(-1)![0]).toMatchObject({ page: 2 }));
   });
 
   it("sends only a permitted page size", async () => {
@@ -277,7 +272,7 @@ describe("pagination", () => {
 
     await userEvent.selectOptions(screen.getByLabelText("Tickets per page"), "20");
 
-    await waitFor(() => expect(fetchSpy.mock.calls.at(-1)![1]).toMatchObject({ pageSize: 20 }));
+    await waitFor(() => expect(fetchSpy.mock.calls.at(-1)![0]).toMatchObject({ pageSize: 20 }));
   });
 });
 
@@ -330,7 +325,7 @@ describe("states", () => {
     await userEvent.click(clearButtons[0]);
 
     await waitFor(() =>
-      expect(fetchSpy.mock.calls.at(-1)![1]).toMatchObject({ categoryId: undefined, page: 1 }),
+      expect(fetchSpy.mock.calls.at(-1)![0]).toMatchObject({ categoryId: undefined, page: 1 }),
     );
   });
 

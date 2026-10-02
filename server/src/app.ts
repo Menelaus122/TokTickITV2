@@ -2,7 +2,7 @@ import express, { Request, Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { getPrisma } from "./prisma.js";
-import { attachSession, authRouter, enforcePasswordChange } from "./auth.js";
+import { attachSession, authRouter, enforcePasswordChange, requireSession } from "./auth.js";
 import { apiNotFound, rejectForeignOrigin, requireRole, resolveRequesterIdentity, safeErrors } from "./authorization.js";
 import { validateTicketInput } from "./validation.js";
 import { nextTicketNumber } from "./ticketNumber.js";
@@ -78,8 +78,9 @@ app.get("/api/health", (_req: Request, res: Response) => {
 // Issue 4 — Category list
 // GET /api/categories reads the supported request categories from PostgreSQL
 // via Prisma and returns each { id, name } in a predictable id order.
+// Lab 3: reference data is for signed-in users only (api-spec §3).
 // ---------------------------------------------------------------------------
-app.get("/api/categories", async (_req: Request, res: Response) => {
+app.get("/api/categories", requireSession, async (_req: Request, res: Response) => {
   // Category data is small and always-fresh; skip conditional caching so a
   // browser reload comes back as a clean 200 rather than a 304 Not Modified.
   res.set("Cache-Control", "no-store");
@@ -101,45 +102,11 @@ app.get("/api/categories", async (_req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
-// Lab 2, Issue 4 — active Development Requesters
-// GET /api/requesters lists the temporary Lab 2 testing identities so the
-// Development Requester Selection screen can offer them.
-//
-// This is NOT authentication (BR-03). The response carries no password, role,
-// or token, because the model has none. Only isActive requesters are returned,
-// so a deactivated one can never be selected (BR-09).
-// ---------------------------------------------------------------------------
-app.get("/api/requesters", async (_req: Request, res: Response) => {
-  res.set("Cache-Control", "no-store");
-  try {
-    const requesters = await getPrisma().user.findMany({
-      // Lab 3: IT Staff and Administrators live in the same table now, so the
-      // selector must ask for Requesters explicitly or it would offer them too.
-      where: { isActive: true, role: "REQUESTER" },
-      // Sorted by name because this list is read by a human scanning a dropdown.
-      orderBy: { fullName: "asc" },
-      select: { id: true, fullName: true, email: true, department: true },
-    });
-    // An empty array is a valid answer; it drives the selection screen's empty
-    // state rather than being an error (BR-13).
-    res.status(200).json(requesters);
-  } catch {
-    // Never leak internal/database details to the client (FR-33).
-    res.status(500).json({
-      error: {
-        code: "INTERNAL_ERROR",
-        message: "Failed to load development requesters.",
-      },
-    });
-  }
-});
-
-// ---------------------------------------------------------------------------
 // Lab 2, Issue 5 — active Related Systems
 // The specific service, application, device, or platform a ticket is about.
 // Sorted by name because this list is long enough to be scanned alphabetically.
 // ---------------------------------------------------------------------------
-app.get("/api/related-systems", async (_req: Request, res: Response) => {
+app.get("/api/related-systems", requireSession, async (_req: Request, res: Response) => {
   res.set("Cache-Control", "no-store");
   try {
     const systems = await getPrisma().relatedSystem.findMany({
@@ -160,8 +127,8 @@ app.get("/api/related-systems", async (_req: Request, res: Response) => {
 //
 // The backend owns everything the Requester does not type: the official Ticket
 // Number (BR-01), the Ticket Date (BR-05), the NEW status (BR-02), and the
-// owning Requester, which comes from the X-Requester-Id header and never from
-// the body (BR-06, BR-14).
+// owning Requester, which comes from the session and never from the body
+// (BR-06; Lab 3 BR-03).
 // ---------------------------------------------------------------------------
 
 // How many times a unique-constraint collision on ticketNumber is retried
@@ -190,7 +157,7 @@ app.post("/api/tickets", async (req: Request, res: Response) => {
   res.set("Cache-Control", "no-store");
   const prisma = getPrisma();
 
-  const context = await resolveRequesterIdentity(prisma, req);
+  const context = resolveRequesterIdentity(req);
   if (!context.ok) {
     return res
       .status(context.status)
@@ -273,10 +240,10 @@ app.post("/api/tickets", async (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
-// Lab 2, Issue 6 — the selected Requester's Tickets
+// Lab 2, Issue 6 — the signed-in Requester's Tickets
 //
 // Search, filter, sort, and paginate, always scoped to the requester from the
-// X-Requester-Id header. The owner filter is part of the database query itself
+// session (Lab 3 BR-03). The owner filter is part of the database query itself
 // rather than a check applied afterwards (BR-15), so there is no code path that
 // can fetch another requester's rows and forget to discard them.
 // ---------------------------------------------------------------------------
@@ -301,7 +268,7 @@ app.get("/api/tickets", async (req: Request, res: Response) => {
   res.set("Cache-Control", "no-store");
   const prisma = getPrisma();
 
-  const context = await resolveRequesterIdentity(prisma, req);
+  const context = resolveRequesterIdentity(req);
   if (!context.ok) {
     return res
       .status(context.status)
@@ -431,7 +398,7 @@ app.get("/api/tickets/:id", async (req: Request, res: Response) => {
   res.set("Cache-Control", "no-store");
   const prisma = getPrisma();
 
-  const context = await resolveRequesterIdentity(prisma, req);
+  const context = resolveRequesterIdentity(req);
   if (!context.ok) {
     return res
       .status(context.status)
@@ -477,7 +444,7 @@ app.get("/api/tickets/:id/attachments", async (req: Request, res: Response) => {
   res.set("Cache-Control", "no-store");
   const prisma = getPrisma();
 
-  const context = await resolveRequesterIdentity(prisma, req);
+  const context = resolveRequesterIdentity(req);
   if (!context.ok) {
     return res
       .status(context.status)
@@ -533,7 +500,7 @@ app.post("/api/tickets/:id/attachments", (req: Request, res: Response) => {
 
     const prisma = getPrisma();
 
-    const context = await resolveRequesterIdentity(prisma, req);
+    const context = resolveRequesterIdentity(req);
     if (!context.ok) {
       return res
         .status(context.status)
@@ -627,7 +594,7 @@ app.get("/api/attachments/:id/download", async (req: Request, res: Response) => 
   res.set("Cache-Control", "no-store");
   const prisma = getPrisma();
 
-  const context = await resolveRequesterIdentity(prisma, req);
+  const context = resolveRequesterIdentity(req);
   if (!context.ok) {
     return res
       .status(context.status)
@@ -694,7 +661,7 @@ app.patch("/api/attachments/:id/remove", async (req: Request, res: Response) => 
   res.set("Cache-Control", "no-store");
   const prisma = getPrisma();
 
-  const context = await resolveRequesterIdentity(prisma, req);
+  const context = resolveRequesterIdentity(req);
   if (!context.ok) {
     return res
       .status(context.status)

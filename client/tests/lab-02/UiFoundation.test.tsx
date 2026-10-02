@@ -96,8 +96,9 @@ describe("Badges", () => {
   });
 
   it("spells out status as text", () => {
+    // Lab 3 (ui-spec §1.3): title case with spaces, never the raw enum.
     render(<StatusBadge value="NEW" />);
-    expect(screen.getByText("NEW")).toBeInTheDocument();
+    expect(screen.getByText("New")).toBeInTheDocument();
   });
 
   it("labels an attachment as Active or Removed in words", () => {

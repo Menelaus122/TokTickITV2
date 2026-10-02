@@ -261,6 +261,11 @@ textarea.tt-field__control {
    pale green, Administrator solid green. */
 .tt-badge--readonly { background: var(--tt-readonly-bg); color: var(--tt-text); border-color: var(--tt-border); }
 .tt-badge--solid    { background: var(--tt-green-primary); color: #fff; border-color: var(--tt-green-primary); }
+/* Lab 3 status badges (ui-spec §1.3): the label is shown as written, in title
+   case ("Waiting for Requester"), and never breaks across lines. */
+.tt-badge[data-badge="status"] { text-transform: none; letter-spacing: 0; white-space: nowrap; }
+.tt-badge--outline  { background: var(--tt-surface); color: var(--tt-green-secondary); border-color: var(--tt-green-secondary); }
+.tt-badge--success  { background: var(--tt-success-bg); color: var(--tt-success); border-color: var(--tt-success-bg); }
 
 /* --- States (ui-spec.md 6) ----------------------------------------------- */
 

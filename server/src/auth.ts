@@ -47,8 +47,7 @@ function clearSessionCookie(res: Response) {
 }
 
 // Resolves the session behind the cookie, if any, into req.auth. A request with
-// no cookie costs nothing, so Lab 2's header-based Requester flow is untouched
-// until Issue 6 replaces it.
+// no cookie costs nothing; whether it may proceed is each route's guard's call.
 export async function attachSession(req: Request, _res: Response, next: NextFunction) {
   const token = sessionToken(req);
   if (token === null) return next();

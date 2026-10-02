@@ -9,7 +9,7 @@ export type { TextInputProps, TextAreaProps, SelectInputProps, ReadOnlyFieldProp
 export { Button, IconButton } from "./Button.js";
 export type { ButtonProps, IconButtonProps, ButtonVariant } from "./Button.js";
 
-export { PriorityBadge, StatusBadge, AttachmentBadge, RoleBadge } from "./Badge.js";
+export { PriorityBadge, StatusBadge, AttachmentBadge, RoleBadge, STATUS_LABEL, TICKET_STATUSES } from "./Badge.js";
 export type { Priority, TicketStatus, RoleValue } from "./Badge.js";
 
 export { LoadingState, EmptyState, NoResultsState, ErrorState, SuccessCallout, WarningCallout } from "./States.js";

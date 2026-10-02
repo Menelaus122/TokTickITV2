@@ -1,6 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import { app } from "../../src/app.js";
+import { getPrisma } from "../../src/prisma.js";
+import { endTestSessions, signInAs } from "../helpers/signIn.js";
 
 // Issue 4 — integration test (mirrors health.test.ts).
 // Requires the DB to be migrated and seeded first:
@@ -15,9 +17,23 @@ const EXPECTED_NAMES = [
   "Network",
 ];
 
+// Lab 3 (Issue 6): reference data needs a session, so the suite signs in as a
+// seeded Requester first. The contract it checks is unchanged.
+let cookie: string;
+
+beforeAll(async () => {
+  const requester = await getPrisma().user.findFirstOrThrow({ where: { role: "REQUESTER", isActive: true, mustChangePassword: false }, orderBy: { id: "asc" } });
+  cookie = await signInAs(requester.id);
+});
+
+afterAll(async () => {
+  await endTestSessions();
+  await getPrisma().$disconnect();
+});
+
 describe("GET /api/categories", () => {
   it("returns the four seeded categories in id order", async () => {
-    const res = await request(app).get("/api/categories");
+    const res = await request(app).get("/api/categories").set("Cookie", cookie);
 
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
@@ -34,5 +50,11 @@ describe("GET /api/categories", () => {
       expect(typeof category.id).toBe("number");
       expect(typeof category.name).toBe("string");
     }
+  });
+
+  it("refuses a request with no session (Lab 3)", async () => {
+    const res = await request(app).get("/api/categories");
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe("AUTH_REQUIRED");
   });
 });

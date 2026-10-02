@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CreateTicket } from "../../src/screens/CreateTicket.js";
-import { RequesterProvider, STORAGE_KEY, useRequester } from "../../src/context/RequesterContext.js";
+import { RequesterProvider } from "../../src/context/RequesterContext.js";
 import * as api from "../../src/api.js";
 import { AttachmentError, TicketValidationError } from "../../src/api.js";
 import type { Requester, Ticket } from "../../src/api.js";
@@ -56,22 +56,13 @@ afterEach(() => {
   window.localStorage.clear();
 });
 
-// Mirrors how the application mounts this screen: the requester gate renders
-// nothing until a Development Requester is in context, so the screen never sees
-// a null requester. The selection is restored from localStorage exactly as it
-// is for a returning user.
-function Gate({ children }: { children: React.ReactNode }) {
-  const { requester } = useRequester();
-  return requester ? <>{children}</> : null;
-}
-
+// Mirrors how the application mounts these screens since Lab 3, Issue 6: the
+// signed-in Requester is handed to RequesterProvider by the route guard.
+// There is no selector and nothing in localStorage.
 function renderScreen() {
-  window.localStorage.setItem(STORAGE_KEY, String(REQUESTER.id));
   return render(
-    <RequesterProvider available={[REQUESTER]}>
-      <Gate>
+    <RequesterProvider requester={REQUESTER}>
         <CreateTicket />
-      </Gate>
     </RequesterProvider>,
   );
 }
@@ -188,7 +179,7 @@ describe("submission", () => {
     await userEvent.click(screen.getByRole("button", { name: "Submit Ticket" }));
 
     await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
-    expect(create).toHaveBeenCalledWith(3, {
+    expect(create).toHaveBeenCalledWith({
       categoryId: 2,
       relatedSystemId: 2,
       summary: GOOD_SUMMARY,
@@ -205,7 +196,7 @@ describe("submission", () => {
     await userEvent.click(screen.getByRole("button", { name: "Submit Ticket" }));
 
     await waitFor(() => expect(create).toHaveBeenCalled());
-    const payload = create.mock.calls[0][1] as unknown as Record<string, unknown>;
+    const payload = create.mock.calls[0][0] as unknown as Record<string, unknown>;
     expect(Object.keys(payload).sort()).toEqual([
       "categoryId",
       "description",
@@ -437,7 +428,7 @@ describe("attachments on the Create Ticket form", () => {
 
     // The ticket has to exist first, so its id is what the upload targets.
     await waitFor(() => expect(upload).toHaveBeenCalledTimes(1));
-    expect(upload).toHaveBeenCalledWith(3, CREATED.id, file);
+    expect(upload).toHaveBeenCalledWith(CREATED.id, file);
   });
 
   it("keeps the ticket and reports the files that failed", async () => {
@@ -465,14 +456,9 @@ describe("attachments on the Create Ticket form", () => {
       new AttachmentError("UPLOAD_FAILED", "The file could not be attached."),
     );
 
-    // Stored before rendering, exactly as renderScreen does: the gate renders
-    // nothing until the selection has been restored.
-    window.localStorage.setItem(STORAGE_KEY, String(REQUESTER.id));
     render(
-      <RequesterProvider available={[REQUESTER]}>
-        <Gate>
+      <RequesterProvider requester={REQUESTER}>
           <CreateTicket onCreated={onCreated} />
-        </Gate>
       </RequesterProvider>,
     );
 
@@ -522,12 +508,9 @@ describe("attachments on the Create Ticket form", () => {
 
 describe("the success state is reachable and complete", () => {
   function renderWith(onCreated?: (t: Ticket) => void, onCancel?: () => void) {
-    window.localStorage.setItem(STORAGE_KEY, String(REQUESTER.id));
     return render(
-      <RequesterProvider available={[REQUESTER]}>
-        <Gate>
+      <RequesterProvider requester={REQUESTER}>
           <CreateTicket onCreated={onCreated} onCancel={onCancel} />
-        </Gate>
       </RequesterProvider>,
     );
   }
@@ -585,13 +568,10 @@ describe("the success state is reachable and complete", () => {
 
 describe("secondary action", () => {
   it("offers Cancel beside Submit Ticket", async () => {
-    window.localStorage.setItem(STORAGE_KEY, String(REQUESTER.id));
     const onCancel = vi.fn();
     render(
-      <RequesterProvider available={[REQUESTER]}>
-        <Gate>
+      <RequesterProvider requester={REQUESTER}>
           <CreateTicket onCancel={onCancel} />
-        </Gate>
       </RequesterProvider>,
     );
 
@@ -606,13 +586,10 @@ describe("secondary action", () => {
   });
 
   it("does not submit the form when Cancel is used", async () => {
-    window.localStorage.setItem(STORAGE_KEY, String(REQUESTER.id));
     const create = vi.spyOn(api, "createTicket");
     render(
-      <RequesterProvider available={[REQUESTER]}>
-        <Gate>
+      <RequesterProvider requester={REQUESTER}>
           <CreateTicket onCancel={() => {}} />
-        </Gate>
       </RequesterProvider>,
     );
 

@@ -1,10 +1,33 @@
+import type { TicketStatus } from "./components/Badge.js";
+
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
 // Lab 3 — every request carries the session cookie. The client runs on another
 // port, so without credentials: "include" the browser would not send tt_sid to
 // the API at all, and every call would arrive unauthenticated (api-spec §1.1).
-function apiFetch(url: string, init: RequestInit = {}): Promise<Response> {
-  return fetch(url, { ...init, credentials: "include" });
+//
+// Issue 6 — a 401 from anywhere outside /api/auth means the session ended
+// while the user was working (it expired, or was signed out elsewhere). The
+// listener — AuthProvider — forgets the user, and the route guard sends them
+// to Login, which brings them back to the same page afterwards. /api/auth is
+// excluded because its 401s are answers, not news: a wrong password, or
+// "nobody is signed in" on first load.
+type SessionEndedListener = () => void;
+const sessionEndedListeners = new Set<SessionEndedListener>();
+
+export function onSessionEnded(listener: SessionEndedListener): () => void {
+  sessionEndedListeners.add(listener);
+  return () => {
+    sessionEndedListeners.delete(listener);
+  };
+}
+
+async function apiFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  const response = await fetch(url, { ...init, credentials: "include" });
+  if (response.status === 401 && !url.startsWith(`${API_URL}/api/auth/`)) {
+    for (const listener of sessionEndedListeners) listener();
+  }
+  return response;
 }
 
 export interface Category {
@@ -17,26 +40,15 @@ export interface SystemStatus {
   categories: Category[];
 }
 
-// --- Lab 2, Issue 4 — Development Requesters -------------------------------
+// --- The current Requester --------------------------------------------------
 
-// A temporary Lab 2 testing identity (BR-03). No password, role, or token:
-// the model has none, and the API never sends one.
+// The signed-in Requester as the Lab 2 screens read it. Since Issue 6 it comes
+// from the session (AuthProvider), never from a selector.
 export interface Requester {
   id: number;
   fullName: string;
   email: string;
   department: string | null;
-}
-
-// Loads the requesters the selector may offer. The backend already filters to
-// active ones (BR-09), so the client never has to decide who is selectable.
-// Throws on any failure so the screen can show one safe error state.
-export async function fetchRequesters(): Promise<Requester[]> {
-  const response = await apiFetch(`${API_URL}/api/requesters`);
-  if (!response.ok) {
-    throw new Error(`Failed to load development requesters (HTTP ${response.status})`);
-  }
-  return (await response.json()) as Requester[];
 }
 
 // --- Lab 2, Issue 5 — reference data and ticket creation -------------------
@@ -63,7 +75,7 @@ export interface Ticket {
   summary: string;
   description: string;
   requestedPriority: RequestedPriority;
-  currentStatus: "NEW";
+  currentStatus: TicketStatus;
   requester: { id: number; fullName: string };
   category: { id: number; name: string };
   relatedSystem: { id: number; name: string };
@@ -92,16 +104,13 @@ export async function fetchRelatedSystems(): Promise<RelatedSystem[]> {
   return (await response.json()) as RelatedSystem[];
 }
 
-// Creates one Ticket for the selected Development Requester. The requester
-// travels in the X-Requester-Id header, never in the body (BR-14), and the
-// server owns the ticket number, date, and status.
-export async function createTicket(requesterId: number, ticket: NewTicket): Promise<Ticket> {
+// Creates one Ticket for the signed-in Requester. Who that is comes from the
+// session cookie, never from the body (Lab 3 BR-03), and the server owns the
+// ticket number, date, and status.
+export async function createTicket(ticket: NewTicket): Promise<Ticket> {
   const response = await apiFetch(`${API_URL}/api/tickets`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Requester-Id": String(requesterId),
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(ticket),
   });
 
@@ -128,7 +137,7 @@ export interface TicketListItem {
   ticketDate: string;
   summary: string;
   requestedPriority: RequestedPriority;
-  currentStatus: "NEW";
+  currentStatus: TicketStatus;
   category: { id: number; name: string };
   relatedSystem: { id: number; name: string };
   activeAttachmentCount: number;
@@ -154,7 +163,7 @@ export interface TicketListParams {
   categoryId?: number | "";
   relatedSystemId?: number | "";
   requestedPriority?: RequestedPriority | "";
-  currentStatus?: "NEW" | "";
+  currentStatus?: TicketStatus | "";
   sortBy?: "createdAt" | "updatedAt";
   sortDir?: "asc" | "desc";
   page?: number;
@@ -163,12 +172,9 @@ export interface TicketListParams {
 
 export const PERMITTED_PAGE_SIZES = [10, 20, 50] as const;
 
-// Lists tickets owned by the given requester. Ownership is decided server-side
-// from the header; sending a different id here would change nothing.
-export async function fetchMyTickets(
-  requesterId: number,
-  params: TicketListParams = {},
-): Promise<TicketListResponse> {
+// Lists the signed-in Requester's tickets. Ownership is decided server-side
+// from the session; nothing the client sends can widen it.
+export async function fetchMyTickets(params: TicketListParams = {}): Promise<TicketListResponse> {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     // Empty means "no filter" and is left out of the query entirely, rather
@@ -179,9 +185,7 @@ export async function fetchMyTickets(
   }
 
   const suffix = search.toString() ? `?${search.toString()}` : "";
-  const response = await apiFetch(`${API_URL}/api/tickets${suffix}`, {
-    headers: { "X-Requester-Id": String(requesterId) },
-  });
+  const response = await apiFetch(`${API_URL}/api/tickets${suffix}`);
 
   if (!response.ok) throw new Error(`Failed to load tickets (HTTP ${response.status})`);
   return (await response.json()) as TicketListResponse;
@@ -221,17 +225,8 @@ export class AttachmentError extends Error {
   }
 }
 
-function requesterHeaders(requesterId: number): HeadersInit {
-  return { "X-Requester-Id": String(requesterId) };
-}
-
-export async function fetchTicketDetail(
-  requesterId: number,
-  ticketId: number,
-): Promise<TicketDetail> {
-  const response = await apiFetch(`${API_URL}/api/tickets/${ticketId}`, {
-    headers: requesterHeaders(requesterId),
-  });
+export async function fetchTicketDetail(ticketId: number): Promise<TicketDetail> {
+  const response = await apiFetch(`${API_URL}/api/tickets/${ticketId}`);
 
   if (response.status === 404) {
     throw new AttachmentError("NOT_FOUND", "That ticket could not be found.");
@@ -240,13 +235,8 @@ export async function fetchTicketDetail(
   return (await response.json()) as TicketDetail;
 }
 
-export async function fetchAttachments(
-  requesterId: number,
-  ticketId: number,
-): Promise<Attachment[]> {
-  const response = await apiFetch(`${API_URL}/api/tickets/${ticketId}/attachments`, {
-    headers: requesterHeaders(requesterId),
-  });
+export async function fetchAttachments(ticketId: number): Promise<Attachment[]> {
+  const response = await apiFetch(`${API_URL}/api/tickets/${ticketId}/attachments`);
   if (!response.ok) throw new Error(`Failed to load attachments (HTTP ${response.status})`);
   return (await response.json()) as Attachment[];
 }
@@ -261,17 +251,12 @@ async function readError(response: Response): Promise<AttachmentError> {
   );
 }
 
-export async function uploadAttachment(
-  requesterId: number,
-  ticketId: number,
-  file: File,
-): Promise<Attachment> {
+export async function uploadAttachment(ticketId: number, file: File): Promise<Attachment> {
   const form = new FormData();
   form.append("file", file);
 
   const response = await apiFetch(`${API_URL}/api/tickets/${ticketId}/attachments`, {
     method: "POST",
-    headers: requesterHeaders(requesterId),
     body: form,
   });
 
@@ -282,19 +267,16 @@ export async function uploadAttachment(
 /**
  * Downloads an active attachment and hands it to the browser to save.
  *
- * This cannot be a plain link or `window.open`. The download route is
- * requester-scoped, so the request has to carry `X-Requester-Id`, and a
- * navigation cannot set headers. The relative `downloadUrl` from the API is
- * also relative to the API origin, not the page's — which differ whenever the
- * client and server are served separately, as they are in development.
+ * Fetched rather than opened as a link, so a refusal (an ended session, a
+ * removed attachment) is shown on the row instead of replacing the page with a
+ * raw JSON error. The relative `downloadUrl` from the API is also relative to
+ * the API origin, not the page's — which differ whenever the client and server
+ * are served separately, as they are in development.
  */
 export async function downloadAttachment(
-  requesterId: number,
   attachment: Pick<Attachment, "id" | "originalFilename">,
 ): Promise<void> {
-  const response = await apiFetch(`${API_URL}/api/attachments/${attachment.id}/download`, {
-    headers: requesterHeaders(requesterId),
-  });
+  const response = await apiFetch(`${API_URL}/api/attachments/${attachment.id}/download`);
 
   if (!response.ok) throw await readError(response);
 
@@ -313,14 +295,10 @@ export async function downloadAttachment(
   }
 }
 
-export async function removeAttachment(
-  requesterId: number,
-  attachmentId: number,
-  removalReason: string,
-): Promise<Attachment> {
+export async function removeAttachment(attachmentId: number, removalReason: string): Promise<Attachment> {
   const response = await apiFetch(`${API_URL}/api/attachments/${attachmentId}/remove`, {
     method: "PATCH",
-    headers: { ...requesterHeaders(requesterId), "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ removalReason }),
   });
 

@@ -11,7 +11,6 @@ import {
   fetchMyTickets,
   fetchRelatedSystems,
 } from "../api.js";
-import { useRequester } from "../context/RequesterContext.js";
 import {
   Button,
   Card,
@@ -21,13 +20,16 @@ import {
   NoResultsState,
   PriorityBadge,
   ResponsiveList,
+  STATUS_LABEL,
   StatusBadge,
+  TICKET_STATUSES,
+  type TicketStatus,
 } from "../components/index.js";
 
 // My Tickets (ui-spec.md 10).
 //
-// Every list read is scoped to the current Development Requester by the server;
-// this screen simply asks for "my tickets" and never sees anyone else's.
+// Every list read is scoped to the signed-in Requester by the server; this
+// screen simply asks for "my tickets" and never sees anyone else's.
 
 const SORT_OPTIONS = [
   { value: "createdAt:desc", label: "Newest first" },
@@ -86,7 +88,6 @@ export function MyTickets({
   onOpenTicket?: (ticket: TicketListItem) => void;
   onCreateTicket?: () => void;
 }) {
-  const { requester } = useRequester();
 
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -145,7 +146,7 @@ export function MyTickets({
       categoryId: filters.categoryId ? Number(filters.categoryId) : undefined,
       relatedSystemId: filters.relatedSystemId ? Number(filters.relatedSystemId) : undefined,
       requestedPriority: (filters.requestedPriority || undefined) as RequestedPriority | undefined,
-      currentStatus: (filters.currentStatus || undefined) as "NEW" | undefined,
+      currentStatus: (filters.currentStatus || undefined) as TicketStatus | undefined,
       sortBy,
       sortDir,
       page,
@@ -165,18 +166,16 @@ export function MyTickets({
   );
 
   const load = useCallback(async () => {
-    if (!requester) return;
     setStatus("loading");
     try {
-      setResult(await fetchMyTickets(requester.id, params));
+      setResult(await fetchMyTickets(params));
       setStatus("ready");
     } catch {
-      // Nothing from a previous requester or a previous query may linger on a
-      // failed load.
+      // Nothing from a previous query may linger on a failed load.
       setResult(null);
       setStatus("error");
     }
-  }, [requester, params]);
+  }, [params]);
 
   useEffect(() => {
     void load();
@@ -255,7 +254,11 @@ export function MyTickets({
           onChange={(event) => update("currentStatus", event.target.value)}
         >
           <option value="">All Statuses</option>
-          <option value="NEW">NEW</option>
+          {TICKET_STATUSES.map((value) => (
+            <option key={value} value={value}>
+              {STATUS_LABEL[value]}
+            </option>
+          ))}
         </select>
 
         <select

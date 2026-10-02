@@ -87,14 +87,14 @@ Principles carried over from Lab 2:
 
 | ID | AC | What it tests | Expected | Issue | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| SEC-01 | AC-10 | every session-only endpoint with no cookie: `/api/auth/me`, `/api/auth/password`, and every `/api/staff/*` and `/api/admin/*` route | 401 `AUTH_REQUIRED`, never 403. The Lab 2 Requester endpoints join this list in Issue 6, when their `X-Requester-Id` fallback is removed (API-15 – API-18) | 4 | Pass |
+| SEC-01 | AC-10 | every session-only endpoint with no cookie: `/api/auth/me`, `/api/auth/password`, every `/api/staff/*` and `/api/admin/*` route, and — since Issue 6 — every Lab 2 endpoint (categories, related systems, tickets, attachments), also with only an `X-Requester-Id` header | 401 `AUTH_REQUIRED`, never 403, and the header never stands in for a session | 4, 6 | Pass |
 | SEC-02 | AC-09 | Requester calls each `/api/staff/*` endpoint | 403 `FORBIDDEN` | 4 | Pass |
 | SEC-03 | AC-09 | Administrator calls each `/api/staff/*` endpoint | 403 `FORBIDDEN` (BR-19) | 4 | Pass |
 | SEC-04 | AC-09 | IT Staff and Requester call each `/api/admin/*` endpoint | 403 `FORBIDDEN` | 4 | Pass |
 | SEC-05 | AC-08 | Requester reads and posts Internal Notes | 403, no note body, author, or count anywhere in the response | 7 | Planned |
 | SEC-06 | AC-11 | Requester opens another Requester's ticket, attachment list, upload, download, and removal | 404 on every route, identical to a nonexistent id. Comments are covered by API-23 when Issue 7 adds them | 4 | Pass |
 | SEC-07 | AC-07 | body carries another user's `requesterId`; header carries `X-Requester-Id` | both ignored, session identity used, no cross-Requester data returned | 4, 6 | Pass |
-| SEC-08 | AC-07 | `POST /api/tickets` with a body `ticketNumber` and `currentStatus` | both ignored, backend values win (Lab 2 BR-01) | 6 | Planned |
+| SEC-08 | AC-07 | `POST /api/tickets` with a body `ticketNumber` and `currentStatus` | both ignored, backend values win (Lab 2 BR-01) | 6 | Pass |
 | SEC-09 | AC-10 | guard order: no session **and** wrong role | 401 wins over 403 (api-spec §7) | 4 | Pass |
 | SEC-10 | AC-28 | every user-carrying response across the whole API | no `passwordHash`, no `tokenHash`, no `initialPassword` field (BR-52) | 4, 10 | Pass |
 | SEC-11 | BR-65 | `POST`, `PATCH`, and a `multipart/form-data` upload carrying a foreign `Origin` header | 403 `FORBIDDEN` before the handler runs; the same requests with the configured origin, and a `GET` with a foreign origin, succeed | 4 | Pass |
@@ -103,13 +103,19 @@ Principles carried over from Lab 2:
 
 | ID | AC | What it tests | Expected | Issue | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| API-15 | AC-13 | create, list, read, attach, download, soft-remove as a logged-in Requester | every Lab 2 behaviour holds | 6 | Planned |
-| API-16 | AC-14 | `X-Requester-Id` naming another user | ignored; the session's tickets are returned | 6 | Planned |
-| API-17 | AC-13 | My Tickets search, filters, sort, pagination | unchanged from Lab 2's contract | 6 | Planned |
-| API-18 | AC-12 | `GET /api/requesters` | 404, the endpoint is gone (FR-16) | 6 | Planned |
+| API-15 | AC-13 | create, list, read, attach, download, soft-remove as a logged-in Requester | every Lab 2 behaviour holds | 6 | Pass |
+| API-16 | AC-14 | `X-Requester-Id` naming another user; the header alone with no session | ignored with a session, so the session's tickets are returned; 401 without one, and nothing is created | 6 | Pass |
+| API-17 | AC-13 | My Tickets search, filters, sort, pagination; the status filter with each of the eight statuses | unchanged from Lab 2's contract; each status filters the session's own tickets, and any other value is 400 `INVALID_QUERY` | 6 | Pass |
+| API-18 | AC-12 | `GET /api/requesters` | 404, the endpoint is gone (FR-16) | 6 | Pass |
 | API-19 | AC-15 | appears-resolved with a valid comment | 200, `requesterResolvedAt` set, comment created, status unchanged | 7 | Planned |
 | API-20 | AC-15 | appears-resolved with a 4-character comment | 400 `VALIDATION_FAILED` | 7 | Planned |
 | API-21 | AC-15 | Requester sends `currentStatus: "RESOLVED"` anywhere | no endpoint accepts it; status unchanged (BR-05) | 7 | Planned |
+
+The same file also pins a fix from the Issue 4 review: a route id Express
+cannot percent-decode (`/api/tickets/%E0`, `/api/attachments/%E0/download`)
+answers `400 INVALID_QUERY` with the handler's own "id is not valid" message,
+not the JSON-body message. The Lab 2 suites sign in through
+`server/tests/helpers/signIn.ts`, which removes exactly the sessions it made.
 
 ### 2.5 API — comments and notes, `server/tests/lab-03/comments-notes.api.test.ts`
 
@@ -185,13 +191,13 @@ Principles carried over from Lab 2:
 | MIG-02 | AC-35 | `itPriority` on every pre-existing ticket | equals `requestedPriority` (BR-63) | 2 | Pass |
 | MIG-03 | AC-35 | migrated Requesters immediately after the migration, before the seed | role `REQUESTER`, `mustChangePassword` true, `passwordHash` null (BR-61, D-22) | 2 | Pass |
 | MIG-04 | AC-35 | ids preserved across the rename | every `Ticket.requesterId` still resolves (BR-60) | 2 | Pass |
-| MIG-05 | AC-36 | Lab 1 and Lab 2 suites after migration | all pass (BR-64) | 6 | Planned |
+| MIG-05 | AC-36 | Lab 1 and Lab 2 suites after migration | all pass (BR-64), each signing in through `POST /api/auth/login` instead of sending `X-Requester-Id` | 6 | Pass |
 | MIG-06 | BR-61 | seed run twice | the database is identical after the second run, every column of users, tickets, comments, notes, and sessions included — timestamps too, so no row is rewritten when nothing drifted (labsheet §5.3) | 2 | Pass |
 | MIG-07 | §7.5 | seed account counts, ticket spread, and timeline | ≥ 4 active Requesters + 1 inactive, ≥ 3 active IT Staff + 1 inactive, ≥ 2 active Administrators; tickets in all 8 statuses and 4 priorities; each seeded ticket's Last Updated follows its own seeded history and is never the moment the seed ran | 2 | Pass |
 | MIG-08 | D-22 | migrated Requester after the migration but before the seed, then after it | before: `passwordHash` null, so the documented password cannot verify (BR-66) — the login endpoint's own answer is API-67 in Issue 3; after: the documented password works with no forced change, and `first.login@toktickit.local` is the only seeded account that must change (BR-61, §7.5) | 2 | Pass |
 | MIG-09 | §7.5 | change a documented account's password and set its flag, then re-run the seed | the documented password works again and the flag is back to its documented value; an account created through User Management is untouched | 2 | Pass |
 | MIG-10 | BR-28 | create a ticket through the Lab 2 endpoint after the migration | `itPriority` equals `requestedPriority` and the ticket is unassigned | 2 | Pass |
-| MIG-11 | BR-03 | send an IT Staff id as `X-Requester-Id`, and read the Lab 2 selector, while the header still exists | refused as `REQUESTER_INVALID`, exactly like an unknown id; the selector lists Requesters only | 2 | Pass |
+| MIG-11 | BR-03 | an IT Staff account trying to act as a Requester: through `X-Requester-Id`, through its own session, and through the selector's list | Issue 2 refused the header as `REQUESTER_INVALID`; since Issue 6 the header alone is 401, the staff session is 403 `FORBIDDEN`, and `/api/requesters` is 404 | 2, 6 | Pass |
 | MIG-12 | BR-45 | migrate a Lab 2 Requester whose email has capitals and surrounding spaces | stored as `lower(trim(email))`, and every migrated email is lowercase | 2 | Pass |
 
 ### 2.10 UI component — `client/tests/lab-03/`
@@ -206,7 +212,7 @@ Principles carried over from Lab 2:
 | UI-06 | AC-02 | `ChangePassword.test.tsx` | mandatory mode renders without the shell and blocks navigation away | 5 | Pass |
 | UI-07 | AC-09 | `RoleNavigation.test.tsx` | each role sees only its own destinations; an unauthorized route shows the forbidden state | 5 | Pass |
 | UI-08 | AC-05 | `RoleNavigation.test.tsx` | shell shows name and Role badge, and Logout clears the session | 5 | Pass |
-| UI-09 | AC-12 | `RequesterRegression.test.tsx` | no selector, no Change Requester control anywhere | 6 | Planned |
+| UI-09 | AC-12 | `RequesterRegression.test.tsx` | no selector, no Change Requester control anywhere, and nothing in localStorage; the old selector URL leads home or to Login; requests never carry `X-Requester-Id`; a 401 mid-session returns to Login and back; eight status labels and filters | 6 | Pass |
 | UI-10 | AC-15 | `RequesterComments.test.tsx` | comment composer validation, appears-resolved panel, undo, and the "only IT Staff can resolve" helper text | 7 | Planned |
 | UI-11 | AC-17 | `RequesterComments.test.tsx` | no Internal Notes region and no element hinting at one | 7 | Planned |
 | UI-12 | AC-21 | `StaffTicketQueue.test.tsx` | search, each filter, sort, page size, and Clear Filters issue the documented requests | 8 | Planned |
@@ -425,5 +431,5 @@ from memory.
 | Actions Taken | Deferred to Lab 4, so no test covers resolution being blocked by incomplete Actions Taken. |
 | Concurrency | API-41 covers the claim race with two sequential requests plus a conditional update; true parallel load is not tested. |
 | Accessibility | Checked by assertions on roles, labels, and focus order plus the manual checklist; no automated axe audit runs in Lab 3. |
-| Lab 2 selector suite | `client/tests/lab-02/RequesterContext.test.tsx` tested only the Development Requester selection flow, which Issue 5 removed from the application. It was deleted in Issue 5; UI-07 and UI-08 cover the shell and navigation that replaced it, and `Navigation.test.tsx` now starts from a signed-in Requester. |
+| Lab 2 selector suites | `client/tests/lab-02/RequesterContext.test.tsx` tested only the Development Requester selection flow, which Issue 5 removed from the application; it was deleted in Issue 5, and UI-07 and UI-08 cover the shell and navigation that replaced it. Issue 6 deleted the rest of the selector, and with it `client/tests/lab-02/RequesterSelection.test.tsx` (the selection screen) and `server/tests/lab-02/requesters.api.test.ts` (`GET /api/requesters`); UI-09 and API-18 assert both are gone. The Lab 2 tests that asserted `REQUESTER_CONTEXT_REQUIRED`, `REQUESTER_INVALID`, and `REQUESTER_INACTIVE` now assert the session contract that retired those codes (api-spec §1.4). |
 | Login throttling | The 15-minute lock and window are tested with an explicit clock (UNIT-11, UNIT-12) rather than by waiting. The counter is in memory (D-24), so the API tests cannot observe a lock surviving a restart, because it does not. |

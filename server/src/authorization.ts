@@ -1,6 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import type { PrismaClient, Role } from "@prisma/client";
-import { REQUESTER_HEADER, resolveRequester, type RequesterContext } from "./requesterContext.js";
+import type { Role } from "@prisma/client";
 
 // Lab 3, Issue 4 — authorization and safe errors (docs/lab-03/api-spec.md
 // §1.1, §1.3, §7; specification.md BR-17 to BR-23, BR-65).
@@ -48,30 +47,24 @@ export function rejectForeignOrigin(allowedOrigins: readonly string[]) {
 
 // Who a Requester-scoped request acts for (BR-03, BR-13).
 //
-// With a session, the session decides, and nothing the client sends — the
-// X-Requester-Id header, a requesterId in the body or query — can change it.
-// A session whose role is not REQUESTER is refused, because IT Staff and
-// Administrators have no "own tickets" in Lab 3 (BR-18).
-//
-// Without a session, the Lab 2 header still works, so the Lab 2 screens keep
-// working until Issue 6 replaces the Development Requester selector with
-// sign-in and removes this fallback.
-export async function resolveRequesterIdentity(prisma: PrismaClient, req: Request): Promise<RequesterContext> {
-  if (req.auth) {
-    if (req.auth.user.role !== "REQUESTER") {
-      return { ok: false, status: 403, code: "FORBIDDEN", message: "Only Requesters have tickets of their own." };
-    }
-    return { ok: true, requesterId: req.auth.user.id };
+// The session decides, and only the session. Nothing the client sends — an
+// X-Requester-Id header, a requesterId in the body or query — is read, so a
+// client cannot claim to be someone else. Without a session the answer is 401,
+// as for every other signed-in endpoint (BR-21). A session whose role is not
+// REQUESTER is refused, because IT Staff and Administrators have no "own
+// tickets" in Lab 3 (BR-18).
+export type RequesterContext =
+  | { ok: true; requesterId: number }
+  | { ok: false; status: number; code: string; message: string };
+
+export function resolveRequesterIdentity(req: Request): RequesterContext {
+  if (!req.auth) {
+    return { ok: false, status: 401, code: "AUTH_REQUIRED", message: "Sign in to continue." };
   }
-  // Every handler awaits this BEFORE its own try block, and Express 4 does not
-  // pass a rejected promise to the error handler: a database failure here used
-  // to become an unhandled rejection that ended the whole process. It is turned
-  // into an ordinary safe 500 instead, for this request only.
-  try {
-    return await resolveRequester(prisma, req.headers[REQUESTER_HEADER]);
-  } catch {
-    return { ok: false, status: 500, code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." };
+  if (req.auth.user.role !== "REQUESTER") {
+    return { ok: false, status: 403, code: "FORBIDDEN", message: "Only Requesters have tickets of their own." };
   }
+  return { ok: true, requesterId: req.auth.user.id };
 }
 
 // Unknown /api routes answer in the same error envelope as everything else,
@@ -90,8 +83,15 @@ const CLIENT_ERROR_CODES: Record<number, [string, string]> = {
   415: ["UNSUPPORTED_MEDIA_TYPE", "The request body's format is not supported."],
 };
 
-export function safeErrors(error: unknown, _req: Request, res: Response, next: NextFunction) {
+export function safeErrors(error: unknown, req: Request, res: Response, next: NextFunction) {
   if (res.headersSent) return next(error);
+  // A route id Express cannot percent-decode (`/api/tickets/%E0`) fails before
+  // any handler runs. It is still a malformed id, so it gets the handler's own
+  // answer, not the JSON-body message below.
+  if (error instanceof URIError) {
+    const what = req.path.startsWith("/api/attachments/") ? "attachment" : "ticket";
+    return res.status(400).json({ error: { code: "INVALID_QUERY", message: `The ${what} id is not valid.` } });
+  }
   const status = typeof error === "object" && error !== null ? (error as { status?: unknown }).status : undefined;
   if (typeof status === "number" && status >= 400 && status < 500) {
     const [code, message] = CLIENT_ERROR_CODES[status] ?? ["VALIDATION_FAILED", "The request body is not valid JSON."];

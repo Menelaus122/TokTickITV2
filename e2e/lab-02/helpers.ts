@@ -1,4 +1,4 @@
-import { Page, expect } from "@playwright/test";
+import { APIRequestContext, Page, expect } from "@playwright/test";
 
 // Shared helpers for the Lab 2 end-to-end suites.
 
@@ -30,6 +30,18 @@ async function signInOnScreen(page: Page, name: string) {
   await page.getByRole("button", { name: "Sign in" }).click();
 
   await expect(page.getByTestId("current-user")).toHaveText(name);
+}
+
+/**
+ * Signs a bare API request context in as a seeded Requester (Lab 3, Issue 6).
+ * The context keeps the session cookie, so its later calls act as that person
+ * — the same way the retired X-Requester-Id header used to name one.
+ */
+export async function signInApi(request: APIRequestContext, apiUrl: string, name: string) {
+  const email = REQUESTER_EMAILS[name];
+  if (!email) throw new Error(`No seeded Requester account named "${name}"`);
+  const res = await request.post(`${apiUrl}/api/auth/login`, { data: { email, password: SEED_PASSWORD } });
+  expect(res.status()).toBe(201);
 }
 
 /** Logs out through the shell, then signs in as a different Requester. */

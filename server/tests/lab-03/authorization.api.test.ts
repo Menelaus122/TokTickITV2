@@ -38,12 +38,25 @@ const SESSION_ROUTES: [string, string][] = [
   ["GET", "/api/auth/me"],
   ["POST", "/api/auth/password"],
 ];
+// Issue 6 — the Lab 2 endpoints, which lost their X-Requester-Id fallback.
+const REQUESTER_ROUTES: [string, string][] = [
+  ["GET", "/api/categories"],
+  ["GET", "/api/related-systems"],
+  ["POST", "/api/tickets"],
+  ["GET", "/api/tickets"],
+  ["GET", "/api/tickets/1"],
+  ["GET", "/api/tickets/1/attachments"],
+  ["POST", "/api/tickets/1/attachments"],
+  ["GET", "/api/attachments/1/download"],
+  ["PATCH", "/api/attachments/1/remove"],
+];
 
-function call(method: string, path: string, cookie?: string) {
+function call(method: string, path: string, cookie?: string, headers: Record<string, string> = {}) {
   const agent = request(app);
   const req =
     method === "GET" ? agent.get(path) : method === "POST" ? agent.post(path) : agent.patch(path);
   if (cookie) req.set("Cookie", cookie);
+  for (const [name, value] of Object.entries(headers)) req.set(name, value);
   return method === "GET" ? req : req.send({});
 }
 
@@ -135,8 +148,16 @@ afterAll(async () => {
 
 describe("guards on every protected route family (BR-18, BR-21)", () => {
   it("SEC-01 answers 401 AUTH_REQUIRED, never 403, without a session", async () => {
-    for (const [method, path] of [...SESSION_ROUTES, ...STAFF_ROUTES, ...ADMIN_ROUTES]) {
+    for (const [method, path] of [...SESSION_ROUTES, ...REQUESTER_ROUTES, ...STAFF_ROUTES, ...ADMIN_ROUTES]) {
       const res = await call(method, path);
+      expect(res.status, `${method} ${path}`).toBe(401);
+      expect(res.body.error.code).toBe("AUTH_REQUIRED");
+    }
+  });
+
+  it("SEC-01 does not accept the retired X-Requester-Id header in place of a session (Issue 6)", async () => {
+    for (const [method, path] of REQUESTER_ROUTES) {
+      const res = await call(method, path, undefined, { "X-Requester-Id": String(requesterA) });
       expect(res.status, `${method} ${path}`).toBe(401);
       expect(res.body.error.code).toBe("AUTH_REQUIRED");
     }
@@ -265,7 +286,7 @@ describe("no password material leaves the API (BR-52)", () => {
         return res;
       }),
       await request(app).get("/api/auth/me").set("Cookie", cookies.staff),
-      await request(app).get("/api/requesters"),
+      await request(app).get(`/api/tickets/${ticketOfB}`).set("Cookie", cookies.requesterB),
     ];
     for (const res of responses) {
       expect(res.status).toBeLessThan(300);
@@ -328,19 +349,20 @@ describe("one distinct answer per kind of failure (§6.2, AC-10)", () => {
 });
 
 describe("failures that must not take the server down (§6.2, FR-47)", () => {
-  it("answers a safe 500 when the database fails on the Lab 2 header path, and keeps serving", async () => {
-    // Before the fix this rejection escaped every handler's try block, and
-    // Node ended the process: one request during a database blip took the API
-    // down for everyone.
+  it("answers a safe 500 when the database fails while resolving the session, and keeps serving", async () => {
+    // Issue 4 fixed this on the Lab 2 header path, where the rejection escaped
+    // every handler's try block and Node ended the process. Issue 6 removed
+    // that path; the session lookup is now the database call every Requester
+    // request makes before its handler, so it is the one checked here.
     // Patched by hand: Prisma's model delegates are proxies, and vi.spyOn's
     // restore leaves findUnique broken for the rest of the run. Reassigning the
     // original function restores it cleanly.
-    const delegate = prisma.user as unknown as Record<string, unknown>;
+    const delegate = prisma.session as unknown as Record<string, unknown>;
     const original = delegate.findUnique;
     delegate.findUnique = () =>
-      Promise.reject(new Error("P1001: Can't reach database server at db:5432 (SELECT * FROM \"User\") C:\app\server"));
+      Promise.reject(new Error("P1001: Can't reach database server at db:5432 (SELECT * FROM \"Session\") C:\app\server"));
     try {
-      const res = await request(app).get("/api/tickets").set("X-Requester-Id", String(requesterA));
+      const res = await request(app).get("/api/tickets").set("Cookie", cookies.requesterA);
       expect(res.status).toBe(500);
       expect(res.body).toEqual({ error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." } });
       expect(JSON.stringify(res.body)).not.toMatch(/P1001|SELECT|db:5432|\app|stack/i);
@@ -348,7 +370,7 @@ describe("failures that must not take the server down (§6.2, FR-47)", () => {
       delegate.findUnique = original;
     }
     expect((await request(app).get("/api/health")).status).toBe(200);
-    expect((await request(app).get("/api/tickets").set("X-Requester-Id", String(requesterA))).status).toBe(200);
+    expect((await request(app).get("/api/tickets").set("Cookie", cookies.requesterA)).status).toBe(200);
   });
 
   it("keeps the client's own body mistakes as 4xx, not server errors", async () => {

@@ -8,7 +8,6 @@ import {
   removeAttachment,
   uploadAttachment,
 } from "../api.js";
-import { useRequester } from "../context/RequesterContext.js";
 import {
   AttachmentSection,
   checkFileBeforeUpload,
@@ -41,8 +40,6 @@ export function RequesterTicketDetail({
   onBack,
   onDownload,
 }: RequesterTicketDetailProps) {
-  const { requester } = useRequester();
-
   const [ticket, setTicket] = useState<TicketDetail | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "not-found" | "error">("loading");
   const [uploading, setUploading] = useState(false);
@@ -50,10 +47,9 @@ export function RequesterTicketDetail({
   const [rejected, setRejected] = useState<{ filename: string; message: string }[]>([]);
 
   const load = useCallback(async () => {
-    if (!requester) return;
     setStatus("loading");
     try {
-      setTicket(await fetchTicketDetail(requester.id, ticketId));
+      setTicket(await fetchTicketDetail(ticketId));
       setStatus("ready");
     } catch (error) {
       setTicket(null);
@@ -61,7 +57,7 @@ export function RequesterTicketDetail({
       // not exist, by design (BR-16).
       setStatus(error instanceof AttachmentError && error.code === "NOT_FOUND" ? "not-found" : "error");
     }
-  }, [requester, ticketId]);
+  }, [ticketId]);
 
   useEffect(() => {
     void load();
@@ -72,7 +68,7 @@ export function RequesterTicketDetail({
   }
 
   async function handleUpload(file: File) {
-    if (!requester || !ticket) return;
+    if (!ticket) return;
 
     // Fast local feedback; the server re-validates and stays the authority.
     const localProblem = checkFileBeforeUpload(file);
@@ -83,7 +79,7 @@ export function RequesterTicketDetail({
 
     setUploading(true);
     try {
-      const attachment = await uploadAttachment(requester.id, ticket.id, file);
+      const attachment = await uploadAttachment(ticket.id, file);
       setTicket({ ...ticket, attachments: [...ticket.attachments, attachment] });
       setRejected((current) => current.filter((r) => r.filename !== file.name));
     } catch (error) {
@@ -99,11 +95,11 @@ export function RequesterTicketDetail({
   }
 
   async function handleRemove(attachment: Attachment, reason: string) {
-    if (!requester || !ticket) return;
+    if (!ticket) return;
 
     setRemovingId(attachment.id);
     try {
-      const updated = await removeAttachment(requester.id, attachment.id, reason);
+      const updated = await removeAttachment(attachment.id, reason);
       setTicket({
         ...ticket,
         attachments: ticket.attachments.map((a) => (a.id === updated.id ? updated : a)),
@@ -120,10 +116,9 @@ export function RequesterTicketDetail({
 
   async function handleDownload(attachment: Attachment) {
     if (onDownload) return onDownload(attachment);
-    if (!requester) return;
 
     try {
-      await downloadAttachment(requester.id, attachment);
+      await downloadAttachment(attachment);
     } catch (error) {
       // Reported on the failing row only; the rest of the screen is untouched.
       reject(
