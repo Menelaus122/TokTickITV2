@@ -2,9 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Attachment,
   AttachmentError,
+  ThreadEntry,
   TicketDetail,
   downloadAttachment,
+  fetchComments,
   fetchTicketDetail,
+  postComment,
+  setAppearsResolved,
   removeAttachment,
   uploadAttachment,
 } from "../api.js";
@@ -21,12 +25,16 @@ import {
   PriorityBadge,
   StatusBadge,
 } from "../components/index.js";
+import { ConversationThread } from "../components/ConversationThread.js";
+import { AppearsResolvedPanel } from "../components/AppearsResolvedPanel.js";
 
 // Requester Ticket Detail (ui-spec.md 11).
 //
 // Every ticket field is read-only — rendered as plain text, not as disabled
-// inputs, so there is no control to enable by accident (FR-25). The only
-// actions on this screen belong to attachments.
+// inputs, so there is no control to enable by accident (FR-25). The actions on
+// this screen belong to attachments and, since Lab 3 Issue 7, to the Public
+// Comments thread and the "Problem Appears Resolved" panel (FR-19). There is
+// no Internal Notes region and nothing that hints at one (AC-17).
 
 export interface RequesterTicketDetailProps {
   ticketId: number;
@@ -45,6 +53,8 @@ export function RequesterTicketDetail({
   const [uploading, setUploading] = useState(false);
   const [removingId, setRemovingId] = useState<number | null>(null);
   const [rejected, setRejected] = useState<{ filename: string; message: string }[]>([]);
+  const [comments, setComments] = useState<ThreadEntry[]>([]);
+  const [commentsStatus, setCommentsStatus] = useState<"loading" | "ready" | "error">("loading");
 
   const load = useCallback(async () => {
     setStatus("loading");
@@ -62,6 +72,40 @@ export function RequesterTicketDetail({
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Loaded on its own, so a thread that fails to load leaves the ticket and
+  // its attachments usable, with a retry on the thread alone.
+  const loadComments = useCallback(async () => {
+    setCommentsStatus("loading");
+    try {
+      setComments(await fetchComments(ticketId));
+      setCommentsStatus("ready");
+    } catch {
+      setComments([]);
+      setCommentsStatus("error");
+    }
+  }, [ticketId]);
+
+  useEffect(() => {
+    void loadComments();
+  }, [loadComments]);
+
+  async function handlePostComment(body: string) {
+    const comment = await postComment(ticketId, body);
+    setComments((current) => [...current, comment]);
+  }
+
+  async function handleMarkResolved(comment: string) {
+    const result = await setAppearsResolved(ticketId, { appearsResolved: true, comment });
+    setTicket((current) => (current ? { ...current, requesterResolvedAt: result.ticket.requesterResolvedAt } : current));
+    // The accompanying Public Comment joins the thread straight away.
+    if (result.comment) setComments((current) => [...current, result.comment!]);
+  }
+
+  async function handleUndoResolved() {
+    const result = await setAppearsResolved(ticketId, { appearsResolved: false });
+    setTicket((current) => (current ? { ...current, requesterResolvedAt: result.ticket.requesterResolvedAt } : current));
+  }
 
   function reject(filename: string, message: string) {
     setRejected((current) => [...current.filter((r) => r.filename !== filename), { filename, message }]);
@@ -210,6 +254,20 @@ export function RequesterTicketDetail({
         onDismissRejection={(filename) =>
           setRejected((current) => current.filter((r) => r.filename !== filename))
         }
+      />
+
+      <AppearsResolvedPanel
+        resolvedAt={ticket.requesterResolvedAt}
+        onMark={handleMarkResolved}
+        onUndo={handleUndoResolved}
+      />
+
+      <ConversationThread
+        variant="public"
+        status={commentsStatus}
+        entries={comments}
+        onRetry={() => void loadComments()}
+        onPost={handlePostComment}
       />
     </>
   );

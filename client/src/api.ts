@@ -207,6 +207,8 @@ export interface Attachment {
 
 export interface TicketDetail extends Ticket {
   attachments: Attachment[];
+  /** Lab 3, Issue 7 — when the Requester said the problem appears resolved. */
+  requesterResolvedAt: string | null;
 }
 
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
@@ -304,6 +306,58 @@ export async function removeAttachment(attachmentId: number, removalReason: stri
 
   if (response.ok) return (await response.json()) as Attachment;
   throw await readError(response);
+}
+
+// --- Lab 3, Issue 7 — Public Comments and Problem Appears Resolved ----------
+
+/** One entry in a conversation thread (api-spec §4.1). */
+export interface ThreadEntry {
+  id: number;
+  body: string;
+  createdAt: string;
+  author: { id: number; fullName: string; role: Role };
+}
+
+export const COMMENT_MAX = 2000; // BR-41
+export const APPEARS_RESOLVED_MIN = 5; // BR-29
+
+export async function fetchComments(ticketId: number): Promise<ThreadEntry[]> {
+  const response = await apiFetch(`${API_URL}/api/tickets/${ticketId}/comments`);
+  if (!response.ok) throw await failure(response, "Cannot load the comments.");
+  return ((await response.json()) as { comments: ThreadEntry[] }).comments;
+}
+
+/** Throws ApiError; a 400 carries the field message under `fields.body`. */
+export async function postComment(ticketId: number, body: string): Promise<ThreadEntry> {
+  const response = await apiFetch(`${API_URL}/api/tickets/${ticketId}/comments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ body }),
+  });
+  if (response.status !== 201) throw await failure(response, "The comment could not be posted.");
+  return (await response.json()) as ThreadEntry;
+}
+
+export interface AppearsResolvedResult {
+  ticket: { id: number; requesterResolvedAt: string | null; currentStatus: TicketStatus };
+  comment: ThreadEntry | null;
+}
+
+/**
+ * Sets (with a comment) or clears the Requester's "appears resolved" signal.
+ * There is deliberately no status in the request: only IT Staff resolve (BR-05).
+ */
+export async function setAppearsResolved(
+  ticketId: number,
+  change: { appearsResolved: true; comment: string } | { appearsResolved: false },
+): Promise<AppearsResolvedResult> {
+  const response = await apiFetch(`${API_URL}/api/tickets/${ticketId}/appears-resolved`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(change),
+  });
+  if (!response.ok) throw await failure(response, "That could not be saved.");
+  return (await response.json()) as AppearsResolvedResult;
 }
 
 // Issue 2 + Issue 4 — call the backend.
