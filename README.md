@@ -200,6 +200,9 @@ cross-site and never sends the session cookie, so sign-in fails.
 | GET | `/api/tickets/:id/attachments` | Requester | Attachment metadata, active and removed |
 | GET | `/api/attachments/:id/download` | Requester | Download an active attachment |
 | PATCH | `/api/attachments/:id/remove` | Requester | Soft-remove an attachment, with a required reason |
+| GET, POST | `/api/tickets/:id/comments` | Requester (own), IT Staff, Administrator | Public Comments — read the thread, or post 1–2000 characters (Lab 3) |
+| GET, POST | `/api/tickets/:id/notes` | IT Staff, Administrator | Internal Notes; a Requester gets `403` and learns nothing about them (Lab 3) |
+| PATCH | `/api/tickets/:id/appears-resolved` | Requester (own) | Set the "Problem Appears Resolved" signal with a 5–2000 character comment, or clear it; never changes the status (Lab 3) |
 
 ```bash
 curl http://localhost:3000/api/health

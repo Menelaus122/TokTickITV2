@@ -276,7 +276,7 @@ session alive, and deletes every other session for that user (BR-15, AC-06).
 | `GET /api/categories`, `GET /api/related-systems` | unchanged shapes; now require a session |
 | `POST /api/tickets` | unchanged shape; Requester comes from the session (BR-03) |
 | `GET /api/tickets` | unchanged shape and query contract; scoped to the session's Requester |
-| `GET /api/tickets/:id` | unchanged; 404 for another Requester's ticket (BR-22) |
+| `GET /api/tickets/:id` | unchanged, plus `requesterResolvedAt` (ISO timestamp or `null`) so the screen can show the Requester's own signal (§3.1); 404 for another Requester's ticket (BR-22) |
 | `POST /api/tickets/:id/attachments`, `GET /api/tickets/:id/attachments`, `GET /api/attachments/:id/download`, `PATCH /api/attachments/:id/remove` | unchanged, ownership now resolved from the session |
 | `GET /api/requesters` | **removed** with the selector (FR-16) |
 
