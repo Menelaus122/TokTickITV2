@@ -8,6 +8,7 @@ import { validateTicketInput } from "./validation.js";
 import { nextTicketNumber } from "./ticketNumber.js";
 import { parseTicketListQuery, buildPageMeta } from "./listQuery.js";
 import { conversationRouter } from "./conversation.js";
+import { staffRouter } from "./staff.js";
 import { routeId } from "./routeId.js";
 import multer from "multer";
 import { mkdir, writeFile, unlink } from "node:fs/promises";
@@ -729,6 +730,8 @@ app.patch("/api/attachments/:id/remove", async (req: Request, res: Response) => 
 // Lab 3, Issue 4 — safe errors to the very end (FR-47, api-spec §6.2).
 // Lab 3, Issue 7 — Public Comments, Internal Notes, and appears-resolved.
 app.use("/api/tickets", conversationRouter);
+// Lab 3, Issue 8 — the IT Staff queue, behind the /api/staff role guard above.
+app.use("/api/staff", staffRouter);
 
 app.use("/api", apiNotFound);
 app.use(safeErrors);

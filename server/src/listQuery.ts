@@ -50,13 +50,13 @@ export type ParseResult =
 type RawQuery = Record<string, unknown>;
 
 /** Express gives repeated params as arrays; only a lone string is meaningful. */
-function single(value: unknown): string | undefined {
+export function single(value: unknown): string | undefined {
   if (typeof value === "string") return value;
   if (Array.isArray(value) && value.length === 1 && typeof value[0] === "string") return value[0];
   return undefined;
 }
 
-function absent(value: unknown): boolean {
+export function absent(value: unknown): boolean {
   return value === undefined || value === null || value === "";
 }
 
