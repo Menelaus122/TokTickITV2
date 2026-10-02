@@ -7,6 +7,8 @@ import { apiNotFound, rejectForeignOrigin, requireRole, resolveRequesterIdentity
 import { validateTicketInput } from "./validation.js";
 import { nextTicketNumber } from "./ticketNumber.js";
 import { parseTicketListQuery, buildPageMeta } from "./listQuery.js";
+import { conversationRouter } from "./conversation.js";
+import { routeId } from "./routeId.js";
 import multer from "multer";
 import { mkdir, writeFile, unlink } from "node:fs/promises";
 import { createReadStream, existsSync } from "node:fs";
@@ -142,6 +144,8 @@ const TICKET_DETAIL_SELECT = {
   description: true,
   requestedPriority: true,
   currentStatus: true,
+  // Lab 3, Issue 7 — the Requester's own "appears resolved" signal (BR-29).
+  requesterResolvedAt: true,
   createdAt: true,
   updatedAt: true,
   requester: { select: { id: true, fullName: true } },
@@ -385,12 +389,6 @@ const ATTACHMENT_SELECT = {
   removedAt: true,
   removalReason: true,
 } as const;
-
-/** Parses a positive integer route parameter, or null when malformed. */
-function routeId(raw: string): number | null {
-  const id = Number(raw);
-  return Number.isInteger(id) && id > 0 ? id : null;
-}
 
 // --- GET /api/tickets/:id — one owned Ticket -------------------------------
 
@@ -729,6 +727,9 @@ app.patch("/api/attachments/:id/remove", async (req: Request, res: Response) => 
 });
 
 // Lab 3, Issue 4 — safe errors to the very end (FR-47, api-spec §6.2).
+// Lab 3, Issue 7 — Public Comments, Internal Notes, and appears-resolved.
+app.use("/api/tickets", conversationRouter);
+
 app.use("/api", apiNotFound);
 app.use(safeErrors);
 

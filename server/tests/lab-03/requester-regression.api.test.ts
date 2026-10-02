@@ -126,6 +126,97 @@ describe("the Lab 2 journey as a signed-in Requester", () => {
   });
 });
 
+describe("Problem Appears Resolved (BR-29, BR-30, BR-05)", () => {
+  async function ownTicket(status: "NEW" | "IN_PROGRESS" = "IN_PROGRESS") {
+    const created = await createTicket(cookieA);
+    createdTicketIds.push(created.body.id);
+    await prisma.ticket.update({ where: { id: created.body.id }, data: { currentStatus: status } });
+    return created.body.id as number;
+  }
+
+  function mark(id: number, body: unknown, cookie = cookieA) {
+    return request(app).patch(`/api/tickets/${id}/appears-resolved`).set("Cookie", cookie).send(body as object);
+  }
+
+  it("API-19 records the signal and a Public Comment, and leaves Current Status alone", async () => {
+    const id = await ownTicket();
+    const res = await mark(id, { appearsResolved: true, comment: "  Printer works again since this morning.  " });
+    expect(res.status).toBe(200);
+    expect(res.body.ticket).toEqual({ id, requesterResolvedAt: expect.any(String), currentStatus: "IN_PROGRESS" });
+    expect(res.body.comment).toMatchObject({ body: "Printer works again since this morning.", author: { id: requesterA, role: "REQUESTER" } });
+    expect(res.body.comment.createdAt).toBe(res.body.ticket.requesterResolvedAt);
+
+    const row = await prisma.ticket.findUniqueOrThrow({ where: { id } });
+    expect(row.currentStatus).toBe("IN_PROGRESS");
+    expect(row.requesterResolvedAt?.toISOString()).toBe(res.body.ticket.requesterResolvedAt);
+    const thread = await request(app).get(`/api/tickets/${id}/comments`).set("Cookie", cookieA);
+    expect(thread.body.comments.map((c: { id: number }) => c.id)).toEqual([res.body.comment.id]);
+
+    // The detail screen learns about it too.
+    const detail = await request(app).get(`/api/tickets/${id}`).set("Cookie", cookieA);
+    expect(detail.body.requesterResolvedAt).toBe(res.body.ticket.requesterResolvedAt);
+  });
+
+  it("API-19 the Requester can withdraw the signal without a comment (BR-30)", async () => {
+    const id = await ownTicket();
+    expect((await mark(id, { appearsResolved: true, comment: "Looks fixed to me." })).status).toBe(200);
+    const comments = await prisma.publicComment.count({ where: { ticketId: id } });
+
+    const undo = await mark(id, { appearsResolved: false });
+    expect(undo.status).toBe(200);
+    expect(undo.body).toEqual({ ticket: { id, requesterResolvedAt: null, currentStatus: "IN_PROGRESS" }, comment: null });
+    expect((await prisma.ticket.findUniqueOrThrow({ where: { id } })).requesterResolvedAt).toBeNull();
+    expect(await prisma.publicComment.count({ where: { ticketId: id } })).toBe(comments);
+  });
+
+  it("API-20 requires a comment of 5 to 2000 characters, and records nothing otherwise", async () => {
+    const id = await ownTicket();
+    for (const comment of [undefined, "", "   ", "Fine", "a".repeat(2001), 12345]) {
+      const res = await mark(id, { appearsResolved: true, comment });
+      expect(res.status, JSON.stringify(comment)).toBe(400);
+      expect(res.body.error.code).toBe("VALIDATION_FAILED");
+      expect(res.body.error.fields.comment).toBeTruthy();
+    }
+    for (const appearsResolved of [undefined, "true", 1, null]) {
+      const res = await mark(id, { appearsResolved, comment: "Looks fixed to me." });
+      expect(res.status, JSON.stringify(appearsResolved)).toBe(400);
+      expect(res.body.error.fields.appearsResolved).toBeTruthy();
+    }
+    expect((await prisma.ticket.findUniqueOrThrow({ where: { id } })).requesterResolvedAt).toBeNull();
+    expect(await prisma.publicComment.count({ where: { ticketId: id } })).toBe(0);
+
+    expect((await mark(id, { appearsResolved: true, comment: "Fixed" })).status).toBe(200); // 5 is enough
+    expect((await mark(id, { appearsResolved: true, comment: "b".repeat(2000) })).status).toBe(200);
+  });
+
+  it("API-21 no Requester request can set Current Status (BR-05)", async () => {
+    const id = await ownTicket("NEW");
+    const attempts = [
+      await mark(id, { appearsResolved: true, comment: "Please close this.", currentStatus: "RESOLVED" }),
+      await request(app).post(`/api/tickets/${id}/comments`).set("Cookie", cookieA).send({ body: "Closing it myself.", currentStatus: "CLOSED" }),
+      await request(app).patch(`/api/staff/tickets/${id}/status`).set("Cookie", cookieA).send({ currentStatus: "RESOLVED", reason: "Fixed now." }),
+      await request(app).patch(`/api/tickets/${id}`).set("Cookie", cookieA).send({ currentStatus: "RESOLVED" }),
+      await request(app).patch(`/api/tickets/${id}/status`).set("Cookie", cookieA).send({ currentStatus: "RESOLVED" }),
+    ];
+    expect(attempts.map((r) => r.status)).toEqual([200, 201, 403, 404, 404]);
+    expect((await prisma.ticket.findUniqueOrThrow({ where: { id } })).currentStatus).toBe("NEW");
+  });
+
+  it("is the owning Requester's alone: another Requester gets 404, IT Staff and Administrators 403", async () => {
+    const id = await ownTicket();
+    const other = await signInAs(requesterB);
+    const staff = await signInAs((await prisma.user.findFirstOrThrow({ where: { role: "IT_STAFF", isActive: true, mustChangePassword: false } })).id);
+    const admin = await signInAs((await prisma.user.findFirstOrThrow({ where: { role: "ADMINISTRATOR", isActive: true, mustChangePassword: false } })).id);
+    const body = { appearsResolved: true, comment: "Looks fixed from here." };
+
+    expect((await mark(id, body, other)).status).toBe(404);
+    expect((await mark(id, body, staff)).status).toBe(403);
+    expect((await mark(id, body, admin)).status).toBe(403);
+    expect((await request(app).patch(`/api/tickets/${id}/appears-resolved`).send(body)).status).toBe(401);
+    expect((await prisma.ticket.findUniqueOrThrow({ where: { id } })).requesterResolvedAt).toBeNull();
+  });
+});
+
 describe("identity comes from the session only", () => {
   it("API-16 ignores X-Requester-Id naming another user; the session's tickets come back", async () => {
     const res = await request(app)
