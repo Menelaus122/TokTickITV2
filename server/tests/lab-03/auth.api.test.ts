@@ -340,10 +340,13 @@ describe("a session that must change its password (BR-14)", () => {
     }
   });
 
-  it("leaves requests without a session cookie exactly as Lab 2 had them", async () => {
-    // Until Issues 4 and 6 move the Lab 2 endpoints onto the session, a
-    // request carrying no cookie must behave as it always did.
-    expect((await request(app).get("/api/categories")).status).toBe(200);
-    expect((await request(app).get("/api/requesters")).status).toBe(200);
+  it("answers a request with no session cookie 401, not the password gate (Issue 6)", async () => {
+    // With the Lab 2 header gone there is no anonymous path left: no cookie
+    // means "sign in", never PASSWORD_CHANGE_REQUIRED, and the selector's list
+    // of requesters no longer exists.
+    const categories = await request(app).get("/api/categories");
+    expect(categories.status).toBe(401);
+    expect(categories.body.error.code).toBe("AUTH_REQUIRED");
+    expect((await request(app).get("/api/requesters")).status).toBe(404);
   });
 });

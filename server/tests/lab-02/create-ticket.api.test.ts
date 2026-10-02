@@ -2,6 +2,8 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
+import { endTestSessions, signInAll } from "../helpers/signIn.js";
+import { createSession, hashSessionToken } from "../../src/session.js";
 import { TICKET_NUMBER_PATTERN, parseYear } from "../../src/ticketNumber.js";
 
 // API-05 to API-09 — POST /api/tickets and the reference-data endpoints.
@@ -12,6 +14,14 @@ import { TICKET_NUMBER_PATTERN, parseYear } from "../../src/ticketNumber.js";
 //   docker exec toktickit-server npm run prisma:seed
 
 const prisma = getPrisma();
+
+// Lab 3, Issue 6 — each Requester signs in; the session is the identity.
+let cookies = new Map<number, string>();
+function cookieOf(requesterId: number | string): string {
+  const cookie = cookies.get(Number(requesterId));
+  if (!cookie) throw new Error(`no session for requester ${requesterId}`);
+  return cookie;
+}
 
 let activeRequesterId: number;
 let inactiveRequesterId: number;
@@ -31,7 +41,7 @@ const VALID_BODY = {
 
 async function createTicket(body: Record<string, unknown>, requesterId: number | string | null) {
   const req = request(app).post("/api/tickets").send(body);
-  if (requesterId !== null) req.set("X-Requester-Id", String(requesterId));
+  if (requesterId !== null) req.set("Cookie", cookieOf(requesterId));
   const res = await req;
   if (res.status === 201) createdTicketIds.push(res.body.id);
   return res;
@@ -47,18 +57,21 @@ beforeAll(async () => {
   inactiveRequesterId = inactive.id;
   categoryId = category.id;
   relatedSystemId = system.id;
+
+  cookies = await signInAll(activeRequesterId);
 });
 
 afterAll(async () => {
   if (createdTicketIds.length > 0) {
     await prisma.ticket.deleteMany({ where: { id: { in: createdTicketIds } } });
   }
+  await endTestSessions();
   await prisma.$disconnect();
 });
 
 describe("GET /api/related-systems", () => {
   it("returns the active related systems sorted by name", async () => {
-    const res = await request(app).get("/api/related-systems");
+    const res = await request(app).get("/api/related-systems").set("Cookie", cookieOf(activeRequesterId));
 
     expect(res.status).toBe(200);
     expect(res.body.length).toBeGreaterThanOrEqual(6);
@@ -76,7 +89,7 @@ describe("GET /api/related-systems", () => {
       where: { isActive: true },
       select: { id: true },
     });
-    const res = await request(app).get("/api/related-systems");
+    const res = await request(app).get("/api/related-systems").set("Cookie", cookieOf(activeRequesterId));
 
     expect(res.body.map((r: { id: number }) => r.id).sort()).toEqual(
       active.map((r) => r.id).sort(),
@@ -251,37 +264,43 @@ describe("POST /api/tickets — validation", () => {
   });
 });
 
+// Lab 3, Issue 6 — the Lab 2 requester-context errors are retired; who may
+// create a ticket is now decided by the session alone (api-spec §1.4).
 describe("POST /api/tickets — requester context", () => {
-  it("refuses a request with no requester context", async () => {
+  it("refuses a request with no session", async () => {
     const res = await createTicket({ ...VALID_BODY, categoryId, relatedSystemId }, null);
 
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe("REQUESTER_CONTEXT_REQUIRED");
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe("AUTH_REQUIRED");
   });
 
-  it("refuses a malformed requester id", async () => {
-    const res = await createTicket({ ...VALID_BODY, categoryId, relatedSystemId }, "abc");
-
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe("REQUESTER_CONTEXT_REQUIRED");
-  });
-
-  it("refuses a requester that does not exist", async () => {
-    const res = await createTicket({ ...VALID_BODY, categoryId, relatedSystemId }, 999999);
-
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe("REQUESTER_INVALID");
-  });
-
-  it("refuses an inactive requester and creates nothing", async () => {
+  it("refuses the retired X-Requester-Id header on its own and creates nothing", async () => {
     const before = await prisma.ticket.count();
-    const res = await createTicket(
-      { ...VALID_BODY, categoryId, relatedSystemId },
-      inactiveRequesterId,
-    );
+    const res = await request(app)
+      .post("/api/tickets")
+      .set("X-Requester-Id", String(activeRequesterId))
+      .send({ ...VALID_BODY, categoryId, relatedSystemId });
 
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe("REQUESTER_INACTIVE");
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe("AUTH_REQUIRED");
     expect(await prisma.ticket.count()).toBe(before);
+  });
+
+  it("refuses a session whose account is inactive and creates nothing", async () => {
+    // A session row left over from before the account was deactivated.
+    const token = await createSession(prisma, inactiveRequesterId);
+    try {
+      const before = await prisma.ticket.count();
+      const res = await request(app)
+        .post("/api/tickets")
+        .set("Cookie", `tt_sid=${token}`)
+        .send({ ...VALID_BODY, categoryId, relatedSystemId });
+
+      expect(res.status).toBe(401);
+      expect(res.body.error.code).toBe("AUTH_REQUIRED");
+      expect(await prisma.ticket.count()).toBe(before);
+    } finally {
+      await prisma.session.deleteMany({ where: { tokenHash: hashSessionToken(token) } });
+    }
   });
 });

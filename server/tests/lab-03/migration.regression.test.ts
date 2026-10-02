@@ -7,6 +7,7 @@ import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
 import { hashPassword, verifyPassword } from "../../src/password.js";
 import { ACCOUNTS, FIRST_LOGIN_EMAIL, SEED_PASSWORD, TICKETS, runSeed } from "../../prisma/seedData.js";
+import { endTestSessions, signInAs } from "../helpers/signIn.js";
 
 // Lab 3, Issue 2 — migration and regression (MIG-01 to MIG-10 in
 // docs/lab-03/tests.md).
@@ -296,6 +297,7 @@ describe("the seed", () => {
       await prisma.session.deleteMany({ where: { userId: undocumentedId } });
       await prisma.user.delete({ where: { id: undocumentedId } });
     }
+    await endTestSessions();
     await prisma.$disconnect();
   });
 
@@ -421,7 +423,7 @@ describe("the seed", () => {
 
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await signInAs(requester.id))
       .send({
         categoryId: category.id,
         relatedSystemId: system.id,
@@ -438,15 +440,19 @@ describe("the seed", () => {
     expect(ticket.ownerId).toBeNull();
   });
 
-  it("MIG-11 does not let an IT Staff id act as a Requester through the Lab 2 header", async () => {
-    // Until Issue 6 removes X-Requester-Id, a staff id must be refused exactly
-    // like an id that does not exist.
-    const staff = await prisma.user.findFirstOrThrow({ where: { role: "IT_STAFF", isActive: true } });
-    const res = await request(app).get("/api/tickets").set("X-Requester-Id", String(staff.id));
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe("REQUESTER_INVALID");
+  it("MIG-11 does not let an IT Staff account act as a Requester", async () => {
+    // Issue 4 refused a staff id on the Lab 2 header; Issue 6 removed the
+    // header and the selector's list, so a staff account can reach the Lab 2
+    // endpoints only through its own session, which they refuse (BR-18).
+    const staff = await prisma.user.findFirstOrThrow({ where: { role: "IT_STAFF", isActive: true, mustChangePassword: false } });
+    const header = await request(app).get("/api/tickets").set("X-Requester-Id", String(staff.id));
+    expect(header.status).toBe(401);
+    expect(header.body.error.code).toBe("AUTH_REQUIRED");
 
-    const selector = await request(app).get("/api/requesters");
-    expect(selector.body.map((row: { id: number }) => row.id)).not.toContain(staff.id);
+    const session = await request(app).get("/api/tickets").set("Cookie", await signInAs(staff.id));
+    expect(session.status).toBe(403);
+    expect(session.body.error.code).toBe("FORBIDDEN");
+
+    expect((await request(app).get("/api/requesters")).status).toBe(404);
   });
 });

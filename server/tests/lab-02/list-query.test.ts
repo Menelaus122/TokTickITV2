@@ -79,9 +79,13 @@ describe("filters", () => {
     expect(parseTicketListQuery({ requestedPriority: "low" }).ok).toBe(false);
   });
 
-  it("accepts NEW as the only status Lab 2 produces", () => {
-    expect(ok({ currentStatus: "NEW" }).currentStatus).toBe("NEW");
-    expect(parseTicketListQuery({ currentStatus: "CLOSED" }).ok).toBe(false);
+  // Lab 2 produced only NEW; Lab 3 tickets reach all eight statuses (Issue 6).
+  it("accepts each of the eight ticket statuses, exactly as spelled", () => {
+    for (const status of ["NEW", "OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "RESOLVED", "CLOSED", "REOPENED", "CANCELLED"]) {
+      expect(ok({ currentStatus: status }).currentStatus).toBe(status);
+    }
+    expect(parseTicketListQuery({ currentStatus: "closed" }).ok).toBe(false);
+    expect(parseTicketListQuery({ currentStatus: "ARCHIVED" }).ok).toBe(false);
   });
 });
 

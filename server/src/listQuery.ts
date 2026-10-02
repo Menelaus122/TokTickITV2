@@ -17,7 +17,18 @@ export type SortField = (typeof SORTABLE_FIELDS)[number];
 export const SORT_DIRECTIONS = ["asc", "desc"] as const;
 export type SortDirection = (typeof SORT_DIRECTIONS)[number];
 
-export const TICKET_STATUSES = ["NEW"] as const;
+// Lab 3 tickets move through eight statuses, and a Requester's own list shows
+// every one of them, so the filter accepts them all (api-spec §1.5).
+export const TICKET_STATUSES = [
+  "NEW",
+  "OPEN",
+  "IN_PROGRESS",
+  "WAITING_FOR_REQUESTER",
+  "RESOLVED",
+  "CLOSED",
+  "REOPENED",
+  "CANCELLED",
+] as const;
 export type TicketStatus = (typeof TICKET_STATUSES)[number];
 
 export interface TicketListQuery {

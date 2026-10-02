@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
+import { endTestSessions, signInAll } from "../helpers/signIn.js";
 
 // API-10 to API-15 — GET /api/tickets.
 //
@@ -9,6 +10,14 @@ import { getPrisma } from "../../src/prisma.js";
 // them in afterAll so the database is left as it was found.
 
 const prisma = getPrisma();
+
+// Lab 3, Issue 6 — each Requester signs in; the session is the identity.
+let cookies = new Map<number, string>();
+function cookieOf(requesterId: number | string): string {
+  const cookie = cookies.get(Number(requesterId));
+  if (!cookie) throw new Error(`no session for requester ${requesterId}`);
+  return cookie;
+}
 
 let requesterA: number;
 let requesterB: number;
@@ -22,7 +31,7 @@ const A_COUNT = 12;
 
 function list(requesterId: number | null, query = "") {
   const req = request(app).get(`/api/tickets${query}`);
-  if (requesterId !== null) req.set("X-Requester-Id", String(requesterId));
+  if (requesterId !== null) req.set("Cookie", cookieOf(requesterId));
   return req;
 }
 
@@ -72,10 +81,13 @@ beforeAll(async () => {
     },
   });
   createdIds.push(bTicket.id);
+
+  cookies = await signInAll(requesterA, requesterB);
 });
 
 afterAll(async () => {
   await prisma.ticket.deleteMany({ where: { id: { in: createdIds } } });
+  await endTestSessions();
   await prisma.$disconnect();
 });
 
@@ -122,10 +134,10 @@ describe("ownership scoping", () => {
     }
   });
 
-  it("refuses a request with no requester context", async () => {
+  it("refuses a request with no session", async () => {
     const res = await list(null);
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe("REQUESTER_CONTEXT_REQUIRED");
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe("AUTH_REQUIRED");
   });
 });
 
