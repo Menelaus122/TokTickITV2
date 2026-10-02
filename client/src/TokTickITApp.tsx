@@ -18,6 +18,7 @@ import { RoleHome } from "./screens/RoleHome.js";
 import { CreateTicket } from "./screens/CreateTicket.js";
 import { MyTickets } from "./screens/MyTickets.js";
 import { RequesterTicketDetail } from "./screens/RequesterTicketDetail.js";
+import { StaffTicketQueue } from "./screens/StaffTicketQueue.js";
 import { AppShell } from "./components/AppShell.js";
 import { ErrorState, LoadingState, Page } from "./components/index.js";
 import { ROUTES } from "./routes.js";
@@ -202,6 +203,16 @@ function TicketDetailRoute() {
   );
 }
 
+function QueueRoute() {
+  const { user } = useAuth();
+  if (!user) return null;
+  return (
+    <Page>
+      <StaffTicketQueue currentUserId={user.id} />
+    </Page>
+  );
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -216,8 +227,16 @@ function AppRoutes() {
         path={ROUTES.queue}
         element={
           <RequireAuth roles={["IT_STAFF"]}>
+            <QueueRoute />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/queue/:id"
+        element={
+          <RequireAuth roles={["IT_STAFF"]}>
             <Page>
-              <RoleHome title="Ticket Queue" body="The shared IT Staff queue arrives in Issue 8." />
+              <RoleHome title="Ticket Detail" body="The IT Staff ticket detail screen arrives in Issue 9." />
             </Page>
           </RequireAuth>
         }

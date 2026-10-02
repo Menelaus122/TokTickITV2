@@ -9,6 +9,7 @@ export const ROUTES = {
   login: "/login",
   password: "/change-password",
   queue: "/queue",
+  staffDetail: (id: number | string) => `/queue/${id}`,
   users: "/users",
 } as const;
 

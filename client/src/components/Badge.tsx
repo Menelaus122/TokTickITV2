@@ -115,3 +115,31 @@ const ROLE_TEXT: Record<RoleValue, string> = {
 export function RoleBadge({ value }: { value: RoleValue }) {
   return <BadgeBase kind="role" tone={ROLE_TONE[value]} text={ROLE_TEXT[value]} />;
 }
+
+// --- Owner (Lab 3, ui-spec §1.2) --------------------------------------------
+
+export interface OwnerValue {
+  id: number;
+  fullName: string;
+  isActive: boolean;
+}
+
+// Never an empty cell: an unassigned ticket says so in words (FR-28). A
+// deactivated owner keeps their name, marked Inactive (BR-26), and the signed-in
+// IT Staff member's own tickets carry a "You" pill.
+export function OwnerPresentation({ owner, currentUserId }: { owner: OwnerValue | null; currentUserId?: number }) {
+  if (!owner) {
+    return (
+      <em className="tt-owner tt-owner--unassigned" data-owner="unassigned">
+        Unassigned
+      </em>
+    );
+  }
+  return (
+    <span className="tt-owner" data-owner={owner.id}>
+      {owner.fullName}
+      {!owner.isActive && <BadgeBase kind="owner-inactive" tone="neutral" text="Inactive" />}
+      {owner.id === currentUserId && <BadgeBase kind="owner-you" tone="green" text="You" />}
+    </span>
+  );
+}

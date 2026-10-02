@@ -653,3 +653,59 @@ html, body { overflow-x: hidden; }
 
 /* A failed Logout is said out loud under the header (FR-06). */
 .tt-shell__alert { margin: var(--tt-space-3) var(--tt-space-6) 0; }
+
+/* --- Lab 3: IT Staff Ticket Queue (ui-spec §6, §1.2) ----------------------- */
+
+/* Owner presentation: a name, or the word Unassigned — never an empty cell. */
+.tt-owner { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--tt-space-1); }
+.tt-owner--unassigned { color: var(--tt-text-muted); font-style: italic; }
+.tt-owner .tt-badge { text-transform: none; letter-spacing: 0; }
+.tt-badge[data-badge="owner-inactive"] { background: var(--tt-surface); border-color: var(--tt-border); }
+
+.tt-queue__search { flex: 1 1 260px; }
+.tt-queue__search .tt-field__control { width: 100%; }
+.tt-queue__filters .tt-field { margin-bottom: 0; }
+.tt-queue__filters { align-items: flex-end; }
+.tt-queue__filters-toggle { display: none; }
+
+/* Fixed layout so the summary column can truncate instead of widening the
+   table; every other column has room for its widest badge. */
+.tt-queue-table { table-layout: fixed; }
+.tt-queue-table .tt-queue__col-1 { width: 140px; }
+.tt-queue-table .tt-queue__col-3 { width: 100px; }
+.tt-queue-table .tt-queue__col-4 { width: 92px; }
+.tt-queue-table .tt-queue__col-5 { width: 150px; }
+.tt-queue-table .tt-queue__col-6 { width: 150px; }
+.tt-queue-table .tt-queue__col-7 { width: 120px; white-space: nowrap; }
+
+.tt-queue__number { font-family: var(--bs-font-monospace, monospace); font-weight: 600; color: var(--tt-green-primary); }
+.tt-queue__summary { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.tt-queue__resolved { display: block; color: var(--tt-success); font-size: var(--tt-font-help); }
+.tt-queue__secondary { display: none; }
+
+.tt-queue-card { margin: 0; }
+.tt-queue-card dd { margin: 0; }
+.tt-queue-card > div { margin-bottom: var(--tt-space-2); }
+.tt-queue-card__line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tt-space-2); }
+/* Line three is two groups — the priorities, then the owner — that sit side by
+   side and wrap as whole groups, so a label never parts from its value. */
+.tt-queue-card > .tt-queue-card__group { display: inline-flex; margin-right: var(--tt-space-3); }
+.tt-queue-card__line dt { font-size: var(--tt-font-help); color: var(--tt-text-muted); font-weight: 600; }
+
+/* Tablet: Requested Priority and Last Updated fold beneath the summary. */
+@media (min-width: 768px) and (max-width: 991px) {
+  .tt-queue-table .tt-queue__col-3,
+  .tt-queue-table .tt-queue__col-7 { display: none; }
+  .tt-queue__summary { white-space: normal; }
+  .tt-queue-table .tt-queue__col-1 { width: 130px; }
+  .tt-queue-table .tt-queue__col-5 { width: 130px; }
+  .tt-queue-table .tt-queue__col-6 { width: 130px; }
+  .tt-queue__secondary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tt-space-2); margin-top: var(--tt-space-1); color: var(--tt-text-muted); font-size: var(--tt-font-help); }
+}
+
+/* Mobile: the filters wait behind the Filters toggle. */
+@media (max-width: 767px) {
+  .tt-queue__filters-toggle { display: block; width: 100%; margin-bottom: var(--tt-space-3); }
+  .tt-queue__filters:not(.tt-queue__filters--open) { display: none; }
+  .tt-queue__search { flex: none; }
+}

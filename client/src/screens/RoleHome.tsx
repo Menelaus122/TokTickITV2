@@ -1,8 +1,9 @@
 import { Card, EmptyState } from "../components/index.js";
 
-// Lab 3, Issue 5 — the landing pages for IT Staff and Administrators, so both
-// roles can sign in and see their navigation now. The Ticket Queue arrives in
-// Issue 8 and User Management in Issue 10, and each replaces its page here.
+// Lab 3, Issue 5 — placeholder pages for screens a later issue builds, so each
+// role can sign in and see its navigation now. The Ticket Queue replaced its
+// page in Issue 8; the IT Staff Ticket Detail arrives in Issue 9 and User
+// Management in Issue 10.
 
 export function RoleHome({ title, body }: { title: string; body: string }) {
   return (
