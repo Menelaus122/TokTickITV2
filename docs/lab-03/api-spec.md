@@ -428,6 +428,9 @@ deactivated account (BR-26).
 | `pageSize` outside 10/20/50, or `page` below 1 | `400 INVALID_QUERY` |
 | `page` beyond the last page | `200` with an empty `tickets` array and correct metadata (BR-59) |
 | `q` empty after trimming | treated as absent, not as a filter matching nothing (BR-53) |
+| `categoryId` or `owner` not a positive integer | `400 INVALID_QUERY` |
+| `categoryId` or `owner` a well-formed id that matches nothing | `200` with an empty `tickets` array — the filter is applied as asked, not looked up first |
+| Any parameter given more than once | `400 INVALID_QUERY` |
 
 ### 5.2 `GET /api/staff/tickets/:id`
 
