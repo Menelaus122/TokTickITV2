@@ -46,12 +46,16 @@ function ticket(attachments: Attachment[] = []): TicketDetail {
     relatedSystem: { id: 2, name: "Corporate Laptop" },
     createdAt: "2026-08-25T09:14:22.310Z",
     updatedAt: "2026-08-25T09:14:22.310Z",
+    requesterResolvedAt: null,
     attachments,
   };
 }
 
 beforeEach(() => {
   window.localStorage.clear();
+  // Lab 3, Issue 7 added a Public Comments thread to this screen; these Lab 2
+  // tests are about the ticket and its attachments, so the thread is empty.
+  vi.spyOn(api, "fetchComments").mockResolvedValue([]);
 });
 
 afterEach(() => {

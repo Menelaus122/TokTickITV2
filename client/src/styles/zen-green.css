@@ -267,6 +267,30 @@ textarea.tt-field__control {
 .tt-badge--outline  { background: var(--tt-surface); color: var(--tt-green-secondary); border-color: var(--tt-green-secondary); }
 .tt-badge--success  { background: var(--tt-success-bg); color: var(--tt-success); border-color: var(--tt-success-bg); }
 
+/* --- Conversation threads (Lab 3 ui-spec §5.2, §7.1, §1.4) ----------------- */
+
+.tt-thread__list { list-style: none; margin: 0 0 var(--tt-space-4); padding: 0; }
+.tt-thread__entry { padding: var(--tt-space-3) 0; border-bottom: 1px solid var(--tt-border); }
+.tt-thread__entry:last-child { border-bottom: 0; }
+.tt-thread__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tt-space-2); font-size: 14px; }
+.tt-thread__meta time { color: var(--tt-text-muted); }
+/* Text, never HTML; line breaks the author typed are kept (BR-43). */
+.tt-thread__body { margin: var(--tt-space-1) 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tt-thread__empty { color: var(--tt-text-muted); margin: 0 0 var(--tt-space-4); }
+.tt-thread__composer .tt-btn { margin-top: var(--tt-space-2); }
+
+/* The internal region (§1.4): read-only background, dashed left edge, and a
+   caption in words so the restriction survives greyscale and screen readers. */
+.tt-thread--internal {
+  background: var(--tt-readonly-bg);
+  border-left: 4px dashed var(--tt-border);
+}
+.tt-thread__caption { margin: 0 0 var(--tt-space-3); font-weight: 700; color: var(--tt-text-muted); }
+
+/* Problem Appears Resolved (§5.1) */
+.tt-resolved .tt-btn--primary { margin-top: var(--tt-space-2); }
+.tt-resolved__helper { margin: var(--tt-space-3) 0 0; font-size: 14px; color: var(--tt-text-muted); }
+
 /* --- States (ui-spec.md 6) ----------------------------------------------- */
 
 .tt-state {

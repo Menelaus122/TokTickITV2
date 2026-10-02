@@ -278,6 +278,39 @@ describe("Requester ownership through the session (BR-03, BR-22)", () => {
   });
 });
 
+describe("Internal Notes are closed to Requesters (BR-23, AC-08)", () => {
+  it("SEC-05 refuses a Requester reading or posting notes with 403 and nothing about the notes", async () => {
+    // Seeded so there is something to leak: a note on the Requester's own
+    // ticket and on another Requester's.
+    const ownTicket = createdTicketIds[0];
+    const staffId = (await prisma.user.findFirstOrThrow({ where: { role: "IT_STAFF", isActive: true } })).id;
+    const secret = "SEC-05 internal detail that must stay internal.";
+    await prisma.internalNote.createMany({
+      data: [
+        { ticketId: ownTicket, authorId: staffId, body: secret },
+        { ticketId: ticketOfB, authorId: staffId, body: secret },
+      ],
+    });
+    const before = await prisma.internalNote.count();
+
+    const refusals = [];
+    for (const id of [ownTicket, ticketOfB, 999999999]) {
+      refusals.push(await request(app).get(`/api/tickets/${id}/notes`).set("Cookie", cookies.requesterA));
+      refusals.push(await request(app).post(`/api/tickets/${id}/notes`).set("Cookie", cookies.requesterA).send({ body: "Let me in." }));
+    }
+    for (const res of refusals) {
+      expect(res.status).toBe(403);
+      // The same body every time: own ticket, someone else's, or none at all.
+      expect(res.body).toEqual(refusals[0].body);
+      expect(Object.keys(res.body.error).sort()).toEqual(["code", "message"]);
+      expect(JSON.stringify(res.body)).not.toContain(secret);
+      expect(JSON.stringify(res.body)).not.toMatch(/\d/); // no count, no id
+    }
+    expect(refusals[0].body.error.code).toBe("FORBIDDEN");
+    expect(await prisma.internalNote.count()).toBe(before);
+  });
+});
+
 describe("no password material leaves the API (BR-52)", () => {
   it("SEC-10 keeps hashes and tokens out of every user-carrying response", async () => {
     const responses = [

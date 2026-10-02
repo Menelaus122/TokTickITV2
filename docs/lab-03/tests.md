@@ -91,7 +91,7 @@ Principles carried over from Lab 2:
 | SEC-02 | AC-09 | Requester calls each `/api/staff/*` endpoint | 403 `FORBIDDEN` | 4 | Pass |
 | SEC-03 | AC-09 | Administrator calls each `/api/staff/*` endpoint | 403 `FORBIDDEN` (BR-19) | 4 | Pass |
 | SEC-04 | AC-09 | IT Staff and Requester call each `/api/admin/*` endpoint | 403 `FORBIDDEN` | 4 | Pass |
-| SEC-05 | AC-08 | Requester reads and posts Internal Notes | 403, no note body, author, or count anywhere in the response | 7 | Planned |
+| SEC-05 | AC-08 | Requester reads and posts Internal Notes | 403, no note body, author, or count anywhere in the response | 7 | Pass |
 | SEC-06 | AC-11 | Requester opens another Requester's ticket, attachment list, upload, download, and removal | 404 on every route, identical to a nonexistent id. Comments are covered by API-23 when Issue 7 adds them | 4 | Pass |
 | SEC-07 | AC-07 | body carries another user's `requesterId`; header carries `X-Requester-Id` | both ignored, session identity used, no cross-Requester data returned | 4, 6 | Pass |
 | SEC-08 | AC-07 | `POST /api/tickets` with a body `ticketNumber` and `currentStatus` | both ignored, backend values win (Lab 2 BR-01) | 6 | Pass |
@@ -107,11 +107,12 @@ Principles carried over from Lab 2:
 | API-16 | AC-14 | `X-Requester-Id` naming another user; the header alone with no session | ignored with a session, so the session's tickets are returned; 401 without one, and nothing is created | 6 | Pass |
 | API-17 | AC-13 | My Tickets search, filters, sort, pagination; the status filter with each of the eight statuses | unchanged from Lab 2's contract; each status filters the session's own tickets, and any other value is 400 `INVALID_QUERY` | 6 | Pass |
 | API-18 | AC-12 | `GET /api/requesters` | 404, the endpoint is gone (FR-16) | 6 | Pass |
-| API-19 | AC-15 | appears-resolved with a valid comment | 200, `requesterResolvedAt` set, comment created, status unchanged | 7 | Planned |
-| API-20 | AC-15 | appears-resolved with a 4-character comment | 400 `VALIDATION_FAILED` | 7 | Planned |
-| API-21 | AC-15 | Requester sends `currentStatus: "RESOLVED"` anywhere | no endpoint accepts it; status unchanged (BR-05) | 7 | Planned |
+| API-19 | AC-15 | appears-resolved with a valid comment | 200, `requesterResolvedAt` set, comment created, status unchanged | 7 | Pass |
+| API-20 | AC-15 | appears-resolved with a 4-character comment | 400 `VALIDATION_FAILED` | 7 | Pass |
+| API-21 | AC-15 | Requester sends `currentStatus: "RESOLVED"` anywhere | no endpoint accepts it; status unchanged (BR-05) | 7 | Pass |
 
-The same file also pins a fix from the Issue 4 review: a route id Express
+API-19 – API-21 also live in this file, beside the rest of the Requester's own
+ticket. The same file also pins a fix from the Issue 4 review: a route id Express
 cannot percent-decode (`/api/tickets/%E0`, `/api/attachments/%E0/download`)
 answers `400 INVALID_QUERY` with the handler's own "id is not valid" message,
 not the JSON-body message. The Lab 2 suites sign in through
@@ -121,14 +122,14 @@ not the JSON-body message. The Lab 2 suites sign in through
 
 | ID | AC | What it tests | Expected | Issue | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| API-22 | AC-16 | owning Requester, IT Staff, and Administrator read one thread | all three see the same comments with authors and timestamps | 7 | Planned |
-| API-23 | AC-16 | non-owning Requester reads the thread | 404 | 7 | Planned |
-| API-24 | AC-18 | empty and whitespace-only bodies, comment and note | 400 on all four | 7 | Planned |
-| API-25 | AC-18 | 2001-character body | 400; 2000 accepted | 7 | Planned |
-| API-26 | AC-17 | IT Staff posts a note, Requester fetches the ticket and its comments | note absent from every field | 7 | Planned |
-| API-27 | AC-19 | `PATCH` and `DELETE` on a comment and a note | 404 — no such route exists (BR-42) | 7 | Planned |
-| API-28 | AC-16 | author and timestamp come from the server | client-supplied `authorId` and `createdAt` ignored (BR-40) | 7 | Planned |
-| API-29 | BR-44 | posting a comment or note | ticket `updatedAt` advances (BR-44) | 7 | Planned |
+| API-22 | AC-16 | owning Requester, IT Staff, and Administrator read one thread | all three see the same comments with authors and timestamps | 7 | Pass |
+| API-23 | AC-16 | non-owning Requester reads the thread | 404 | 7 | Pass |
+| API-24 | AC-18 | empty and whitespace-only bodies, comment and note | 400 on all four | 7 | Pass |
+| API-25 | AC-18 | 2001-character body | 400; 2000 accepted | 7 | Pass |
+| API-26 | AC-17 | IT Staff posts a note, Requester fetches the ticket and its comments | note absent from every field | 7 | Pass |
+| API-27 | AC-19 | `PATCH` and `DELETE` on a comment and a note | 404 — no such route exists (BR-42) | 7 | Pass |
+| API-28 | AC-16 | author and timestamp come from the server | client-supplied `authorId` and `createdAt` ignored (BR-40) | 7 | Pass |
+| API-29 | BR-44 | posting a comment or note | ticket `updatedAt` advances (BR-44) | 7 | Pass |
 
 ### 2.6 API — IT Staff queue, `server/tests/lab-03/staff-queue.api.test.ts`
 
@@ -213,8 +214,8 @@ not the JSON-body message. The Lab 2 suites sign in through
 | UI-07 | AC-09 | `RoleNavigation.test.tsx` | each role sees only its own destinations; an unauthorized route shows the forbidden state | 5 | Pass |
 | UI-08 | AC-05 | `RoleNavigation.test.tsx` | shell shows name and Role badge, and Logout clears the session | 5 | Pass |
 | UI-09 | AC-12 | `RequesterRegression.test.tsx` | no selector, no Change Requester control anywhere, and nothing in localStorage; the old selector URL leads home or to Login; requests never carry `X-Requester-Id`; a 401 mid-session returns to Login and back; eight status labels and filters | 6 | Pass |
-| UI-10 | AC-15 | `RequesterComments.test.tsx` | comment composer validation, appears-resolved panel, undo, and the "only IT Staff can resolve" helper text | 7 | Planned |
-| UI-11 | AC-17 | `RequesterComments.test.tsx` | no Internal Notes region and no element hinting at one | 7 | Planned |
+| UI-10 | AC-15 | `RequesterComments.test.tsx` | comment composer validation, appears-resolved panel, undo, and the "only IT Staff can resolve" helper text | 7 | Pass |
+| UI-11 | AC-17 | `RequesterComments.test.tsx` | no Internal Notes region and no element hinting at one | 7 | Pass |
 | UI-12 | AC-21 | `StaffTicketQueue.test.tsx` | search, each filter, sort, page size, and Clear Filters issue the documented requests | 8 | Planned |
 | UI-13 | AC-20 | `StaffTicketQueue.test.tsx` | seven columns in order; Unassigned rendered as the word | 8 | Planned |
 | UI-14 | AC-38 | `StaffTicketQueue.test.tsx` | loading, empty, no-results, forbidden, failure states | 8 | Planned |
@@ -229,6 +230,13 @@ not the JSON-body message. The Lab 2 suites sign in through
 | UI-23 | AC-32 | `UserManagement.test.tsx` | own row has Role and Active disabled with the explanatory helper text | 10 | Planned |
 | UI-24 | AC-33 | `UserManagement.test.tsx` | last-Administrator refusal renders as its own callout | 10 | Planned |
 | UI-25 | AC-34 | `UserManagement.test.tsx` | new-initial-password confirmation states the sign-out consequence | 10 | Planned |
+
+`RequesterComments.test.tsx` also renders the public and internal variants of
+the shared `ConversationThread` side by side and checks they cannot be
+confused: different accessible names, the "Internal — not visible to the
+Requester" caption on the internal one only, the internal region styling, and
+different button labels ("Post comment" / "Post internal note"). The IT Staff
+screen that places both threads is Issue 9 (UI-15 – UI-19, AC-39).
 
 ### 2.11 UI style — `client/tests/lab-03/ZenGreenLab3.test.tsx`
 
