@@ -96,24 +96,24 @@ function RequireAuth({ roles, children }: { roles: Role[]; children: ReactNode }
 }
 
 // Requester screens read "the current Requester" from RequesterContext, as in
-// Lab 2. Since Issue 5 that Requester is the signed-in user.
-function RequesterArea({ children }: { children: ReactNode }) {
+// Lab 2. Since Issue 6 that Requester is only ever the signed-in user; the
+// guard has already proved there is one, and that it is a Requester.
+function SignedInRequester({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   if (!user) return null;
   return (
-    <RequireAuth roles={["REQUESTER"]}>
-      <RequesterProvider signedIn={{ id: user.id, fullName: user.fullName, email: user.email, department: null }}>
-        {children}
-      </RequesterProvider>
-    </RequireAuth>
+    <RequesterProvider requester={{ id: user.id, fullName: user.fullName, email: user.email, department: null }}>
+      {children}
+    </RequesterProvider>
   );
 }
 
 function RequesterRoute({ children }: { children: ReactNode }) {
-  const { status, user } = useAuth();
-  // Before anyone is known, the plain guard decides where to go.
-  if (status !== "authenticated" || !user) return <RequireAuth roles={["REQUESTER"]}>{children}</RequireAuth>;
-  return <RequesterArea>{children}</RequesterArea>;
+  return (
+    <RequireAuth roles={["REQUESTER"]}>
+      <SignedInRequester>{children}</SignedInRequester>
+    </RequireAuth>
+  );
 }
 
 function LoginRoute() {

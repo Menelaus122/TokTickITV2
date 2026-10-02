@@ -60,6 +60,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, [refresh]);
 
+  // Issue 6 — the session ended under a working screen (any 401 outside
+  // /api/auth). Forgetting the user is enough: the route guard then sends them
+  // to Login, carrying the page they were on so sign-in brings them back.
+  useEffect(
+    () =>
+      api.onSessionEnded(() => {
+        setUser(null);
+        setStatus("anonymous");
+      }),
+    [],
+  );
+
   const signIn = useCallback(async (email: string, password: string) => {
     const signedIn = await api.login(email, password);
     setUser(signedIn);
