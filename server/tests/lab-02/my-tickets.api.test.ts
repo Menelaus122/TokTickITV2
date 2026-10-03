@@ -42,7 +42,7 @@ beforeAll(async () => {
     take: 2,
   });
   const categories = await prisma.category.findMany({ where: { isActive: true }, take: 2 });
-  const system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true } });
+  const system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true }, orderBy: { id: "asc" } });
 
   requesterA = a.id;
   requesterB = b.id;
@@ -220,7 +220,7 @@ describe("search", () => {
   });
 
   it("matches the ticket number", async () => {
-    const anyTicket = await prisma.ticket.findFirstOrThrow({ where: { requesterId: requesterA } });
+    const anyTicket = await prisma.ticket.findFirstOrThrow({ where: { requesterId: requesterA }, orderBy: { id: "asc" } });
     const res = await list(requesterA, `?search=${anyTicket.ticketNumber}`);
 
     expect(res.body.data.map((t: { id: number }) => t.id)).toContain(anyTicket.id);

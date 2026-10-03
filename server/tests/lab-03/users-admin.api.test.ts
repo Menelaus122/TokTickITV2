@@ -78,8 +78,8 @@ async function signedIn(email: string) {
 beforeAll(async () => {
   resetLoginThrottle();
   const admin = await prisma.user.findFirstOrThrow({ where: { role: "ADMINISTRATOR", isActive: true, mustChangePassword: false }, orderBy: { id: "asc" } });
-  const staff = await prisma.user.findFirstOrThrow({ where: { role: "IT_STAFF", isActive: true, mustChangePassword: false } });
-  const requester = await prisma.user.findFirstOrThrow({ where: { role: "REQUESTER", isActive: true, mustChangePassword: false } });
+  const staff = await prisma.user.findFirstOrThrow({ where: { role: "IT_STAFF", isActive: true, mustChangePassword: false }, orderBy: { id: "asc" } });
+  const requester = await prisma.user.findFirstOrThrow({ where: { role: "REQUESTER", isActive: true, mustChangePassword: false }, orderBy: { id: "asc" } });
   adminId = admin.id;
   cookies.admin = await signInAs(admin.id);
   cookies.staff = await signInAs(staff.id);
@@ -317,14 +317,14 @@ describe("PATCH /api/admin/users/:id", () => {
   it("API-65 deactivating a user deletes their sessions and keeps their ticket ownership (BR-51, BR-26)", async () => {
     const staff = await seedUser("IT_STAFF");
     const cookie = await signedIn(staff.email);
-    const requester = await prisma.user.findFirstOrThrow({ where: { role: "REQUESTER", isActive: true } });
+    const requester = await prisma.user.findFirstOrThrow({ where: { role: "REQUESTER", isActive: true }, orderBy: { id: "asc" } });
     const ticket = await prisma.ticket.create({
       data: {
         ticketNumber: `TT-9996-${String(Date.now() % 90000).padStart(5, "0")}`,
         requesterId: requester.id,
         ownerId: staff.id,
-        categoryId: (await prisma.category.findFirstOrThrow()).id,
-        relatedSystemId: (await prisma.relatedSystem.findFirstOrThrow()).id,
+        categoryId: (await prisma.category.findFirstOrThrow({ orderBy: { id: "asc" } })).id,
+        relatedSystemId: (await prisma.relatedSystem.findFirstOrThrow({ orderBy: { id: "asc" } })).id,
         summary: "Owned by a soon-inactive account",
         description: "Created by the admin users suite.",
         requestedPriority: "LOW",

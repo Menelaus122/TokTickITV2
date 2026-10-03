@@ -82,8 +82,8 @@ beforeAll(async () => {
     orderBy: { id: "asc" },
     take: 2,
   });
-  const inactiveStaff = await prisma.user.findFirstOrThrow({ where: { role: "IT_STAFF", isActive: false } });
-  const admin = await prisma.user.findFirstOrThrow({ where: { role: "ADMINISTRATOR", isActive: true, mustChangePassword: false } });
+  const inactiveStaff = await prisma.user.findFirstOrThrow({ where: { role: "IT_STAFF", isActive: false }, orderBy: { id: "asc" } });
+  const admin = await prisma.user.findFirstOrThrow({ where: { role: "ADMINISTRATOR", isActive: true, mustChangePassword: false }, orderBy: { id: "asc" } });
   ids.me = me.id;
   ids.colleague = colleague.id;
   ids.inactiveStaff = inactiveStaff.id;
@@ -93,7 +93,7 @@ beforeAll(async () => {
   cookies.requester = await signInAs(requesterIds[0]);
 
   categoryIds = (await prisma.category.findMany({ where: { isActive: true }, orderBy: { id: "asc" }, take: 2 })).map((c) => c.id);
-  const system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true } });
+  const system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true }, orderBy: { id: "asc" } });
 
   const owners = [null, ids.me, ids.colleague, ids.inactiveStaff];
   const base = Date.UTC(2026, 0, 1);

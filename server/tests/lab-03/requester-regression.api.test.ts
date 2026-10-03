@@ -36,8 +36,8 @@ beforeAll(async () => {
   requesterA = a.id;
   requesterB = b.id;
   cookieA = await signInAs(requesterA);
-  categoryId = (await prisma.category.findFirstOrThrow({ where: { isActive: true } })).id;
-  relatedSystemId = (await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true } })).id;
+  categoryId = (await prisma.category.findFirstOrThrow({ where: { isActive: true }, orderBy: { id: "asc" } })).id;
+  relatedSystemId = (await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true }, orderBy: { id: "asc" } })).id;
 });
 
 afterAll(async () => {
@@ -205,8 +205,8 @@ describe("Problem Appears Resolved (BR-29, BR-30, BR-05)", () => {
   it("is the owning Requester's alone: another Requester gets 404, IT Staff and Administrators 403", async () => {
     const id = await ownTicket();
     const other = await signInAs(requesterB);
-    const staff = await signInAs((await prisma.user.findFirstOrThrow({ where: { role: "IT_STAFF", isActive: true, mustChangePassword: false } })).id);
-    const admin = await signInAs((await prisma.user.findFirstOrThrow({ where: { role: "ADMINISTRATOR", isActive: true, mustChangePassword: false } })).id);
+    const staff = await signInAs((await prisma.user.findFirstOrThrow({ where: { role: "IT_STAFF", isActive: true, mustChangePassword: false }, orderBy: { id: "asc" } })).id);
+    const admin = await signInAs((await prisma.user.findFirstOrThrow({ where: { role: "ADMINISTRATOR", isActive: true, mustChangePassword: false }, orderBy: { id: "asc" } })).id);
     const body = { appearsResolved: true, comment: "Looks fixed from here." };
 
     expect((await mark(id, body, other)).status).toBe(404);
@@ -265,6 +265,7 @@ describe("My Tickets with Lab 3 statuses", () => {
     for (const status of STATUSES) {
       const owner = await prisma.ticket.findFirstOrThrow({
         where: { currentStatus: status, requester: { isActive: true, mustChangePassword: false, role: "REQUESTER" } },
+        orderBy: { id: "asc" },
         select: { requesterId: true },
       });
       const cookie = owner.requesterId === requesterA ? cookieA : await signInAs(owner.requesterId);
