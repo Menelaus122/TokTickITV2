@@ -714,6 +714,36 @@ html, body { overflow-x: hidden; }
   .tt-queue__search { flex: none; }
 }
 
+/* --- Lab 3: IT Staff Ticket Detail (ui-spec §7) ---------------------------- */
+
+.tt-h3 { font-size: var(--tt-font-body); font-weight: 700; margin: 0 0 var(--tt-space-2); }
+
+.tt-staff-detail { display: grid; grid-template-columns: 1fr; gap: var(--tt-space-4); margin-bottom: var(--tt-space-4); }
+.tt-staff-detail > .tt-card { margin: 0; min-width: 0; }
+.tt-staff-detail__region-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--tt-space-2); margin-bottom: var(--tt-space-3); }
+.tt-staff-detail__region-head .tt-h2 { margin: 0; }
+.tt-staff-detail__group { padding-top: var(--tt-space-3); margin-top: var(--tt-space-3); border-top: 1px solid var(--tt-border); }
+.tt-staff-detail__group[data-control="owner"] { border-top: 0; margin-top: 0; padding-top: 0; }
+.tt-staff-detail__group .tt-btn { margin-bottom: var(--tt-space-3); }
+.tt-staff-detail__confirm { padding: var(--tt-space-3); margin-bottom: var(--tt-space-3); background: var(--tt-readonly-bg); border: 1px solid var(--tt-border); border-radius: 6px; }
+.tt-staff-detail__confirm p { margin-top: 0; }
+.tt-staff-detail__operational .tt-field__control { width: 100%; }
+.tt-staff-detail .tt-detail__description { overflow-wrap: anywhere; }
+
+/* Below 992px the regions stack, operational first: it is why IT Staff opened
+   the screen (ui-spec §7.3). */
+.tt-staff-detail__operational { order: -1; }
+
+@media (min-width: 992px) {
+  .tt-staff-detail { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; }
+  .tt-staff-detail__operational { order: 0; }
+}
+
+@media (max-width: 767px) {
+  .tt-staff-detail .tt-detail { grid-template-columns: 1fr; }
+  .tt-staff-detail__group .tt-btn { width: 100%; }
+}
+
 /* --- Lab 3: Administrator User Management (ui-spec §8) --------------------- */
 
 .tt-users__head { display: flex; justify-content: flex-end; margin-bottom: var(--tt-space-3); }

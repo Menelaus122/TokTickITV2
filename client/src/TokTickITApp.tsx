@@ -14,11 +14,11 @@ import { AuthProvider, LANDING, useAuth } from "./context/AuthContext.js";
 import { RequesterProvider } from "./context/RequesterContext.js";
 import { Login } from "./screens/Login.js";
 import { ChangePassword } from "./screens/ChangePassword.js";
-import { RoleHome } from "./screens/RoleHome.js";
 import { CreateTicket } from "./screens/CreateTicket.js";
 import { MyTickets } from "./screens/MyTickets.js";
 import { RequesterTicketDetail } from "./screens/RequesterTicketDetail.js";
 import { StaffTicketQueue } from "./screens/StaffTicketQueue.js";
+import { StaffTicketDetail } from "./screens/StaffTicketDetail.js";
 import { UserManagement } from "./screens/UserManagement.js";
 import { AppShell } from "./components/AppShell.js";
 import { ErrorState, LoadingState, Page } from "./components/index.js";
@@ -224,6 +224,25 @@ function UsersRoute() {
   );
 }
 
+function StaffDetailRoute() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { id } = useParams();
+  const ticketId = Number(id);
+  if (!user) return null;
+  if (!Number.isInteger(ticketId) || ticketId <= 0) return <Navigate to={ROUTES.queue} replace />;
+  return (
+    <Page>
+      <StaffTicketDetail
+        key={`staff-detail-${ticketId}`}
+        ticketId={ticketId}
+        currentUserId={user.id}
+        onBack={() => navigate(ROUTES.queue)}
+      />
+    </Page>
+  );
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -246,9 +265,7 @@ function AppRoutes() {
         path="/queue/:id"
         element={
           <RequireAuth roles={["IT_STAFF"]}>
-            <Page>
-              <RoleHome title="Ticket Detail" body="The IT Staff ticket detail screen arrives in Issue 9." />
-            </Page>
+            <StaffDetailRoute />
           </RequireAuth>
         }
       />

@@ -11,11 +11,13 @@ import { conversationRouter } from "./conversation.js";
 import { staffRouter } from "./staff.js";
 import { adminRouter } from "./admin.js";
 import { routeId } from "./routeId.js";
+import { ATTACHMENT_SELECT, UPLOAD_DIR, attachmentView, sendAttachment } from "./attachmentResponse.js";
 import { containsText } from "./queryParams.js";
 import multer from "multer";
+
+export { UPLOAD_DIR };
 import { mkdir, writeFile, unlink } from "node:fs/promises";
-import { createReadStream, existsSync } from "node:fs";
-import { join, resolve as resolvePath } from "node:path";
+import { join } from "node:path";
 import {
   MAX_ACTIVE_ATTACHMENTS,
   MAX_FILE_BYTES,
@@ -346,8 +348,6 @@ app.get("/api/tickets", async (req: Request, res: Response) => {
 // that does not exist, so the API never discloses that it is there (BR-16).
 // ---------------------------------------------------------------------------
 
-export const UPLOAD_DIR = resolvePath(process.env.UPLOAD_DIR ?? "uploads");
-
 // Files are held in memory and written only after they pass validation, so a
 // rejected upload never touches the disk and no metadata row can outlive a
 // failed write (BR-43).
@@ -358,39 +358,6 @@ const upload = multer({
 
 const NOT_FOUND = {
   error: { code: "NOT_FOUND", message: "That ticket could not be found." },
-} as const;
-
-function attachmentView(row: {
-  id: number;
-  originalFilename: string;
-  mimeType: string;
-  sizeBytes: number;
-  uploadedAt: Date;
-  removedAt: Date | null;
-  removalReason: string | null;
-}) {
-  return {
-    id: row.id,
-    originalFilename: row.originalFilename,
-    mimeType: row.mimeType,
-    sizeBytes: row.sizeBytes,
-    uploadedAt: row.uploadedAt,
-    removedAt: row.removedAt,
-    removalReason: row.removalReason,
-    // A removed attachment reports no download URL, so a client cannot build a
-    // working link out of the response (BR-40).
-    downloadUrl: row.removedAt ? null : `/api/attachments/${row.id}/download`,
-  };
-}
-
-const ATTACHMENT_SELECT = {
-  id: true,
-  originalFilename: true,
-  mimeType: true,
-  sizeBytes: true,
-  uploadedAt: true,
-  removedAt: true,
-  removalReason: true,
 } as const;
 
 // --- GET /api/tickets/:id — one owned Ticket -------------------------------
@@ -430,7 +397,7 @@ app.get("/api/tickets/:id", async (req: Request, res: Response) => {
     return res.status(200).json({
       ...rest,
       ticketDate: ticket.createdAt,
-      attachments: attachments.map(attachmentView),
+      attachments: attachments.map((row) => attachmentView(row)),
     });
   } catch {
     return res
@@ -473,7 +440,7 @@ app.get("/api/tickets/:id/attachments", async (req: Request, res: Response) => {
     });
 
     // Removed attachments stay in the listing as metadata (BR-40).
-    return res.status(200).json(attachments.map(attachmentView));
+    return res.status(200).json(attachments.map((row) => attachmentView(row)));
   } catch {
     return res
       .status(500)
@@ -623,32 +590,7 @@ app.get("/api/attachments/:id/download", async (req: Request, res: Response) => 
       });
     }
 
-    // A removed attachment never streams bytes, whatever the UI shows (BR-41).
-    if (attachment.removedAt) {
-      return res.status(410).json({
-        error: {
-          code: "ATTACHMENT_REMOVED",
-          message: "That attachment was removed and can no longer be downloaded.",
-        },
-      });
-    }
-
-    const path = join(UPLOAD_DIR, attachment.storedFilename);
-    if (!existsSync(path)) {
-      return res
-        .status(500)
-        .json({ error: { code: "INTERNAL_ERROR", message: "The stored file is unavailable." } });
-    }
-
-    res.status(200);
-    res.set("Content-Type", attachment.mimeType);
-    res.set("Content-Length", String(attachment.sizeBytes));
-    // The original name is only ever used as a label, never as a path.
-    res.set(
-      "Content-Disposition",
-      `attachment; filename="${attachment.originalFilename.replace(/"/g, "")}"`,
-    );
-    return createReadStream(path).pipe(res);
+    return sendAttachment(res, attachment);
   } catch {
     return res
       .status(500)

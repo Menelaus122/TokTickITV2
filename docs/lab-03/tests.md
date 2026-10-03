@@ -48,9 +48,9 @@ Principles carried over from Lab 2:
 | UNIT-03 | `password.test.ts` | hash then verify; a wrong password fails | bcrypt round-trip holds, hash never equals input (BR-06) | 3 | Pass |
 | UNIT-04 | `session.test.ts` | token generation and SHA-256 derivation | 32 bytes, URL-safe, never stored raw (BR-09, BR-10) | 3 | Pass |
 | UNIT-05 | `session.test.ts` | expiry arithmetic at 8 hours | a session one second past expiry is invalid (BR-11) | 3 | Pass |
-| UNIT-06 | `transitions.test.ts` | every pair in the BR-33 matrix | exactly the permitted pairs allowed, all 56 others refused | 9 | Planned |
-| UNIT-07 | `transitions.test.ts` | same-status transition | refused (BR-38) | 9 | Planned |
-| UNIT-08 | `transitions.test.ts` | reason requirement per target status | required for Resolved, Cancelled, Reopened only (BR-36, BR-37) | 9 | Planned |
+| UNIT-06 | `transitions.test.ts` | every pair in the BR-33 matrix | of the 56 ordered pairs of different statuses, exactly the 15 permitted ones allowed and the other 41 refused | 9 | Pass |
+| UNIT-07 | `transitions.test.ts` | same-status transition | refused (BR-38) | 9 | Pass |
+| UNIT-08 | `transitions.test.ts` | reason requirement per target status | required for Resolved, Cancelled, Reopened only (BR-36, BR-37) | 9 | Pass |
 | UNIT-09 | `queue-query.test.ts` | query parsing: defaults, permitted sorts, page sizes; ids and `page` above 2147483647 or not plain digits (`1.0`, `1e0`) | defaults applied; unknown or out-of-range values rejected, never corrected (BR-55, BR-58; api-spec §1.5) | 8 | Pass |
 | UNIT-10 | `queue-query.test.ts` | blank `q` after trimming; `%` and `_` kept as typed; a NUL character | treated as absent (BR-53); kept; rejected | 8 | Pass |
 | UNIT-11 | `login-throttle.test.ts` | four, then five failures for one email, against an explicit clock | no lock after four; the fifth locks for 15 minutes from itself; the lock lifts exactly at expiry with a clean count (BR-67) | 13 | Pass |
@@ -151,20 +151,20 @@ not the JSON-body message. The Lab 2 suites sign in through
 
 | ID | AC | What it tests | Expected | Issue | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| API-40 | AC-22 | claim an unassigned `NEW` ticket | 200, owner set, status `OPEN` in one operation (BR-34) | 9 | Planned |
-| API-41 | AC-23 | second IT Staff member claims the same ticket | 409 `TICKET_ALREADY_OWNED`, owner unchanged | 9 | Planned |
-| API-42 | AC-22 | reassign to another active IT Staff member, then unassign | both 200 | 9 | Planned |
-| API-43 | BR-24 | assign to a Requester, and to an inactive IT Staff member | 409 `OWNER_NOT_ASSIGNABLE` on both (BR-24) | 9 | Planned |
-| API-44 | AC-24 | change IT Priority | 200, `requestedPriority` unchanged (BR-27) | 9 | Planned |
-| API-45 | AC-25 | every permitted transition in the matrix | 200 for each | 9 | Planned |
-| API-46 | AC-25 | refused transitions, including `CANCELLED` → anything | 409 `INVALID_TRANSITION`, status unchanged | 9 | Planned |
-| API-47 | AC-26 | Resolved, Cancelled, Reopened without a reason | 400 `VALIDATION_FAILED` | 9 | Planned |
-| API-48 | AC-26 | Resolved with a reason | 200 and a Public Comment created in the same transaction (D-08) | 9 | Planned |
-| API-49 | BR-35 | Resolve and close a ticket with no owner | 409 `OWNER_REQUIRED` on both | 9 | Planned |
-| API-68 | BR-35 | cancel an unassigned `NEW` ticket with a reason | 200 — cancelling needs no owner, unlike resolve and close | 9 | Planned |
-| API-50 | BR-30 | any successful transition on a ticket flagged by its Requester | `requesterResolvedAt` cleared (BR-30) | 9 | Planned |
-| API-51 | AC-27 | `permittedTransitions` in the detail response | matches the matrix for the current status (FR-34) | 9 | Planned |
-| API-52 | AC-27 | attachments on the staff detail response | active ones downloadable, removed ones present as marked metadata | 9 | Planned |
+| API-40 | AC-22 | claim an unassigned `NEW` ticket | 200, owner set, status `OPEN` in one operation (BR-34) | 9 | Pass |
+| API-41 | AC-23 | second IT Staff member claims the same ticket, one after the other and at the same time | 409 `TICKET_ALREADY_OWNED`, owner unchanged; exactly one of two simultaneous claims wins (D-26) | 9 | Pass |
+| API-42 | AC-22 | reassign to another active IT Staff member, then unassign | both 200 | 9 | Pass |
+| API-43 | BR-24 | assign to a Requester, and to an inactive IT Staff member | 409 `OWNER_NOT_ASSIGNABLE` on both (BR-24) | 9 | Pass |
+| API-44 | AC-24 | change IT Priority | 200, `requestedPriority` unchanged (BR-27) | 9 | Pass |
+| API-45 | AC-25 | every permitted transition in the matrix | 200 for each | 9 | Pass |
+| API-46 | AC-25 | refused transitions, including `CANCELLED` → anything | 409 `INVALID_TRANSITION`, status unchanged | 9 | Pass |
+| API-47 | AC-26 | Resolved, Cancelled, Reopened without a reason | 400 `VALIDATION_FAILED` | 9 | Pass |
+| API-48 | AC-26 | Resolved with a reason | 200 and a Public Comment created in the same transaction (D-08) | 9 | Pass |
+| API-49 | BR-35 | Resolve and close a ticket with no owner | 409 `OWNER_REQUIRED` on both | 9 | Pass |
+| API-68 | BR-35 | cancel an unassigned `NEW` ticket with a reason | 200 — cancelling needs no owner, unlike resolve and close | 9 | Pass |
+| API-50 | BR-30 | any successful transition on a ticket flagged by its Requester | `requesterResolvedAt` cleared (BR-30) | 9 | Pass |
+| API-51 | AC-27 | `permittedTransitions` in the detail response | matches the matrix for the current status (FR-34) | 9 | Pass |
+| API-52 | AC-27 | attachments on the staff detail response | active ones downloadable, removed ones present as marked metadata | 9 | Pass |
 
 ### 2.8 API — administration, `server/tests/lab-03/users-admin.api.test.ts`
 
@@ -220,11 +220,11 @@ not the JSON-body message. The Lab 2 suites sign in through
 | UI-12 | AC-21 | `StaffTicketQueue.test.tsx` | search, each filter, sort, page size, and Clear Filters issue the documented requests; a new filter is never requested on the old page, and a late, superseded response never replaces the latest one | 8 | Pass |
 | UI-13 | AC-20 | `StaffTicketQueue.test.tsx` | seven columns in order; Unassigned rendered as the word | 8 | Pass |
 | UI-14 | AC-38 | `StaffTicketQueue.test.tsx` | loading, empty, no-results, forbidden, failure states | 8 | Pass |
-| UI-15 | AC-22 | `StaffTicketDetail.test.tsx` | Claim shown only when unassigned; confirmation mentions the move to Open | 9 | Planned |
-| UI-16 | AC-24 | `StaffTicketDetail.test.tsx` | Requested Priority read-only, IT Priority editable, both visible | 9 | Planned |
-| UI-17 | AC-25 | `StaffTicketDetail.test.tsx` | the status select offers only `permittedTransitions` | 9 | Planned |
-| UI-18 | AC-26 | `StaffTicketDetail.test.tsx` | reason textarea required before Apply for Resolved, Cancelled, Reopened | 9 | Planned |
-| UI-19 | AC-39 | `StaffTicketDetail.test.tsx` | the two threads are distinct regions with distinct button wording and the internal caption | 9 | Planned |
+| UI-15 | AC-22 | `StaffTicketDetail.test.tsx` | Claim shown only when unassigned; confirmation mentions the move to Open | 9 | Pass |
+| UI-16 | AC-24 | `StaffTicketDetail.test.tsx` | Requested Priority read-only, IT Priority editable, both visible | 9 | Pass |
+| UI-17 | AC-25 | `StaffTicketDetail.test.tsx` | the status select offers only `permittedTransitions` | 9 | Pass |
+| UI-18 | AC-26 | `StaffTicketDetail.test.tsx` | reason textarea required before Apply for Resolved, Cancelled, Reopened | 9 | Pass |
+| UI-19 | AC-39 | `StaffTicketDetail.test.tsx` | the two threads are distinct regions with distinct button wording and the internal caption | 9 | Pass |
 | UI-20 | AC-28 | `UserManagement.test.tsx` | list columns, search, role filter, empty and no-results states | 10 | Pass |
 | UI-21 | AC-30 | `UserManagement.test.tsx` | create panel: role as radio buttons, required initial password, helper text | 10 | Pass |
 | UI-22 | AC-31 | `UserManagement.test.tsx` | duplicate email renders on the email field | 10 | Pass |
@@ -245,11 +245,11 @@ screen that places both threads is Issue 9 (UI-15 – UI-19, AC-39).
 | :--- | :--- | :--- | :--- | :--- |
 | STYLE-01 | AC-37 | every new screen uses only Lab 2 colour tokens; no hard-coded hex | 5–10 | Planned |
 | STYLE-02 | AC-39 | Role, Status, Requested Priority, and IT Priority badges carry text, not colour alone | 8, 9 | Planned |
-| STYLE-03 | AC-37 | read-only fields use `--tt-readonly-bg` and `readonly`, distinct from disabled controls | 9 | Planned |
+| STYLE-03 | AC-37 | read-only fields use `--tt-readonly-bg` and `readonly`, distinct from disabled controls | 9 | Pass |
 | STYLE-04 | AC-37 | required fields show the red asterisk and still render a validation message when invalid | 5, 10 | Planned |
 | STYLE-05 | AC-37 | validation messages sit beneath their own field | 5, 9, 10 | Planned |
 | STYLE-06 | AC-38 | busy buttons are disabled, labelled, and permit one request | 5, 9, 10 | Planned |
-| STYLE-07 | AC-39 | the Internal Notes region carries its dashed edge, lock icon, and `aria-label` | 9 | Planned |
+| STYLE-07 | AC-39 | the Internal Notes region carries its dashed edge, lock icon, and `aria-label` | 9 | Pass |
 
 ### 2.12 Responsive — `e2e/lab-03/responsive.spec.ts`
 
@@ -438,7 +438,7 @@ from memory.
 | Session expiry | UNIT-05 and API-14 test expiry with a clock-shifted session row rather than by waiting 8 hours. |
 | Password cost | Tests run bcrypt at cost 10 (D-10); production cost is not exercised. |
 | Actions Taken | Deferred to Lab 4, so no test covers resolution being blocked by incomplete Actions Taken. |
-| Concurrency | API-41 covers the claim race with two sequential requests plus a conditional update; true parallel load is not tested. |
+| Concurrency | API-41 and the status race test send two requests at once against the row lock and the conditional claim, and exactly one wins; sustained parallel load is not tested. |
 | Accessibility | Checked by assertions on roles, labels, and focus order plus the manual checklist; no automated axe audit runs in Lab 3. |
 | Lab 2 selector suites | `client/tests/lab-02/RequesterContext.test.tsx` tested only the Development Requester selection flow, which Issue 5 removed from the application; it was deleted in Issue 5, and UI-07 and UI-08 cover the shell and navigation that replaced it. Issue 6 deleted the rest of the selector, and with it `client/tests/lab-02/RequesterSelection.test.tsx` (the selection screen) and `server/tests/lab-02/requesters.api.test.ts` (`GET /api/requesters`); UI-09 and API-18 assert both are gone. The Lab 2 tests that asserted `REQUESTER_CONTEXT_REQUIRED`, `REQUESTER_INVALID`, and `REQUESTER_INACTIVE` now assert the session contract that retired those codes (api-spec §1.4). |
 | Login throttling | The 15-minute lock and window are tested with an explicit clock (UNIT-11, UNIT-12) rather than by waiting. The counter is in memory (D-24), so the API tests cannot observe a lock surviving a restart, because it does not. |

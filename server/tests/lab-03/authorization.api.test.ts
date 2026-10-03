@@ -190,11 +190,11 @@ describe("guards on every protected route family (BR-18, BR-21)", () => {
   });
 
   it("lets the right role through the guard to the route itself", async () => {
-    // The queue (Issue 8) and user management (Issue 10) answer. The rest of
-    // the staff routes arrive in Issue 9, so for now that request reaches the
-    // end of the API and gets the JSON 404 — past the guard, not stopped by it.
+    // The queue (Issue 8), the ticket detail (Issue 9), and user management
+    // (Issue 10) all answer: the right role gets past the guard to the route.
     expect((await call("GET", "/api/staff/tickets", cookies.staff)).status).toBe(200);
-    expect((await call("GET", "/api/staff/tickets/1", cookies.staff)).status).toBe(404);
+    const ticket = await prisma.ticket.findFirstOrThrow({ select: { id: true } });
+    expect((await call("GET", `/api/staff/tickets/${ticket.id}`, cookies.staff)).status).toBe(200);
     expect((await call("GET", "/api/admin/users", cookies.admin)).status).toBe(200);
   });
 
