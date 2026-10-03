@@ -552,7 +552,7 @@ Administrator only; every other role gets **403 `FORBIDDEN`**.
 | `role` | one role value | none |
 
 No pagination and no sorting parameters: labsheet §8.5 excludes both for the user
-list. Default order is name ascending.
+list. Default order is name ascending. `q` is matched literally (§1.5).
 
 **200**
 
@@ -595,7 +595,8 @@ material (BR-52, AC-28).
 | :--- | :--- |
 | Missing or malformed field | `400 VALIDATION_FAILED` with `fields` |
 | `role` not one of the three values | `400 VALIDATION_FAILED` on `role` |
-| `initialPassword` outside 8–72 characters | `400 VALIDATION_FAILED` |
+| `fullName` blank after trimming, or over 100 characters | `400 VALIDATION_FAILED` on `fullName` |
+| `initialPassword` outside 8–72 characters, over 72 bytes, or equal to the email | `400 VALIDATION_FAILED` on `initialPassword` (BR-07, the same rule as §2.4) |
 | Email already in use, compared case-insensitively | `409 EMAIL_IN_USE`, reported on `email` (BR-45, AC-31) |
 
 ### 6.3 `PATCH /api/admin/users/:id`
@@ -612,7 +613,16 @@ user.
 | Any attempt to send `passwordHash`, `mustChangePassword`, or `initialPassword` | ignored; password changes go through §6.4 |
 
 Deactivating a user deletes their sessions (BR-51) and keeps their ticket
-ownership (BR-26).
+ownership (BR-26). A field that is sent is validated as in §6.2; a field that is
+not sent is left alone, and resending a value unchanged is not a change, so an
+Administrator may resend their own role and activation.
+
+`LAST_ADMINISTRATOR` cannot come from one request on its own: the caller is an
+active Administrator, so removing anyone else leaves at least the caller, and the
+caller's own account answers `SELF_DEACTIVATION` first. It is the answer to a
+race, two Administrators removing each other at once. Every change locks the
+active Administrators' rows before counting, so the second is judged after the
+first (D-27).
 
 ### 6.4 `POST /api/admin/users/:id/initial-password`
 
@@ -625,7 +635,8 @@ ownership (BR-26).
 
 Refused with `409 SELF_DEACTIVATION` on the caller's own account — an
 Administrator changes their own password through `/api/auth/password`, which
-requires knowing the current one.
+requires knowing the current one. The password follows BR-07 (`400
+VALIDATION_FAILED` on `initialPassword`), and an unknown id is `404`.
 
 ---
 

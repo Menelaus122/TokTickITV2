@@ -57,6 +57,7 @@ Principles carried over from Lab 2:
 | UNIT-12 | `login-throttle.test.ts` | failures spread across more than 15 minutes | a failure leaves the count once it is 15 minutes old; five inside the window lock (BR-67) | 13 | Pass |
 | UNIT-13 | `login-throttle.test.ts` | key normalisation, separate emails, success, and the size cap | case and spaces share one count; emails are independent; success clears; the cap holds, and unlocked emails are forgotten before locked ones (BR-67, D-24) | 13 | Pass |
 | UNIT-14 | `login-throttle.test.ts` | attempts reserved but not yet finished | a sixth is refused while five are in flight; in-flight attempts add to earlier failures; failures returned lock; neutral outcomes give the slot back; a success keeps other reservations (BR-67) | 13 | Pass |
+| UNIT-15 | `user-rules.test.ts` | user field validation, and the self and last-Administrator rules as a pure decision | name trimmed, email lowercased, exactly one role; a self deactivation or role change refused; removing the last active Administrator refused, by deactivation or demotion (BR-45, BR-48, BR-49) | 10 | Pass |
 
 ### 2.2 API — authentication, `server/tests/lab-03/auth.api.test.ts`
 
@@ -169,20 +170,20 @@ not the JSON-body message. The Lab 2 suites sign in through
 
 | ID | AC | What it tests | Expected | Issue | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| API-53 | AC-28 | user list as Administrator | every user with Name, Email, Role, Status; no password material | 10 | Planned |
-| API-54 | AC-29 | `q` against name and email, case-insensitive | only matches | 10 | Planned |
-| API-55 | AC-29 | `role` filter, and an unknown role value | correct subset; 400 `INVALID_QUERY` for the unknown value | 10 | Planned |
-| API-56 | AC-30 | create a user with one role and an initial password | 201, `mustChangePassword` true (BR-46) | 10 | Planned |
-| API-57 | AC-31 | create with an existing email, differing only in case | 409 `EMAIL_IN_USE` on the email field (BR-45) | 10 | Planned |
-| API-58 | AC-30 | log in as the created user | succeeds, `mustChangePassword` true, normal endpoints 403 until changed | 10 | Planned |
-| API-59 | FR-43 | create with an invalid role, a 7-character password, a blank name | 400 with per-field messages | 10 | Planned |
-| API-60 | AC-28 | edit name, email, role, activation | 200 on each | 10 | Planned |
-| API-61 | AC-31 | edit an email to one already in use | 409 `EMAIL_IN_USE` | 10 | Planned |
-| API-62 | AC-32 | Administrator deactivates self, and changes own role | 409 `SELF_DEACTIVATION` on both (BR-48) | 10 | Planned |
-| API-63 | AC-33 | deactivate the last active Administrator, and demote them | 409 `LAST_ADMINISTRATOR`, account unchanged (BR-49) | 10 | Planned |
-| API-64 | AC-34 | set a new initial password | 200, target's sessions refused afterwards, next login must change (BR-47) | 10 | Planned |
-| API-65 | BR-51 | deactivate a user who holds tickets | sessions deleted, ticket ownership retained (BR-26, BR-51) | 10 | Planned |
-| API-66 | BR-50 | any delete route for a user | 404 — none exists (BR-50) | 10 | Planned |
+| API-53 | AC-28 | user list as Administrator | every user with Name, Email, Role, Status; no password material | 10 | Pass |
+| API-54 | AC-29 | `q` against name and email, case-insensitive | only matches | 10 | Pass |
+| API-55 | AC-29 | `role` filter, and an unknown role value | correct subset; 400 `INVALID_QUERY` for the unknown value | 10 | Pass |
+| API-56 | AC-30 | create a user with one role and an initial password | 201, `mustChangePassword` true (BR-46) | 10 | Pass |
+| API-57 | AC-31 | create with an existing email, differing only in case | 409 `EMAIL_IN_USE` on the email field (BR-45) | 10 | Pass |
+| API-58 | AC-30 | log in as the created user | succeeds, `mustChangePassword` true, normal endpoints 403 until changed | 10 | Pass |
+| API-59 | FR-43 | create with an invalid role, a 7-character password, a blank name | 400 with per-field messages | 10 | Pass |
+| API-60 | AC-28 | edit name, email, role, activation | 200 on each | 10 | Pass |
+| API-61 | AC-31 | edit an email to one already in use | 409 `EMAIL_IN_USE` | 10 | Pass |
+| API-62 | AC-32 | Administrator deactivates self, and changes own role | 409 `SELF_DEACTIVATION` on both (BR-48) | 10 | Pass |
+| API-63 | AC-33 | two Administrators, the only active ones, deactivate and demote each other at once; and a change made while another holds the Administrators' lock | exactly one succeeds and one active Administrator remains; the loser is 409 `LAST_ADMINISTRATOR` or already signed out; the second change waits for the lock (BR-49, D-27) | 10 | Pass |
+| API-64 | AC-34 | set a new initial password | 200, target's sessions refused afterwards, next login must change (BR-47) | 10 | Pass |
+| API-65 | BR-51 | deactivate a user who holds tickets | sessions deleted, ticket ownership retained (BR-26, BR-51) | 10 | Pass |
+| API-66 | BR-50 | any delete route for a user | 404 — none exists (BR-50) | 10 | Pass |
 
 ### 2.9 Migration and regression — `server/tests/lab-03/migration.regression.test.ts`
 
@@ -224,12 +225,12 @@ not the JSON-body message. The Lab 2 suites sign in through
 | UI-17 | AC-25 | `StaffTicketDetail.test.tsx` | the status select offers only `permittedTransitions` | 9 | Pass |
 | UI-18 | AC-26 | `StaffTicketDetail.test.tsx` | reason textarea required before Apply for Resolved, Cancelled, Reopened | 9 | Pass |
 | UI-19 | AC-39 | `StaffTicketDetail.test.tsx` | the two threads are distinct regions with distinct button wording and the internal caption | 9 | Pass |
-| UI-20 | AC-28 | `UserManagement.test.tsx` | list columns, search, role filter, empty and no-results states | 10 | Planned |
-| UI-21 | AC-30 | `UserManagement.test.tsx` | create panel: role as radio buttons, required initial password, helper text | 10 | Planned |
-| UI-22 | AC-31 | `UserManagement.test.tsx` | duplicate email renders on the email field | 10 | Planned |
-| UI-23 | AC-32 | `UserManagement.test.tsx` | own row has Role and Active disabled with the explanatory helper text | 10 | Planned |
-| UI-24 | AC-33 | `UserManagement.test.tsx` | last-Administrator refusal renders as its own callout | 10 | Planned |
-| UI-25 | AC-34 | `UserManagement.test.tsx` | new-initial-password confirmation states the sign-out consequence | 10 | Planned |
+| UI-20 | AC-28 | `UserManagement.test.tsx` | list columns, search, role filter, empty and no-results states | 10 | Pass |
+| UI-21 | AC-30 | `UserManagement.test.tsx` | create panel: role as radio buttons, required initial password, helper text | 10 | Pass |
+| UI-22 | AC-31 | `UserManagement.test.tsx` | duplicate email renders on the email field | 10 | Pass |
+| UI-23 | AC-32 | `UserManagement.test.tsx` | own row has Role and Active disabled with the explanatory helper text | 10 | Pass |
+| UI-24 | AC-33 | `UserManagement.test.tsx` | last-Administrator refusal renders as its own callout | 10 | Pass |
+| UI-25 | AC-34 | `UserManagement.test.tsx` | new-initial-password confirmation states the sign-out consequence | 10 | Pass |
 
 `RequesterComments.test.tsx` also renders the public and internal variants of
 the shared `ConversationThread` side by side and checks they cannot be

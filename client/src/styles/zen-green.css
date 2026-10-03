@@ -743,3 +743,50 @@ html, body { overflow-x: hidden; }
   .tt-staff-detail .tt-detail { grid-template-columns: 1fr; }
   .tt-staff-detail__group .tt-btn { width: 100%; }
 }
+
+/* --- Lab 3: Administrator User Management (ui-spec §8) --------------------- */
+
+.tt-users__head { display: flex; justify-content: flex-end; margin-bottom: var(--tt-space-3); }
+.tt-users__search { flex: 1 1 260px; }
+.tt-users__search .tt-field__control { width: 100%; }
+.tt-users__filters .tt-field { margin-bottom: 0; }
+.tt-users__email { overflow-wrap: anywhere; }
+.tt-users__you { margin-left: var(--tt-space-2); }
+.tt-users__card { display: flex; flex-direction: column; gap: var(--tt-space-2); align-items: flex-start; }
+.tt-users__pills { display: flex; flex-wrap: wrap; gap: var(--tt-space-2); }
+.tt-users__roles { display: flex; flex-wrap: wrap; gap: var(--tt-space-2) var(--tt-space-4); margin: 0 0 var(--tt-space-4); }
+.tt-users__roles legend { width: 100%; }
+.tt-users__radio,
+.tt-users__toggle { display: inline-flex; align-items: center; gap: var(--tt-space-2); min-height: 44px; cursor: pointer; }
+.tt-users__roles .tt-field__message { width: 100%; margin: 0; }
+.tt-users__password { margin-top: var(--tt-space-4); padding-top: var(--tt-space-4); border-top: 1px solid var(--tt-border); }
+.tt-users__confirm { padding: var(--tt-space-3); background: var(--tt-readonly-bg); border: 1px solid var(--tt-border); border-radius: var(--tt-radius); }
+.tt-users__confirm p { margin-top: 0; }
+
+/* The create/edit panel: a full-screen sheet below 992px, a right-hand drawer
+   from there up (ui-spec §8.6). */
+.tt-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: rgba(28, 43, 36, .45);
+  display: flex;
+  justify-content: flex-end;
+}
+.tt-drawer__panel {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border-radius: 0;
+  overflow-y: auto;
+}
+.tt-drawer__panel .tt-field__control { width: 100%; }
+
+/* In the mobile column the search's flex-basis would become a 260px height. */
+@media (max-width: 767px) {
+  .tt-users__search { flex: none; }
+}
+
+@media (min-width: 992px) {
+  .tt-drawer__panel { max-width: 480px; box-shadow: -4px 0 16px rgba(28, 43, 36, .15); }
+}

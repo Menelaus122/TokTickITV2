@@ -9,6 +9,7 @@ import { nextTicketNumber } from "./ticketNumber.js";
 import { parseTicketListQuery, buildPageMeta } from "./listQuery.js";
 import { conversationRouter } from "./conversation.js";
 import { staffRouter } from "./staff.js";
+import { adminRouter } from "./admin.js";
 import { routeId } from "./routeId.js";
 import { ATTACHMENT_SELECT, UPLOAD_DIR, attachmentView, sendAttachment } from "./attachmentResponse.js";
 import { containsText } from "./queryParams.js";
@@ -675,6 +676,8 @@ app.patch("/api/attachments/:id/remove", async (req: Request, res: Response) => 
 app.use("/api/tickets", conversationRouter);
 // Lab 3, Issue 8 — the IT Staff queue, behind the /api/staff role guard above.
 app.use("/api/staff", staffRouter);
+// Lab 3, Issue 10 — user management, behind the /api/admin role guard above.
+app.use("/api/admin", adminRouter);
 
 app.use("/api", apiNotFound);
 app.use(safeErrors);

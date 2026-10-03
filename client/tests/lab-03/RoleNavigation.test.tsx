@@ -28,6 +28,7 @@ beforeEach(() => {
   vi.spyOn(api, "fetchRelatedSystems").mockResolvedValue([]);
   vi.spyOn(api, "fetchQueue").mockResolvedValue({ tickets: [], page: 1, pageSize: 10, totalItems: 0, totalPages: 0 });
   vi.spyOn(api, "fetchAssignableUsers").mockResolvedValue([]);
+  vi.spyOn(api, "fetchUsers").mockResolvedValue([]);
 });
 
 afterEach(() => {
