@@ -41,9 +41,11 @@ export interface AttachmentSectionProps {
   uploading?: boolean;
   /** Rejections shown as their own rows, keyed by filename. */
   rejected?: { filename: string; message: string }[];
-  onUpload: (file: File) => void;
+  /** Omitted where the role may not add files (IT Staff, BR-18): no Add control is drawn. */
+  onUpload?: (file: File) => void;
   onDownload: (attachment: Attachment) => void;
-  onRemove: (attachment: Attachment, reason: string) => void;
+  /** Omitted where the role may not remove files (IT Staff, BR-18): no Remove control is drawn. */
+  onRemove?: (attachment: Attachment, reason: string) => void;
   onDismissRejection?: (filename: string) => void;
 }
 
@@ -67,7 +69,7 @@ export function AttachmentSection({
 
   function handleFile(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-    if (file) onUpload(file);
+    if (file) onUpload?.(file);
     // Reset so choosing the same file twice still fires a change event.
     event.target.value = "";
   }
@@ -80,7 +82,7 @@ export function AttachmentSection({
       );
       return;
     }
-    if (removing) onRemove(removing, trimmed);
+    if (removing) onRemove?.(removing, trimmed);
     closeDialog();
   }
 
@@ -97,30 +99,36 @@ export function AttachmentSection({
           Attachments ({activeCount} of {MAX_ACTIVE_ATTACHMENTS} active)
         </h2>
 
-        <Button
-          variant="secondary"
-          busy={uploading}
-          busyLabel="Uploading…"
-          disabled={atLimit}
-          title={atLimit ? `Maximum ${MAX_ACTIVE_ATTACHMENTS} active attachments` : undefined}
-          onClick={() => fileInput.current?.click()}
-        >
-          Add attachment
-        </Button>
+        {onUpload && (
+          <>
+            <Button
+              variant="secondary"
+              busy={uploading}
+              busyLabel="Uploading…"
+              disabled={atLimit}
+              title={atLimit ? `Maximum ${MAX_ACTIVE_ATTACHMENTS} active attachments` : undefined}
+              onClick={() => fileInput.current?.click()}
+            >
+              Add attachment
+            </Button>
 
-        <input
-          ref={fileInput}
-          type="file"
-          className="tt-visually-hidden"
-          aria-label="Choose a file to attach"
-          accept={PERMITTED_EXTENSIONS.join(",")}
-          onChange={handleFile}
-        />
+            <input
+              ref={fileInput}
+              type="file"
+              className="tt-visually-hidden"
+              aria-label="Choose a file to attach"
+              accept={PERMITTED_EXTENSIONS.join(",")}
+              onChange={handleFile}
+            />
+          </>
+        )}
       </div>
 
-      <p className="tt-muted">
-        {PERMITTED_EXTENSIONS.join(", ")} · max 5 MB each · up to {MAX_ACTIVE_ATTACHMENTS} active
-      </p>
+      {onUpload && (
+        <p className="tt-muted">
+          {PERMITTED_EXTENSIONS.join(", ")} · max 5 MB each · up to {MAX_ACTIVE_ATTACHMENTS} active
+        </p>
+      )}
 
       {rejected.map((rejection) => (
         <p
@@ -176,13 +184,15 @@ export function AttachmentSection({
                     icon="↓"
                     onClick={() => onDownload(attachment)}
                   />
-                  <Button
-                    variant="destructive"
-                    busy={busyId === attachment.id}
-                    onClick={() => setRemoving(attachment)}
-                  >
-                    Remove
-                  </Button>
+                  {onRemove && (
+                    <Button
+                      variant="destructive"
+                      busy={busyId === attachment.id}
+                      onClick={() => setRemoving(attachment)}
+                    >
+                      Remove
+                    </Button>
+                  )}
                 </span>
               )}
             </li>
