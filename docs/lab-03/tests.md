@@ -51,8 +51,8 @@ Principles carried over from Lab 2:
 | UNIT-06 | `transitions.test.ts` | every pair in the BR-33 matrix | exactly the permitted pairs allowed, all 56 others refused | 9 | Planned |
 | UNIT-07 | `transitions.test.ts` | same-status transition | refused (BR-38) | 9 | Planned |
 | UNIT-08 | `transitions.test.ts` | reason requirement per target status | required for Resolved, Cancelled, Reopened only (BR-36, BR-37) | 9 | Planned |
-| UNIT-09 | `queue-query.test.ts` | query parsing: defaults, permitted sorts, page sizes | defaults applied; unknown values rejected, never corrected (BR-55, BR-58) | 8 | Pass |
-| UNIT-10 | `queue-query.test.ts` | blank `q` after trimming | treated as absent (BR-53) | 8 | Pass |
+| UNIT-09 | `queue-query.test.ts` | query parsing: defaults, permitted sorts, page sizes; ids and `page` above 2147483647 or not plain digits (`1.0`, `1e0`) | defaults applied; unknown or out-of-range values rejected, never corrected (BR-55, BR-58; api-spec §1.5) | 8 | Pass |
+| UNIT-10 | `queue-query.test.ts` | blank `q` after trimming; `%` and `_` kept as typed; a NUL character | treated as absent (BR-53); kept; rejected | 8 | Pass |
 | UNIT-11 | `login-throttle.test.ts` | four, then five failures for one email, against an explicit clock | no lock after four; the fifth locks for 15 minutes from itself; the lock lifts exactly at expiry with a clean count (BR-67) | 13 | Pass |
 | UNIT-12 | `login-throttle.test.ts` | failures spread across more than 15 minutes | a failure leaves the count once it is 15 minutes old; five inside the window lock (BR-67) | 13 | Pass |
 | UNIT-13 | `login-throttle.test.ts` | key normalisation, separate emails, success, and the size cap | case and spaces share one count; emails are independent; success clears; the cap holds, and unlocked emails are forgotten before locked ones (BR-67, D-24) | 13 | Pass |
@@ -137,12 +137,12 @@ not the JSON-body message. The Lab 2 suites sign in through
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | API-30 | AC-20 | queue as IT Staff with tickets from several Requesters | all Requesters' tickets present | 8 | Pass |
 | API-31 | AC-20 | default ordering | IT Priority descending, oldest `createdAt` first within a priority (BR-55) | 8 | Pass |
-| API-32 | AC-21 | `q` against Ticket Number and Summary, case-insensitive | only matches returned | 8 | Pass |
+| API-32 | AC-21 | `q` against Ticket Number and Summary, case-insensitive; `%` and `_` in `q` | only matches returned; `%` and `_` match literally, not as wildcards | 8 | Pass |
 | API-33 | AC-21 | `status`, `itPriority`, `categoryId` filters, alone and combined | AND semantics (BR-54) | 8 | Pass |
 | API-34 | AC-21 | `owner=unassigned`, `owner=me`, `owner=<id>` | correct subsets; unassigned returns `owner: null` | 8 | Pass |
 | API-35 | AC-21 | `sort` and `direction` across all permitted fields | ordering matches, `id` descending breaks ties (BR-56) | 8 | Pass |
 | API-36 | AC-21 | pagination: page 1, page 2, page sizes 10/20/50 | correct slices and metadata (BR-57) | 8 | Pass |
-| API-37 | AC-21 | unknown sort, bad direction, `pageSize=15`, `page=0`, unknown status | 400 `INVALID_QUERY` on each (BR-58) | 8 | Pass |
+| API-37 | AC-21 | unknown sort, bad direction, `pageSize=15`, `page=0`, unknown status; `categoryId`, `owner`, or `page` above 2147483647; `pageSize=10.0`; a NUL in `q` | 400 `INVALID_QUERY` on each, never 500 (BR-58; api-spec §1.5) | 8 | Pass |
 | API-38 | AC-21 | page beyond the last | 200, empty list, correct metadata (BR-59) | 8 | Pass |
 | API-39 | BR-26 | owner of a deactivated account | row still carries the owner with `isActive: false` (BR-26) | 8 | Pass |
 
@@ -216,7 +216,7 @@ not the JSON-body message. The Lab 2 suites sign in through
 | UI-09 | AC-12 | `RequesterRegression.test.tsx` | no selector, no Change Requester control anywhere, and nothing in localStorage; the old selector URL leads home or to Login; requests never carry `X-Requester-Id`; a 401 mid-session returns to Login and back; eight status labels and filters | 6 | Pass |
 | UI-10 | AC-15 | `RequesterComments.test.tsx` | comment composer validation, appears-resolved panel, undo, and the "only IT Staff can resolve" helper text | 7 | Pass |
 | UI-11 | AC-17 | `RequesterComments.test.tsx` | no Internal Notes region and no element hinting at one | 7 | Pass |
-| UI-12 | AC-21 | `StaffTicketQueue.test.tsx` | search, each filter, sort, page size, and Clear Filters issue the documented requests | 8 | Pass |
+| UI-12 | AC-21 | `StaffTicketQueue.test.tsx` | search, each filter, sort, page size, and Clear Filters issue the documented requests; a new filter is never requested on the old page, and a late, superseded response never replaces the latest one | 8 | Pass |
 | UI-13 | AC-20 | `StaffTicketQueue.test.tsx` | seven columns in order; Unassigned rendered as the word | 8 | Pass |
 | UI-14 | AC-38 | `StaffTicketQueue.test.tsx` | loading, empty, no-results, forbidden, failure states | 8 | Pass |
 | UI-15 | AC-22 | `StaffTicketDetail.test.tsx` | Claim shown only when unassigned; confirmation mentions the move to Open | 9 | Planned |

@@ -1,6 +1,7 @@
 import { REQUESTED_PRIORITIES, type RequestedPriority } from "./validation.js";
 import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE, PERMITTED_PAGE_SIZES, SORT_DIRECTIONS, TICKET_STATUSES, absent, single } from "./listQuery.js";
 import type { SortDirection, TicketStatus } from "./listQuery.js";
+import { parseSearch, positiveId } from "./queryParams.js";
 
 // Lab 3, Issue 8 — query contract for GET /api/staff/tickets (api-spec §5.1;
 // specification.md BR-53 to BR-59).
@@ -38,11 +39,6 @@ function oneOf<T extends string>(name: string, value: unknown, allowed: readonly
   return text as T;
 }
 
-function positiveInteger(text: string | undefined): number | null {
-  const parsed = text === undefined ? NaN : Number(text);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
-}
-
 function isError(value: unknown): value is { error: string } {
   return typeof value === "object" && value !== null && "error" in value;
 }
@@ -50,7 +46,9 @@ function isError(value: unknown): value is { error: string } {
 export function parseQueueQuery(raw: Record<string, unknown>): QueueParseResult {
   // Trimmed; blank after trimming means no search, not a search matching
   // nothing (BR-53).
-  const q = single(raw.q)?.trim() || null;
+  const search = parseSearch("q", single(raw.q));
+  if (!search.ok) return search;
+  const q = search.value;
 
   const status = oneOf("status", raw.status, TICKET_STATUSES);
   if (isError(status)) return { ok: false, message: status.error };
@@ -60,7 +58,7 @@ export function parseQueueQuery(raw: Record<string, unknown>): QueueParseResult 
 
   let categoryId: number | null = null;
   if (!absent(raw.categoryId)) {
-    categoryId = positiveInteger(single(raw.categoryId));
+    categoryId = positiveId(single(raw.categoryId));
     if (categoryId === null) return { ok: false, message: "categoryId must be a positive integer." };
   }
 
@@ -70,7 +68,7 @@ export function parseQueueQuery(raw: Record<string, unknown>): QueueParseResult 
     if (text === "any" || text === "unassigned" || text === "me") {
       owner = { kind: text };
     } else {
-      const id = positiveInteger(text);
+      const id = positiveId(text);
       if (id === null) return { ok: false, message: "owner must be any, unassigned, me, or a user id." };
       owner = { kind: "user", id };
     }
@@ -84,15 +82,15 @@ export function parseQueueQuery(raw: Record<string, unknown>): QueueParseResult 
 
   let page = DEFAULT_PAGE;
   if (!absent(raw.page)) {
-    const parsed = positiveInteger(single(raw.page));
+    const parsed = positiveId(single(raw.page));
     if (parsed === null) return { ok: false, message: "page must be an integer of 1 or more." };
     page = parsed;
   }
 
   let pageSize: number = DEFAULT_PAGE_SIZE;
   if (!absent(raw.pageSize)) {
-    const parsed = Number(single(raw.pageSize));
-    if (!PERMITTED_PAGE_SIZES.includes(parsed as (typeof PERMITTED_PAGE_SIZES)[number])) {
+    const parsed = positiveId(single(raw.pageSize));
+    if (parsed === null || !PERMITTED_PAGE_SIZES.includes(parsed as (typeof PERMITTED_PAGE_SIZES)[number])) {
       return { ok: false, message: `pageSize must be one of ${PERMITTED_PAGE_SIZES.join(", ")}.` };
     }
     pageSize = parsed;

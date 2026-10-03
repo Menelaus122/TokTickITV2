@@ -67,6 +67,22 @@ describe("UNIT-09 defaults, permitted values, and rejection", () => {
     rejected({ owner: "0" });
   });
 
+  it("rejects ids and pages beyond the database's integer range rather than letting them reach it", () => {
+    expect(ok({ categoryId: "2147483647" }).categoryId).toBe(2147483647);
+    expect(ok({ owner: "2147483647" }).owner).toEqual({ kind: "user", id: 2147483647 });
+    rejected({ categoryId: "2147483648" });
+    rejected({ categoryId: "9999999999" });
+    rejected({ owner: "9999999999" });
+    rejected({ page: "99999999999999999999" });
+  });
+
+  it("rejects numbers not written as plain digits", () => {
+    rejected({ page: "1.0" });
+    rejected({ pageSize: "10.0" });
+    rejected({ categoryId: "1e0" });
+    rejected({ owner: "+7" });
+  });
+
   it("rejects a parameter given twice", () => {
     rejected({ status: ["NEW", "OPEN"] });
     rejected({ sort: ["createdAt", "updatedAt"] });
@@ -81,6 +97,15 @@ describe("UNIT-10 search", () => {
   it("treats a blank term as absent (BR-53)", () => {
     expect(ok({ q: "" }).q).toBeNull();
     expect(ok({ q: "    " }).q).toBeNull();
+  });
+
+  it("keeps % and _ as typed — the route matches them literally", () => {
+    expect(ok({ q: "50%" }).q).toBe("50%");
+    expect(ok({ q: "file_name" }).q).toBe("file_name");
+  });
+
+  it("rejects a NUL character", () => {
+    rejected({ q: "a\u0000b" });
   });
 });
 

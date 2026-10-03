@@ -255,6 +255,21 @@ describe("sorting and pagination", () => {
     expect(res.body).toEqual({ tickets: [], page: 9, pageSize: 10, totalItems: 12, totalPages: 2 });
   });
 
+  it("matches % and _ literally, not as wildcards", async () => {
+    expect((await queue({ q: MARKER })).body.totalItems).toBe(12);
+    expect((await queue({ q: `${MARKER}%` })).body.totalItems).toBe(0);
+    expect((await queue({ q: `${MARKER.slice(0, -1)}_` })).body.totalItems).toBe(0);
+    const all = await prisma.ticket.findMany({ select: { summary: true, ticketNumber: true } });
+    const withPercent = all.filter((t) => t.summary.includes("%") || t.ticketNumber.includes("%")).length;
+    expect((await queue({ q: "%" })).body.totalItems).toBe(withPercent);
+  });
+
+  it("answers the largest id with an empty list (§5.1)", async () => {
+    const res = await queue({ categoryId: 2147483647 });
+    expect(res.status).toBe(200);
+    expect(res.body.tickets).toEqual([]);
+  });
+
   it("treats a blank search as absent rather than matching nothing (BR-53)", async () => {
     const res = await queue({ q: "   ", pageSize: 50 });
     expect(res.status).toBe(200);
@@ -274,6 +289,14 @@ describe("invalid queries", () => {
       { itPriority: "CRITICAL" },
       { owner: "someone" },
       { categoryId: "x" },
+      // Beyond the database's integer range, or not plain digits (api-spec §1.5).
+      { categoryId: "9999999999" },
+      { owner: "9999999999" },
+      { page: "99999999999999999999" },
+      { pageSize: "10.0" },
+      { page: "1.0" },
+      { categoryId: "1e0" },
+      { q: "a\u0000b" },
     ];
     for (const params of bad) {
       const res = await queue(params);

@@ -233,6 +233,15 @@ describe("search", () => {
     expect(blank.body.meta.totalItems).toBe(all.body.meta.totalItems);
   });
 
+  it("matches % and _ literally, not as wildcards", async () => {
+    const own = await prisma.ticket.findMany({ where: { requesterId: requesterA }, select: { summary: true, ticketNumber: true } });
+    for (const char of ["%", "_"]) {
+      const expected = own.filter((t) => t.summary.includes(char) || t.ticketNumber.includes(char)).length;
+      const res = await list(requesterA, `?search=${encodeURIComponent(char)}&pageSize=50`);
+      expect(res.body.meta.totalItems, char).toBe(expected);
+    }
+  });
+
   it("cannot reach another requester's ticket through search", async () => {
     const res = await list(requesterA, "?search=Requester%20B%20private&pageSize=50");
     expect(res.body.data).toEqual([]);
@@ -310,6 +319,14 @@ describe("invalid queries", () => {
   it("rejects page 0", async () => {
     const res = await list(requesterA, "?page=0");
     expect(res.status).toBe(400);
+  });
+
+  it("rejects ids and pages beyond the database's integer range, and a NUL in search, instead of a 500", async () => {
+    for (const query of ["?categoryId=9999999999", "?relatedSystemId=9999999999", "?page=99999999999999999999", "?search=a%00b"]) {
+      const res = await list(requesterA, query);
+      expect(res.status, query).toBe(400);
+      expect(res.body.error.code).toBe("INVALID_QUERY");
+    }
   });
 
   it("rejects an unknown priority", async () => {

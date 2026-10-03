@@ -119,9 +119,11 @@ describe("Public Comments", () => {
   });
 
   it("a malformed ticket id is 400 INVALID_QUERY", async () => {
-    const res = await get(`/api/tickets/abc/comments`, cookies.staff);
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe("INVALID_QUERY");
+    for (const id of ["abc", "9999999999", "1e0"]) {
+      const res = await get(`/api/tickets/${id}/comments`, cookies.staff);
+      expect(res.status, id).toBe(400);
+      expect(res.body.error.code).toBe("INVALID_QUERY");
+    }
   });
 
   it("without a session is 401", async () => {

@@ -10,6 +10,7 @@ import { parseTicketListQuery, buildPageMeta } from "./listQuery.js";
 import { conversationRouter } from "./conversation.js";
 import { staffRouter } from "./staff.js";
 import { routeId } from "./routeId.js";
+import { containsText } from "./queryParams.js";
 import multer from "multer";
 import { mkdir, writeFile, unlink } from "node:fs/promises";
 import { createReadStream, existsSync } from "node:fs";
@@ -299,8 +300,8 @@ app.get("/api/tickets", async (req: Request, res: Response) => {
       ...(query.search
         ? {
             OR: [
-              { ticketNumber: { contains: query.search, mode: "insensitive" as const } },
-              { summary: { contains: query.search, mode: "insensitive" as const } },
+              { ticketNumber: containsText(query.search) },
+              { summary: containsText(query.search) },
             ],
           }
         : {}),

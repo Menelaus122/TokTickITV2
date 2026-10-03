@@ -1,5 +1,6 @@
-/** Parses a positive integer route parameter, or null when malformed. */
+import { positiveId } from "./queryParams.js";
+
+/** Parses a positive integer route parameter, or null when malformed or out of range. */
 export function routeId(raw: string): number | null {
-  const id = Number(raw);
-  return Number.isInteger(id) && id > 0 ? id : null;
+  return positiveId(raw);
 }

@@ -1,6 +1,7 @@
 import express, { type Request, type Response } from "express";
 import { getPrisma } from "./prisma.js";
 import { buildPageMeta } from "./listQuery.js";
+import { containsText } from "./queryParams.js";
 import { parseQueueQuery, queueOrderBy, type OwnerFilter } from "./queueQuery.js";
 
 // Lab 3, Issues 8 and 9 — IT Staff ticket operations (api-spec §5).
@@ -57,8 +58,8 @@ staffRouter.get("/tickets", async (req: Request, res: Response) => {
     ...(query.q
       ? {
           OR: [
-            { ticketNumber: { contains: query.q, mode: "insensitive" as const } },
-            { summary: { contains: query.q, mode: "insensitive" as const } },
+            { ticketNumber: containsText(query.q) },
+            { summary: containsText(query.q) },
           ],
         }
       : {}),
