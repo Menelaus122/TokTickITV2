@@ -7,10 +7,8 @@ import css from "../../src/styles/zen-green.css?raw";
 import {
   OwnerPresentation,
   PriorityBadge,
-  ROLE_LABEL,
   ReadOnlyField,
   RoleBadge,
-  STATUS_LABEL,
   SelectInput,
   StatusBadge,
   TICKET_STATUSES,
@@ -137,9 +135,14 @@ describe("STYLE-02 badges carry text, not colour alone (AC-39)", () => {
         <OwnerPresentation owner={{ id: 4, fullName: "Prasert Chaiyo", isActive: false }} />
       </div>,
     );
-    for (const status of TICKET_STATUSES) expect(screen.getByText(STATUS_LABEL[status])).toHaveClass("tt-badge");
+    // The words themselves, written out here rather than read from the label
+    // maps, so a raw enum value in a map fails this test on its own.
+    for (const label of ["New", "Open", "In Progress", "Waiting for Requester", "Resolved", "Closed", "Reopened", "Cancelled"]) {
+      expect(screen.getByText(label, { exact: true })).toHaveClass("tt-badge");
+    }
     for (const priority of ["LOW", "MEDIUM", "HIGH", "URGENT"]) expect(screen.getByText(priority)).toHaveClass("tt-badge");
-    for (const role of ["REQUESTER", "IT_STAFF", "ADMINISTRATOR"] as const) expect(screen.getByText(ROLE_LABEL[role])).toHaveClass("tt-badge");
+    for (const label of ["Requester", "IT Staff", "Administrator"]) expect(screen.getByText(label, { exact: true })).toHaveClass("tt-badge");
+    for (const raw of ["WAITING_FOR_REQUESTER", "IN_PROGRESS", "IT_STAFF", "ADMINISTRATOR"]) expect(screen.queryByText(raw)).toBeNull();
     expect(screen.getByText("Active")).toHaveClass("tt-badge");
     expect(screen.getAllByText("Inactive")).toHaveLength(2);
     expect(screen.getByText("Unassigned")).toBeInTheDocument();

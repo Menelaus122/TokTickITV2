@@ -497,6 +497,18 @@ server suite ran after the E2E suites, against the database they leave behind.
 `tsc --noEmit` exits 0 in `server/` and `client/`, and `vite build` succeeds.
 The whole Playwright run, Lab 2 and Lab 3 together, is 46 passed.
 
+**Fixture order.** `create-ticket.api.test.ts` picked "any active Requester",
+with no `orderBy` and no `mustChangePassword: false`. PostgreSQL then returns
+rows in physical order, which changes as rows are updated, so on some databases
+it picked the seeded first-login account: sign-in succeeded and every request
+was `403 PASSWORD_CHANGE_REQUIRED` (15 tests). Latent since Issue 6, it showed
+as an intermittent failure in full runs. The picker now requires
+`mustChangePassword: false`, and every `findFirst` fixture in `server/tests`
+orders by `id`, so none depends on physical order. Reproduced and verified by
+rewriting the `User` table with the first-login account physically first
+(`CLUSTER` on a temporary index): the old picker failed, and the full server
+suite passes 385/385 on that order.
+
 Counts recorded here are the runner's own output, never estimated or restated
 from memory.
 
@@ -514,3 +526,7 @@ from memory.
 | Accessibility | Checked by assertions on roles, labels, and focus order plus the manual checklist; no automated axe audit runs in Lab 3. |
 | Lab 2 selector suites | `client/tests/lab-02/RequesterContext.test.tsx` tested only the Development Requester selection flow, which Issue 5 removed from the application; it was deleted in Issue 5, and UI-07 and UI-08 cover the shell and navigation that replaced it. Issue 6 deleted the rest of the selector, and with it `client/tests/lab-02/RequesterSelection.test.tsx` (the selection screen) and `server/tests/lab-02/requesters.api.test.ts` (`GET /api/requesters`); UI-09 and API-18 assert both are gone. The Lab 2 tests that asserted `REQUESTER_CONTEXT_REQUIRED`, `REQUESTER_INVALID`, and `REQUESTER_INACTIVE` now assert the session contract that retired those codes (api-spec §1.4). |
 | Login throttling | The 15-minute lock and window are tested with an explicit clock (UNIT-11, UNIT-12) rather than by waiting. The counter is in memory (D-24), so the API tests cannot observe a lock surviving a restart, because it does not. |
+| NUL in free text | A NUL character in a free-text **body** field answers `500`: a comment, a note, a transition reason, a ticket summary, a user's name, the login email. PostgreSQL text cannot hold NUL. Query parameters were closed in #57 (`400 INVALID_QUERY`); the body fields are not. No tracking issue yet. |
+| Ids in a request body | An out-of-range `categoryId` or `relatedSystemId` in the `POST /api/tickets` body (for example `9999999999`) answers `500`. Query and path ids were bounded in #57; this body is not. No tracking issue yet. |
+| Role demotion and ownership | An owner whose role changes to Requester keeps their tickets (D-19 covers deactivation; #59 left demotion as an open decision). The staff owner picker then lists that owner as "(inactive)", because it only knows assignable users; the label is wrong for an account that is active but no longer assignable. |
+| Client navigation suites | `RoleNavigation.test.tsx` (UI-07, UI-08) and Lab 2's `Navigation.test.tsx` fail intermittently in full client runs: 1–2 tests in some runs, serial or parallel, and never when the two files run alone (41/41, four runs in a row). Not purely slowness: with Testing Library's limit raised to 3000 ms they still timed out, and one failed in 130 ms, so the change was not kept. The race is still to be found; Issue 12's final run should re-check it. |
