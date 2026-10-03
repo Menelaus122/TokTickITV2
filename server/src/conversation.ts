@@ -22,7 +22,7 @@ const TICKET_NOT_FOUND = { error: { code: "NOT_FOUND", message: "That ticket cou
 const INVALID_ID = { error: { code: "INVALID_QUERY", message: "The ticket id is not valid." } } as const;
 const SERVER_ERROR = { error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." } } as const;
 
-const ENTRY_SELECT = {
+export const ENTRY_SELECT = {
   id: true,
   body: true,
   createdAt: true,
