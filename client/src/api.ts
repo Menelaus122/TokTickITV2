@@ -526,3 +526,78 @@ export async function fetchAssignableUsers(): Promise<AssignableUser[]> {
   if (!response.ok) throw await failure(response, "Cannot load IT Staff.");
   return ((await response.json()) as { users: AssignableUser[] }).users;
 }
+
+// --- Lab 3, Issue 10 — Administrator User Management (api-spec §6) ----------
+
+/** A row of the Administrator's user list. No password material, ever (BR-52). */
+export interface AdminUser {
+  id: number;
+  fullName: string;
+  email: string;
+  role: Role;
+  isActive: boolean;
+  department: string | null;
+  mustChangePassword: boolean;
+  lastLoginAt: string | null;
+}
+
+export interface UserListParams {
+  q?: string;
+  role?: Role;
+}
+
+export interface NewUser {
+  fullName: string;
+  email: string;
+  role: Role;
+  isActive: boolean;
+  initialPassword: string;
+}
+
+export type UserChange = Partial<Pick<AdminUser, "fullName" | "email" | "role" | "isActive">>;
+
+export const PASSWORD_MIN = 8;
+export const PASSWORD_MAX = 72;
+
+/** Throws ApiError, so a 403 can be told apart from an outage. */
+export async function fetchUsers(params: UserListParams = {}): Promise<AdminUser[]> {
+  const search = new URLSearchParams();
+  if (params.q) search.set("q", params.q);
+  if (params.role) search.set("role", params.role);
+  const suffix = search.toString() ? `?${search.toString()}` : "";
+  const response = await apiFetch(`${API_URL}/api/admin/users${suffix}`);
+  if (!response.ok) throw await failure(response, "Cannot load the users.");
+  return ((await response.json()) as { users: AdminUser[] }).users;
+}
+
+/** Throws ApiError; field messages arrive under `fields`, a duplicate email under `fields.email`. */
+export async function createUser(user: NewUser): Promise<AdminUser> {
+  const response = await apiFetch(`${API_URL}/api/admin/users`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(user),
+  });
+  if (response.status !== 201) throw await failure(response, "The user could not be created.");
+  return ((await response.json()) as { user: AdminUser }).user;
+}
+
+/** Throws ApiError; 409 SELF_DEACTIVATION or LAST_ADMINISTRATOR explain a refused change. */
+export async function updateUser(userId: number, change: UserChange): Promise<AdminUser> {
+  const response = await apiFetch(`${API_URL}/api/admin/users/${userId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(change),
+  });
+  if (!response.ok) throw await failure(response, "The user could not be saved.");
+  return ((await response.json()) as { user: AdminUser }).user;
+}
+
+/** Signs the user out everywhere; they must change it at next sign-in (BR-47). */
+export async function issueInitialPassword(userId: number, initialPassword: string): Promise<void> {
+  const response = await apiFetch(`${API_URL}/api/admin/users/${userId}/initial-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ initialPassword }),
+  });
+  if (!response.ok) throw await failure(response, "The new initial password could not be set.");
+}

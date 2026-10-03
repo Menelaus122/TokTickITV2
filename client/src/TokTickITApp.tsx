@@ -19,6 +19,7 @@ import { CreateTicket } from "./screens/CreateTicket.js";
 import { MyTickets } from "./screens/MyTickets.js";
 import { RequesterTicketDetail } from "./screens/RequesterTicketDetail.js";
 import { StaffTicketQueue } from "./screens/StaffTicketQueue.js";
+import { UserManagement } from "./screens/UserManagement.js";
 import { AppShell } from "./components/AppShell.js";
 import { ErrorState, LoadingState, Page } from "./components/index.js";
 import { ROUTES } from "./routes.js";
@@ -213,6 +214,16 @@ function QueueRoute() {
   );
 }
 
+function UsersRoute() {
+  const { user } = useAuth();
+  if (!user) return null;
+  return (
+    <Page>
+      <UserManagement currentUserId={user.id} />
+    </Page>
+  );
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -245,9 +256,7 @@ function AppRoutes() {
         path={ROUTES.users}
         element={
           <RequireAuth roles={["ADMINISTRATOR"]}>
-            <Page>
-              <RoleHome title="User Management" body="Administrator user management arrives in Issue 10." />
-            </Page>
+            <UsersRoute />
           </RequireAuth>
         }
       />

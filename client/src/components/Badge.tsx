@@ -105,7 +105,7 @@ const ROLE_TONE: Record<RoleValue, Tone> = {
   ADMINISTRATOR: "solid",
 };
 
-const ROLE_TEXT: Record<RoleValue, string> = {
+export const ROLE_LABEL: Record<RoleValue, string> = {
   REQUESTER: "Requester",
   IT_STAFF: "IT Staff",
   ADMINISTRATOR: "Administrator",
@@ -113,7 +113,14 @@ const ROLE_TEXT: Record<RoleValue, string> = {
 
 // The role is always spelled out; the shade is never the only signal.
 export function RoleBadge({ value }: { value: RoleValue }) {
-  return <BadgeBase kind="role" tone={ROLE_TONE[value]} text={ROLE_TEXT[value]} />;
+  return <BadgeBase kind="role" tone={ROLE_TONE[value]} text={ROLE_LABEL[value]} />;
+}
+
+// --- Account status (Lab 3, Issue 10; ui-spec §8.1) -------------------------
+
+// "Active" or "Inactive" in words with a pill, never a bare colour dot.
+export function UserStatusBadge({ active }: { active: boolean }) {
+  return <BadgeBase kind="user-status" tone={active ? "success" : "neutral"} text={active ? "Active" : "Inactive"} />;
 }
 
 // --- Owner (Lab 3, ui-spec §1.2) --------------------------------------------
