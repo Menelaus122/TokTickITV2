@@ -277,8 +277,10 @@ export async function uploadAttachment(ticketId: number, file: File): Promise<At
  */
 export async function downloadAttachment(
   attachment: Pick<Attachment, "id" | "originalFilename">,
+  // Lab 3, Issue 9 — IT Staff download through their own route family.
+  base: "/api/attachments" | "/api/staff/attachments" = "/api/attachments",
 ): Promise<void> {
-  const response = await apiFetch(`${API_URL}/api/attachments/${attachment.id}/download`);
+  const response = await apiFetch(`${API_URL}${base}/${attachment.id}/download`);
 
   if (!response.ok) throw await readError(response);
 
@@ -525,4 +527,83 @@ export async function fetchAssignableUsers(): Promise<AssignableUser[]> {
   const response = await apiFetch(`${API_URL}/api/staff/assignable-users`);
   if (!response.ok) throw await failure(response, "Cannot load IT Staff.");
   return ((await response.json()) as { users: AssignableUser[] }).users;
+}
+
+// --- Lab 3, Issue 9 — IT Staff Ticket Detail (api-spec §4.3, §4.4, §5.2–§5.5) --
+
+export interface StaffTicketDetail extends QueueTicket {
+  description: string;
+  relatedSystemName: string;
+  requester: { id: number; fullName: string; email: string; role: Role; isActive: boolean };
+  attachments: Attachment[];
+  /** From the BR-33 matrix on the server; the only statuses the screen offers (FR-34). */
+  permittedTransitions: TicketStatus[];
+}
+
+/** Statuses whose move posts a 5–2000 character reason as a Public Comment (BR-36, BR-37). */
+export const REASON_REQUIRED: readonly TicketStatus[] = ["RESOLVED", "CANCELLED", "REOPENED"];
+export const REASON_MIN = 5;
+
+export async function fetchStaffTicket(ticketId: number): Promise<StaffTicketDetail> {
+  const response = await apiFetch(`${API_URL}/api/staff/tickets/${ticketId}`);
+  if (!response.ok) throw await failure(response, "Cannot load this ticket.");
+  return ((await response.json()) as { ticket: StaffTicketDetail }).ticket;
+}
+
+async function patchStaffTicket<T>(ticketId: number, action: string, body: unknown, fallback: string): Promise<T> {
+  const response = await apiFetch(`${API_URL}/api/staff/tickets/${ticketId}/${action}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw await failure(response, fallback);
+  return (await response.json()) as T;
+}
+
+/**
+ * Claims, reassigns, or (with null) unassigns. `expectedOwnerId` is the owner
+ * the screen was showing, so a change someone else made first is refused with
+ * 409 TICKET_ALREADY_OWNED instead of being overwritten (BR-25).
+ */
+export async function setTicketOwner(ticketId: number, ownerId: number | null, expectedOwnerId: number | null): Promise<StaffTicketDetail> {
+  const result = await patchStaffTicket<{ ticket: StaffTicketDetail }>(
+    ticketId, "owner", { ownerId, expectedOwnerId }, "The owner could not be changed.",
+  );
+  return result.ticket;
+}
+
+export async function setItPriority(ticketId: number, itPriority: RequestedPriority): Promise<StaffTicketDetail> {
+  const result = await patchStaffTicket<{ ticket: StaffTicketDetail }>(
+    ticketId, "it-priority", { itPriority }, "The IT Priority could not be changed.",
+  );
+  return result.ticket;
+}
+
+export interface StatusChangeResult {
+  ticket: StaffTicketDetail;
+  /** The reason, posted as a Public Comment, when the move required one. */
+  comment: ThreadEntry | null;
+}
+
+export async function changeTicketStatus(ticketId: number, currentStatus: TicketStatus, reason?: string): Promise<StatusChangeResult> {
+  return patchStaffTicket<StatusChangeResult>(
+    ticketId, "status", reason === undefined ? { currentStatus } : { currentStatus, reason }, "The status could not be changed.",
+  );
+}
+
+export async function fetchNotes(ticketId: number): Promise<ThreadEntry[]> {
+  const response = await apiFetch(`${API_URL}/api/tickets/${ticketId}/notes`);
+  if (!response.ok) throw await failure(response, "Cannot load the internal notes.");
+  return ((await response.json()) as { notes: ThreadEntry[] }).notes;
+}
+
+/** Throws ApiError; a 400 carries the field message under `fields.body`. */
+export async function postNote(ticketId: number, body: string): Promise<ThreadEntry> {
+  const response = await apiFetch(`${API_URL}/api/tickets/${ticketId}/notes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ body }),
+  });
+  if (response.status !== 201) throw await failure(response, "The note could not be posted.");
+  return (await response.json()) as ThreadEntry;
 }
