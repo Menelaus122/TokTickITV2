@@ -190,12 +190,12 @@ describe("guards on every protected route family (BR-18, BR-21)", () => {
   });
 
   it("lets the right role through the guard to the route itself", async () => {
-    // The queue (Issue 8) answers; the rest of the staff routes arrive in Issue 9
-    // and the admin routes in Issue 10, so for now those requests reach the end
-    // of the API and get the JSON 404 — past the guard, not stopped by it.
+    // The queue (Issue 8) and user management (Issue 10) answer. The rest of
+    // the staff routes arrive in Issue 9, so for now that request reaches the
+    // end of the API and gets the JSON 404 — past the guard, not stopped by it.
     expect((await call("GET", "/api/staff/tickets", cookies.staff)).status).toBe(200);
     expect((await call("GET", "/api/staff/tickets/1", cookies.staff)).status).toBe(404);
-    expect((await call("GET", "/api/admin/users", cookies.admin)).status).toBe(404);
+    expect((await call("GET", "/api/admin/users", cookies.admin)).status).toBe(200);
   });
 
   it("SEC-09 checks the session before the role, and the password change before both", async () => {

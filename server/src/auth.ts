@@ -92,7 +92,7 @@ export function requireSession(req: Request, res: Response, next: NextFunction) 
 // Deliberately one message for an unknown email, a wrong password, and an
 // account with no password yet (BR-16, BR-66).
 const INVALID_CREDENTIALS = "Email or password is incorrect.";
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const authRouter = express.Router();
 
