@@ -453,3 +453,76 @@ export async function changePassword(change: PasswordChange): Promise<void> {
   });
   if (!response.ok) throw await failure(response, "The password could not be changed. Please try again.");
 }
+
+// --- Lab 3, Issue 8 — the IT Staff queue (api-spec §5.1, §5.6) --------------
+
+export interface QueueOwner {
+  id: number;
+  fullName: string;
+  // false marks work held by a deactivated account (BR-26).
+  isActive: boolean;
+}
+
+export interface QueueTicket {
+  id: number;
+  ticketNumber: string;
+  summary: string;
+  categoryName: string;
+  requestedPriority: RequestedPriority;
+  itPriority: RequestedPriority;
+  currentStatus: TicketStatus;
+  // null is an unassigned ticket, shown as the word "Unassigned" (FR-28).
+  owner: QueueOwner | null;
+  requesterResolvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QueueResponse {
+  tickets: QueueTicket[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+}
+
+export type QueueSort = "itPriority" | "createdAt" | "updatedAt";
+
+export interface QueueParams {
+  q?: string;
+  status?: TicketStatus;
+  itPriority?: RequestedPriority;
+  categoryId?: number;
+  // "any" | "unassigned" | "me" | a user id (D-18)
+  owner?: string;
+  sort?: QueueSort;
+  direction?: "asc" | "desc";
+  page?: number;
+  pageSize?: number;
+}
+
+/** One page of the shared queue. Throws ApiError, so a 403 can be told apart from an outage. */
+export async function fetchQueue(params: QueueParams = {}): Promise<QueueResponse> {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") search.set(key, String(value));
+  }
+  const suffix = search.toString() ? `?${search.toString()}` : "";
+  const response = await apiFetch(`${API_URL}/api/staff/tickets${suffix}`);
+  if (!response.ok) throw await failure(response, "Cannot load the ticket queue.");
+  return (await response.json()) as QueueResponse;
+}
+
+export interface AssignableUser {
+  id: number;
+  fullName: string;
+  role: Role;
+  isActive: boolean;
+}
+
+/** Active IT Staff and Administrators, by name — the Owner filter's choices. */
+export async function fetchAssignableUsers(): Promise<AssignableUser[]> {
+  const response = await apiFetch(`${API_URL}/api/staff/assignable-users`);
+  if (!response.ok) throw await failure(response, "Cannot load IT Staff.");
+  return ((await response.json()) as { users: AssignableUser[] }).users;
+}

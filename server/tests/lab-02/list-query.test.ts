@@ -65,7 +65,7 @@ describe("filters", () => {
   });
 
   it("rejects a non-positive or non-integer id", () => {
-    for (const bad of ["0", "-1", "1.5", "abc"]) {
+    for (const bad of ["0", "-1", "1.5", "abc", "1e0", "9999999999"]) {
       expect(parseTicketListQuery({ categoryId: bad }).ok).toBe(false);
       expect(parseTicketListQuery({ relatedSystemId: bad }).ok).toBe(false);
     }
@@ -115,7 +115,7 @@ describe("pagination", () => {
   });
 
   it("rejects page 0, a negative page, and a non-integer page", () => {
-    for (const bad of ["0", "-1", "1.5", "abc"]) {
+    for (const bad of ["0", "-1", "1.5", "1.0", "abc", "99999999999999999999"]) {
       expect(parseTicketListQuery({ page: bad }).ok).toBe(false);
     }
   });

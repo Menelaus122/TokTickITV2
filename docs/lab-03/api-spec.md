@@ -128,6 +128,8 @@ unchanged. `REQUESTER_CONTEXT_REQUIRED`, `REQUESTER_INVALID`, and
 | `role` | `REQUESTER` \| `IT_STAFF` \| `ADMINISTRATOR` |
 | `requestedPriority`, `itPriority` | `LOW` \| `MEDIUM` \| `HIGH` \| `URGENT` |
 | `currentStatus` | `NEW` \| `OPEN` \| `IN_PROGRESS` \| `WAITING_FOR_REQUESTER` \| `RESOLVED` \| `CLOSED` \| `REOPENED` \| `CANCELLED` |
+| Ids and `page`, in a path or query | plain digits from `1` to `2147483647` (the database's integer range). Anything else, `1.0`, `1e0`, and `9999999999` included, is malformed and answers `400 INVALID_QUERY`, never `500` |
+| Search text (`q`, Lab 2's `search`) | matched literally: `%`, `_`, and `\` are ordinary characters, not wildcards. A NUL character is `400 INVALID_QUERY` |
 
 ### 1.6 The permitted user shape
 
@@ -425,9 +427,14 @@ deactivated account (BR-26).
 | Condition | Response |
 | :--- | :--- |
 | Unknown `sort`, `direction`, `status`, `itPriority`, or `owner` value | `400 INVALID_QUERY` (AC-21) |
-| `pageSize` outside 10/20/50, or `page` below 1 | `400 INVALID_QUERY` |
+| `pageSize` outside 10/20/50, or `page` below 1 or above 2147483647 | `400 INVALID_QUERY` (§1.5) |
 | `page` beyond the last page | `200` with an empty `tickets` array and correct metadata (BR-59) |
 | `q` empty after trimming | treated as absent, not as a filter matching nothing (BR-53) |
+| `q` containing `%` or `_` | matched literally, so `50%` finds only text containing `50%` (§1.5) |
+| `q` containing a NUL character | `400 INVALID_QUERY` |
+| `categoryId` or `owner` not a positive integer, or above 2147483647 | `400 INVALID_QUERY` (§1.5) |
+| `categoryId` or `owner` a well-formed id (1 to 2147483647) that matches nothing | `200` with an empty `tickets` array — the filter is applied as asked, not looked up first |
+| Any parameter given more than once | `400 INVALID_QUERY` |
 
 ### 5.2 `GET /api/staff/tickets/:id`
 

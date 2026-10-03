@@ -190,9 +190,11 @@ describe("guards on every protected route family (BR-18, BR-21)", () => {
   });
 
   it("lets the right role through the guard to the route itself", async () => {
-    // These handlers arrive in Issues 8 and 10, so for now the request reaches
-    // the end of the API and gets the JSON 404 — past the guard, not stopped by it.
-    expect((await call("GET", "/api/staff/tickets", cookies.staff)).status).toBe(404);
+    // The queue (Issue 8) answers; the rest of the staff routes arrive in Issue 9
+    // and the admin routes in Issue 10, so for now those requests reach the end
+    // of the API and get the JSON 404 — past the guard, not stopped by it.
+    expect((await call("GET", "/api/staff/tickets", cookies.staff)).status).toBe(200);
+    expect((await call("GET", "/api/staff/tickets/1", cookies.staff)).status).toBe(404);
     expect((await call("GET", "/api/admin/users", cookies.admin)).status).toBe(404);
   });
 
