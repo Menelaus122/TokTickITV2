@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ApiError,
@@ -146,17 +146,21 @@ export function StaffTicketQueue({ currentUserId }: { currentUserId: number }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [staff, setStaff] = useState<AssignableUser[]>([]);
 
-  // Typing should not fire a request per keystroke.
+  // Typing should not fire a request per keystroke. A changed question starts
+  // again from page 1, so a narrowed queue never strands the user on a page
+  // that no longer exists; the page resets in the same update as the question,
+  // so no request for the new question on the old page is ever sent.
+  const appliedSearch = useRef("");
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(filters.search.trim()), SEARCH_DEBOUNCE_MS);
+    const term = filters.search.trim();
+    const timer = setTimeout(() => {
+      if (term === appliedSearch.current) return;
+      appliedSearch.current = term;
+      setDebouncedSearch(term);
+      setPage(1);
+    }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [filters.search]);
-
-  // A changed question starts again from page 1, so a narrowed queue never
-  // strands the user on a page that no longer exists.
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch, filters.status, filters.itPriority, filters.categoryId, filters.owner, filters.sort, filters.direction, filters.pageSize]);
 
   useEffect(() => {
     // The filter options are not the queue: if they fail, the queue still
@@ -180,12 +184,20 @@ export function StaffTicketQueue({ currentUserId }: { currentUserId: number }) {
     [debouncedSearch, filters.status, filters.itPriority, filters.categoryId, filters.owner, filters.sort, filters.direction, filters.pageSize, page],
   );
 
+  // Only the latest request may set what is shown: an earlier one that
+  // answers late would otherwise replace the right page with a stale one.
+  const latestRequest = useRef(0);
+
   const load = useCallback(async () => {
+    const request = ++latestRequest.current;
     setState("loading");
     try {
-      setResult(await fetchQueue(params));
+      const response = await fetchQueue(params);
+      if (request !== latestRequest.current) return;
+      setResult(response);
       setState("ready");
     } catch (error) {
+      if (request !== latestRequest.current) return;
       // Nothing from an earlier page may linger beside a failure.
       setResult(null);
       setState(error instanceof ApiError && error.status === 403 ? "forbidden" : "error");
@@ -198,10 +210,13 @@ export function StaffTicketQueue({ currentUserId }: { currentUserId: number }) {
 
   function update<K extends keyof Filters>(key: K, value: Filters[K]) {
     setFilters((current) => ({ ...current, [key]: value }));
+    // Search returns to page 1 when its debounced term changes, above.
+    if (key !== "search") setPage(1);
   }
 
   function clearFilters() {
     setFilters(DEFAULT_FILTERS);
+    setPage(1);
   }
 
   const filtering = hasActiveFilters(filters);

@@ -263,6 +263,45 @@ describe("pagination", () => {
     await waitFor(() => expect(fetchSpy.mock.calls.at(-1)![0]).toMatchObject({ page: 2 }));
   });
 
+  it("never asks for a new filter on the old page", async () => {
+    const fetchSpy = vi.spyOn(api, "fetchMyTickets").mockResolvedValue(
+      response([ticket()], { totalItems: 25, totalPages: 3, hasNext: true }),
+    );
+    renderScreen();
+    await screen.findByTestId("page-status");
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => expect(fetchSpy.mock.calls.at(-1)![0]).toMatchObject({ page: 2 }));
+
+    await userEvent.selectOptions(screen.getByLabelText("Filter by Requested Priority"), "HIGH");
+    await waitFor(() => expect(fetchSpy.mock.calls.at(-1)![0]).toMatchObject({ requestedPriority: "HIGH", page: 1 }));
+    const filtered = fetchSpy.mock.calls.map(([params]) => params!).filter((params) => params.requestedPriority === "HIGH");
+    expect(filtered.map((params) => params.page)).toEqual([1]);
+  });
+
+  it("shows the latest request's answer even when an earlier one arrives after it", async () => {
+    let answerSlow!: () => void;
+    vi.spyOn(api, "fetchMyTickets").mockImplementation((params: api.TicketListParams = {}) => {
+      if (params.requestedPriority === "LOW") {
+        // The superseded request: it answers only after the newer one has.
+        return new Promise((resolve) => {
+          answerSlow = () => resolve(response([ticket({ ticketNumber: "TT-2026-00099" })]));
+        });
+      }
+      return Promise.resolve(response([ticket({ ticketNumber: params.requestedPriority === "HIGH" ? "TT-2026-00001" : "TT-2026-00042" })]));
+    });
+    renderScreen();
+    await settled();
+
+    await userEvent.selectOptions(screen.getByLabelText("Filter by Requested Priority"), "LOW");
+    await userEvent.selectOptions(screen.getByLabelText("Filter by Requested Priority"), "HIGH");
+    expect((await screen.findAllByText("TT-2026-00001")).length).toBeGreaterThan(0);
+
+    answerSlow();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.queryAllByText("TT-2026-00099")).toHaveLength(0);
+    expect(screen.getAllByText("TT-2026-00001").length).toBeGreaterThan(0);
+  });
+
   it("sends only a permitted page size", async () => {
     const fetchSpy = vi.spyOn(api, "fetchMyTickets").mockResolvedValue(
       response([ticket()], { totalItems: 25, totalPages: 3, hasNext: true }),

@@ -159,6 +159,46 @@ describe("UI-12 each control issues the documented request", () => {
     await waitFor(() => expect(lastParams()).toMatchObject({ status: "NEW", page: 1 }));
   });
 
+  it("never asks for a new filter on the old page", async () => {
+    const user = userEvent.setup();
+    fetchSpy.mockImplementation(async (params: api.QueueParams = {}) =>
+      page([ticket({ id: params.page ?? 1 })], { page: params.page ?? 1, totalItems: 25, totalPages: 3 }),
+    );
+    await ready();
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(await screen.findByTestId("page-status")).toHaveTextContent("Page 2 of 3");
+
+    await user.selectOptions(screen.getByLabelText("Status"), "NEW");
+    await waitFor(() => expect(lastParams()).toMatchObject({ status: "NEW", page: 1 }));
+    const filtered = fetchSpy.mock.calls.map(([params]) => params!).filter((params) => params.status === "NEW");
+    expect(filtered.map((params) => params.page)).toEqual([1]);
+  });
+
+  it("shows the latest request's answer even when an earlier one arrives after it", async () => {
+    const user = userEvent.setup();
+    let answerSlow!: () => void;
+    fetchSpy.mockImplementation((params: api.QueueParams = {}) => {
+      if (params.status === "OPEN") {
+        // The superseded request: it answers only after the newer one has.
+        return new Promise((resolve) => {
+          answerSlow = () => resolve(page([ticket({ id: 99, ticketNumber: "TT-2026-00099" })]));
+        });
+      }
+      return Promise.resolve(page([ticket({ id: params.status === "NEW" ? 1 : 12, ticketNumber: params.status === "NEW" ? "TT-2026-00001" : "TT-2026-00042" })]));
+    });
+    await ready();
+
+    await user.selectOptions(screen.getByLabelText("Status"), "OPEN");
+    await waitFor(() => expect(lastParams()).toMatchObject({ status: "OPEN" }));
+    await user.selectOptions(screen.getByLabelText("Status"), "NEW");
+    expect((await screen.findAllByText("TT-2026-00001")).length).toBeGreaterThan(0);
+
+    answerSlow();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.queryAllByText("TT-2026-00099")).toHaveLength(0);
+    expect(screen.getAllByText("TT-2026-00001").length).toBeGreaterThan(0);
+  });
+
   it("Clear Filters returns every control to its default", async () => {
     const user = userEvent.setup();
     await ready();

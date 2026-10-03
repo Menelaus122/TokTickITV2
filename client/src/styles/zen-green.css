@@ -665,7 +665,11 @@ html, body { overflow-x: hidden; }
 .tt-queue__search { flex: 1 1 260px; }
 .tt-queue__search .tt-field__control { width: 100%; }
 .tt-queue__filters .tt-field { margin-bottom: 0; }
-.tt-queue__filters { align-items: flex-end; }
+/* Bottom-aligned only while the toolbar is a row; in the mobile column,
+   flex-end would push every field to the right instead of stretching it. */
+@media (min-width: 768px) {
+  .tt-queue__filters { align-items: flex-end; }
+}
 .tt-queue__filters-toggle { display: none; }
 
 /* Fixed layout so the summary column can truncate instead of widening the
