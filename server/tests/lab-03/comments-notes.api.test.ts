@@ -17,8 +17,8 @@ let ticketOfOther: number;
 const createdTicketIds: number[] = [];
 
 async function makeTicket(requesterId: number, summary: string): Promise<number> {
-  const category = await prisma.category.findFirstOrThrow({ where: { isActive: true } });
-  const system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true } });
+  const category = await prisma.category.findFirstOrThrow({ where: { isActive: true }, orderBy: { id: "asc" } });
+  const system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true }, orderBy: { id: "asc" } });
   const ticket = await prisma.ticket.create({
     data: {
       ticketNumber: `TT-9994-${String((Date.now() + createdTicketIds.length) % 90000).padStart(5, "0")}`,
@@ -58,8 +58,8 @@ beforeAll(async () => {
     orderBy: { id: "asc" },
     take: 2,
   });
-  const staff = await prisma.user.findFirstOrThrow({ where: { role: "IT_STAFF", isActive: true, mustChangePassword: false } });
-  const admin = await prisma.user.findFirstOrThrow({ where: { role: "ADMINISTRATOR", isActive: true, mustChangePassword: false } });
+  const staff = await prisma.user.findFirstOrThrow({ where: { role: "IT_STAFF", isActive: true, mustChangePassword: false }, orderBy: { id: "asc" } });
+  const admin = await prisma.user.findFirstOrThrow({ where: { role: "ADMINISTRATOR", isActive: true, mustChangePassword: false }, orderBy: { id: "asc" } });
   ids.owner = owner.id;
   ids.staff = staff.id;
   ids.admin = admin.id;

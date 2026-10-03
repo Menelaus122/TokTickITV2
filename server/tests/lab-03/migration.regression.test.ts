@@ -418,8 +418,8 @@ describe("the seed", () => {
 
   it("MIG-10 a ticket created through the Lab 2 endpoint starts with IT Priority equal to Requested Priority", async () => {
     const requester = await prisma.user.findFirstOrThrow({ where: { role: "REQUESTER", isActive: true }, orderBy: { id: "asc" } });
-    const category = await prisma.category.findFirstOrThrow({ where: { isActive: true } });
-    const system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true } });
+    const category = await prisma.category.findFirstOrThrow({ where: { isActive: true }, orderBy: { id: "asc" } });
+    const system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true }, orderBy: { id: "asc" } });
 
     const res = await request(app)
       .post("/api/tickets")
@@ -444,7 +444,7 @@ describe("the seed", () => {
     // Issue 4 refused a staff id on the Lab 2 header; Issue 6 removed the
     // header and the selector's list, so a staff account can reach the Lab 2
     // endpoints only through its own session, which they refuse (BR-18).
-    const staff = await prisma.user.findFirstOrThrow({ where: { role: "IT_STAFF", isActive: true, mustChangePassword: false } });
+    const staff = await prisma.user.findFirstOrThrow({ where: { role: "IT_STAFF", isActive: true, mustChangePassword: false }, orderBy: { id: "asc" } });
     const header = await request(app).get("/api/tickets").set("X-Requester-Id", String(staff.id));
     expect(header.status).toBe(401);
     expect(header.body.error.code).toBe("AUTH_REQUIRED");

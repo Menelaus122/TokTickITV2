@@ -59,8 +59,8 @@ function remove(requesterId: number, attachmentId: number, removalReason?: unkno
 }
 
 async function makeTicket(requesterId: number, number: string, summary: string) {
-  const category = await prisma.category.findFirstOrThrow({ where: { isActive: true } });
-  const system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true } });
+  const category = await prisma.category.findFirstOrThrow({ where: { isActive: true }, orderBy: { id: "asc" } });
+  const system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true }, orderBy: { id: "asc" } });
   const ticket = await prisma.ticket.create({
     data: {
       ticketNumber: number,

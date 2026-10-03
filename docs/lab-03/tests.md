@@ -243,39 +243,39 @@ screen that places both threads is Issue 9 (UI-15 – UI-19, AC-39).
 
 | ID | AC | What it tests | Issue | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| STYLE-01 | AC-37 | every new screen uses only Lab 2 colour tokens; no hard-coded hex | 5–10 | Planned |
-| STYLE-02 | AC-39 | Role, Status, Requested Priority, and IT Priority badges carry text, not colour alone | 8, 9 | Planned |
+| STYLE-01 | AC-37 | every new screen uses only Lab 2 colour tokens; no hard-coded hex | 5–10 | Pass |
+| STYLE-02 | AC-39 | Role, Status, Requested Priority, and IT Priority badges carry text, not colour alone | 8, 9 | Pass |
 | STYLE-03 | AC-37 | read-only fields use `--tt-readonly-bg` and `readonly`, distinct from disabled controls | 9 | Pass |
-| STYLE-04 | AC-37 | required fields show the red asterisk and still render a validation message when invalid | 5, 10 | Planned |
-| STYLE-05 | AC-37 | validation messages sit beneath their own field | 5, 9, 10 | Planned |
-| STYLE-06 | AC-38 | busy buttons are disabled, labelled, and permit one request | 5, 9, 10 | Planned |
+| STYLE-04 | AC-37 | required fields show the red asterisk and still render a validation message when invalid | 5, 10 | Pass |
+| STYLE-05 | AC-37 | validation messages sit beneath their own field | 5, 9, 10 | Pass |
+| STYLE-06 | AC-38 | busy buttons are disabled, labelled, and permit one request | 5, 9, 10 | Pass |
 | STYLE-07 | AC-39 | the Internal Notes region carries its dashed edge, lock icon, and `aria-label` | 9 | Pass |
 
 ### 2.12 Responsive — `e2e/lab-03/responsive.spec.ts`
 
 | ID | AC | What it tests | Expected | Issue | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| RESP-01 | AC-37 | Login and Change Password at all three widths | card fits, no horizontal scroll | 11 | Planned |
-| RESP-02 | AC-37 | shell navigation at < 768 px | hamburger menu holds navigation, user, Change Password, Logout | 11 | Planned |
-| RESP-03 | AC-37 | queue at ≥ 992, 768–991, < 768 px | table, wrapped table, card list; no horizontal scroll at 320 px | 11 | Planned |
-| RESP-04 | AC-37 | staff ticket detail at all three widths | two columns, then stacked with operational first | 11 | Planned |
-| RESP-05 | AC-37 | User Management at all three widths | table then card list; panel as drawer then full-screen sheet | 11 | Planned |
-| RESP-06 | AC-37 | every new screen at all three widths | no clipping, no overlap, focus outlines visible | 11 | Planned |
+| RESP-01 | AC-37 | Login and Change Password at all three widths | card fits, no horizontal scroll | 11 | Pass |
+| RESP-02 | AC-37 | shell navigation at < 768 px | hamburger menu holds navigation, user, Change Password, Logout | 11 | Pass |
+| RESP-03 | AC-37 | queue at ≥ 992, 768–991, < 768 px | table, wrapped table, card list; no horizontal scroll at 320 px | 11 | Pass |
+| RESP-04 | AC-37 | staff ticket detail at all three widths | two columns, then stacked with operational first | 11 | Pass |
+| RESP-05 | AC-37 | User Management at all three widths | table then card list; panel as drawer then full-screen sheet | 11 | Pass |
+| RESP-06 | AC-37 | every new screen at all three widths | no clipping, no overlap, focus outlines visible | 11 | Pass |
 
 ### 2.13 End-to-end — `e2e/lab-03/`
 
 | ID | AC | File | Journey | Issue | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| E2E-01 | AC-01, AC-05 | `authentication.spec.ts` | log in as a Requester, see name and role, log out, then direct access to a protected route is blocked | 11 | Planned |
-| E2E-02 | AC-02 | `authentication.spec.ts` | log in with an initial password, be forced to Change Password, set a new one, land in the app | 11 | Planned |
-| E2E-03 | AC-03, AC-04 | `authentication.spec.ts` | wrong password, then the inactive account, each with its own message | 11 | Planned |
-| E2E-04 | AC-20, AC-22 | `staff-ticket-flow.spec.ts` | IT Staff open the queue, filter to unassigned, claim a `NEW` ticket, see it become Open | 11 | Planned |
-| E2E-05 | AC-24, AC-26 | `staff-ticket-flow.spec.ts` | raise IT Priority, move to Resolved with a reason, confirm the Public Comment appears | 11 | Planned |
-| E2E-06 | AC-16, AC-17 | `staff-ticket-flow.spec.ts` | IT Staff add a note and a comment; the Requester sees only the comment | 11 | Planned |
-| E2E-07 | AC-15 | `staff-ticket-flow.spec.ts` | the Requester marks the problem as appearing resolved; IT Staff see the signal in the queue | 11 | Planned |
-| E2E-08 | AC-30, AC-34 | `user-administration.spec.ts` | Administrator creates a user, then that user logs in and must change the password | 11 | Planned |
-| E2E-09 | AC-31, AC-33 | `user-administration.spec.ts` | duplicate email is refused; the last-Administrator rule is refused | 11 | Planned |
-| E2E-10 | AC-09 | `user-administration.spec.ts` | a Requester typing `/users` is refused, and the API refuses too | 11 | Planned |
+| E2E-01 | AC-01, AC-05 | `authentication.spec.ts` | log in as a Requester, see name and role, log out, then direct access to a protected route is blocked | 11 | Pass |
+| E2E-02 | AC-02 | `authentication.spec.ts` | log in with an initial password, be forced to Change Password, set a new one, land in the app | 11 | Pass |
+| E2E-03 | AC-03, AC-04 | `authentication.spec.ts` | wrong password, then the inactive account, each with its own message | 11 | Pass |
+| E2E-04 | AC-20, AC-22 | `staff-ticket-flow.spec.ts` | IT Staff open the queue, filter to unassigned, claim a `NEW` ticket, see it become Open | 11 | Pass |
+| E2E-05 | AC-24, AC-26 | `staff-ticket-flow.spec.ts` | raise IT Priority, move to Resolved with a reason, confirm the Public Comment appears | 11 | Pass |
+| E2E-06 | AC-16, AC-17 | `staff-ticket-flow.spec.ts` | IT Staff add a note and a comment; the Requester sees only the comment | 11 | Pass |
+| E2E-07 | AC-15 | `staff-ticket-flow.spec.ts` | the Requester marks the problem as appearing resolved; IT Staff see the signal in the queue | 11 | Pass |
+| E2E-08 | AC-30, AC-34 | `user-administration.spec.ts` | Administrator creates a user, then that user logs in and must change the password | 11 | Pass |
+| E2E-09 | AC-31, AC-33 | `user-administration.spec.ts` | duplicate email is refused on its field; the Administrator's own Role and Active are locked with the reason, the API refuses the same change sent directly, and an active Administrator remains. The `LAST_ADMINISTRATOR` refusal itself only arises in a race (D-27), so API-63 and UI-24 prove it | 11 | Pass |
+| E2E-10 | AC-09 | `user-administration.spec.ts` | a Requester typing `/users` is refused, and the API refuses too | 11 | Pass |
 
 ---
 
@@ -354,18 +354,67 @@ ticket detail, and User Management.
 
 | Item | Desktop | Tablet | Mobile |
 | :--- | :--- | :--- | :--- |
-| Design consistency, tokens only | | | |
-| Role-specific navigation, nothing unauthorized shown | | | |
-| Active-page indication, not colour-only | | | |
-| Status / priority / role badges correct and spelled out | | | |
-| Unassigned shown as a word | | | |
-| Read-only vs editable vs disabled distinct | | | |
-| Validation beneath its own field | | | |
-| Internal Notes region distinct and labelled | | | |
-| Focus outlines visible | | | |
-| No clipping, overlap, or horizontal overflow | | | |
-| Busy states block double submission | | | |
-| Empty / no-results / forbidden / failure states legible | | | |
+| Design consistency, tokens only | ✓ | ✓ | ✓ |
+| Role-specific navigation, nothing unauthorized shown | ✓ | ✓ | ✓ |
+| Active-page indication, not colour-only | ✓ | ✓ | ✓ |
+| Status / priority / role badges correct and spelled out | ✓ | ✓ | ✓ |
+| Unassigned shown as a word | ✓ | ✓ | ✓ |
+| Read-only vs editable vs disabled distinct | ✓ | ✓ | ✓ |
+| Requested Priority never editable | ✓ | ✓ | ✓ |
+| Validation beneath its own field | ✓ | ✓ | ✓ |
+| Internal Notes region distinct and labelled | ✓ | ✓ | ✓ |
+| No Requester-facing hint that Internal Notes exist | ✓ | ✓ | ✓ |
+| Focus outlines visible | ✓ | ✓ | ✓ |
+| No clipping, overlap, or horizontal overflow | ✓ | ✓ (after fix 1) | ✓ |
+| Busy states block double submission | ✓ | ✓ | ✓ |
+| Empty / no-results / forbidden / failure states legible | ✓ | ✓ | ✓ |
+
+Checked in Issue 11 against the screenshots in §4.1 and the RESP and STYLE
+assertions behind them. The automated checks are: no horizontal overflow on
+every screen at every width, a visible focus ring on the first Tab stops of each
+screen (RESP-06), the layout of each screen per width (RESP-03 to RESP-05),
+tokens only in Lab 3's stylesheet and screens (STYLE-01), and badges, asterisks,
+messages, and busy buttons (STYLE-02, 04 to 06). The rest was judged by eye from
+the screenshots. Requester ticket detail is covered at Desktop by E2E-06 and at
+every width by Lab 2's RESP suite; Lab 3 changed only its comments and
+appears-resolved regions there.
+
+What the inspection found, and what was done:
+
+1. **Tablet queue: Ticket Numbers broke across two lines.** At 820 px the
+   130 px Ticket Number column was too narrow for `TT-2026-00009` in the
+   monospace face. The column is now 150 px at tablet width and a number never
+   wraps (`white-space: nowrap`). RESP-03 asserts each number sits on one line,
+   and it fails at tablet width with the old CSS.
+2. **Two Lab 3 font sizes were written as `14px`** rather than the
+   `--tt-font-label` token of the same size (the thread meta line and the
+   appears-resolved helper). Both now use the token, and STYLE-01 refuses any
+   raw size in Lab 3's stylesheet.
+3. **Not a defect: full-page captures of the User Management panel showed the
+   list beneath it.** A full-page capture stretches the page past the fixed
+   sheet, which on a real screen covers the whole viewport. Those shots are
+   taken at the viewport instead.
+
+### 4.1 Screenshot artifacts
+
+Per `ui-spec.md` §13, under `artifacts/lab-03/screenshots/` in `authentication/`,
+`staff-queue/`, `staff-ticket-detail/`, and `user-management/`. Each file is
+`<shot>-<desktop|tablet|mobile>.png`, captured by `e2e/lab-03/responsive.spec.ts`
+at 1440×900, 820×1180, and 390×844: 81 files in all.
+
+| Folder | Shots, each at all three widths |
+| :--- | :--- |
+| `authentication/` | `login-empty`, `login-validation`, `login-invalid-credentials`, `login-inactive-account`, `change-password-mandatory`, `change-password`, `shell-signed-in` (the mobile one with the menu open), `after-logout` |
+| `staff-queue/` | `populated` (desktop, tablet) and `mobile-card-list` (mobile), `search`, `filters-applied`, `no-results`, `forbidden` |
+| `staff-ticket-detail/` | `unassigned-with-claim`, `owned-with-transitions`, `reason-required`, `public-comment-posted`, `internal-note-posted`, `forbidden` |
+| `user-management/` | `list`, `search`, `role-filter`, `create-panel`, `duplicate-email`, `edit-own-account-restricted`, `last-administrator-refusal`, `new-initial-password-confirmation` |
+
+Two states are not captured live. The queue's **empty** state needs a database
+with no tickets at all, which the seeded one never is; UI-14 renders and tests
+it. The **last-Administrator** refusal only arises in a race (D-27), so for that
+one shot the suite answers the PATCH with the API's documented `409
+LAST_ADMINISTRATOR` instead of sending it; API-63 and UI-24 prove the real
+behaviour.
 
 ### 4.1 Screenshot artifacts
 
@@ -403,6 +452,16 @@ npx tsc --noEmit
 npx playwright test e2e/lab-03
 ```
 
+The E2E suites act only as people would, so what they create stays: a few
+tickets per run, and the accounts they make, which each spec deactivates in its
+`afterAll` (BR-50 allows no delete). Deactivated, those accounts can never be
+picked by the API suites, which choose fixtures among active accounts. To start
+again from a clean database:
+
+```sh
+docker exec toktickit-server npx prisma migrate reset --force
+```
+
 ### Everything
 
 ```sh
@@ -418,12 +477,37 @@ cd .. && npx playwright test
 Filled in from the real runner output as each issue merges, and completed in
 Issue 11 (#44) from `lab3-staging`. Until then every row in §2 reads **Planned**.
 
+Run on `feature/11-e2e-and-visual-evidence`, which is `lab3-staging` with
+every Lab 3 issue merged (Issues 1 to 10 and 13) plus this issue, on
+2026-10-04. Server suites run inside the server container (§5), the client suite
+with `--no-file-parallelism`, and the E2E suites against the running stack. The
+server suite ran after the E2E suites, against the database they leave behind.
+
 | Suite | Files | Tests | Result |
 | :--- | :--- | :--- | :--- |
-| `server` unit + API + security + migration | — | — | pending |
-| `client` UI component + UI style | — | — | pending |
-| `e2e/lab-03` responsive + E2E | — | — | pending |
-| Lab 1 + Lab 2 regression | — | — | pending |
+| `server` unit + API + security + migration, all labs | 26 | 385 | 385 passed |
+| ↳ of which Lab 3 (`server/tests/lab-03`) | 16 | 228 | 228 passed |
+| `client` UI component + UI style, all labs | 18 | 350 | 350 passed |
+| ↳ of which Lab 3 (`client/tests/lab-03`) | 9 | 159 | 159 passed |
+| `e2e/lab-03` responsive + E2E | 4 | 25 | 25 passed |
+| Lab 1 + Lab 2 regression: `server` Lab 1 / Lab 2 | 2 / 8 | 3 / 154 | all passed |
+| Lab 1 + Lab 2 regression: `client` Lab 1 / Lab 2 | 1 / 8 | 3 / 188 | all passed |
+| Lab 1 + Lab 2 regression: `e2e/lab-02` | 2 | 21 | 21 passed |
+
+`tsc --noEmit` exits 0 in `server/` and `client/`, and `vite build` succeeds.
+The whole Playwright run, Lab 2 and Lab 3 together, is 46 passed.
+
+**Fixture order.** `create-ticket.api.test.ts` picked "any active Requester",
+with no `orderBy` and no `mustChangePassword: false`. PostgreSQL then returns
+rows in physical order, which changes as rows are updated, so on some databases
+it picked the seeded first-login account: sign-in succeeded and every request
+was `403 PASSWORD_CHANGE_REQUIRED` (15 tests). Latent since Issue 6, it showed
+as an intermittent failure in full runs. The picker now requires
+`mustChangePassword: false`, and every `findFirst` fixture in `server/tests`
+orders by `id`, so none depends on physical order. Reproduced and verified by
+rewriting the `User` table with the first-login account physically first
+(`CLUSTER` on a temporary index): the old picker failed, and the full server
+suite passes 385/385 on that order.
 
 Counts recorded here are the runner's own output, never estimated or restated
 from memory.
@@ -442,3 +526,7 @@ from memory.
 | Accessibility | Checked by assertions on roles, labels, and focus order plus the manual checklist; no automated axe audit runs in Lab 3. |
 | Lab 2 selector suites | `client/tests/lab-02/RequesterContext.test.tsx` tested only the Development Requester selection flow, which Issue 5 removed from the application; it was deleted in Issue 5, and UI-07 and UI-08 cover the shell and navigation that replaced it. Issue 6 deleted the rest of the selector, and with it `client/tests/lab-02/RequesterSelection.test.tsx` (the selection screen) and `server/tests/lab-02/requesters.api.test.ts` (`GET /api/requesters`); UI-09 and API-18 assert both are gone. The Lab 2 tests that asserted `REQUESTER_CONTEXT_REQUIRED`, `REQUESTER_INVALID`, and `REQUESTER_INACTIVE` now assert the session contract that retired those codes (api-spec §1.4). |
 | Login throttling | The 15-minute lock and window are tested with an explicit clock (UNIT-11, UNIT-12) rather than by waiting. The counter is in memory (D-24), so the API tests cannot observe a lock surviving a restart, because it does not. |
+| NUL in free text | A NUL character in a free-text **body** field answers `500`: a comment, a note, a transition reason, a ticket summary, a user's name, the login email. PostgreSQL text cannot hold NUL. Query parameters were closed in #57 (`400 INVALID_QUERY`); the body fields are not. No tracking issue yet. |
+| Ids in a request body | An out-of-range `categoryId` or `relatedSystemId` in the `POST /api/tickets` body (for example `9999999999`) answers `500`. Query and path ids were bounded in #57; this body is not. No tracking issue yet. |
+| Role demotion and ownership | An owner whose role changes to Requester keeps their tickets (D-19 covers deactivation; #59 left demotion as an open decision). The staff owner picker then lists that owner as "(inactive)", because it only knows assignable users; the label is wrong for an account that is active but no longer assignable. |
+| Client navigation suites | `RoleNavigation.test.tsx` (UI-07, UI-08) and Lab 2's `Navigation.test.tsx` fail intermittently in full client runs: 1–2 tests in some runs, serial or parallel, and never when the two files run alone (41/41, four runs in a row). Not purely slowness: with Testing Library's limit raised to 3000 ms they still timed out, and one failed in 130 ms, so the change was not kept. The race is still to be found; Issue 12's final run should re-check it. |

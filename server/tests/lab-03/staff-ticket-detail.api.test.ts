@@ -72,9 +72,9 @@ beforeAll(async () => {
     orderBy: { id: "asc" },
     take: 2,
   });
-  const admin = await prisma.user.findFirstOrThrow({ where: { role: "ADMINISTRATOR", isActive: true, mustChangePassword: false } });
-  const requester = await prisma.user.findFirstOrThrow({ where: { role: "REQUESTER", isActive: true, mustChangePassword: false } });
-  const inactiveStaff = await prisma.user.findFirstOrThrow({ where: { role: "IT_STAFF", isActive: false } });
+  const admin = await prisma.user.findFirstOrThrow({ where: { role: "ADMINISTRATOR", isActive: true, mustChangePassword: false }, orderBy: { id: "asc" } });
+  const requester = await prisma.user.findFirstOrThrow({ where: { role: "REQUESTER", isActive: true, mustChangePassword: false }, orderBy: { id: "asc" } });
+  const inactiveStaff = await prisma.user.findFirstOrThrow({ where: { role: "IT_STAFF", isActive: false }, orderBy: { id: "asc" } });
   Object.assign(ids, { me: me.id, colleague: colleague.id, admin: admin.id, requester: requester.id, inactiveStaff: inactiveStaff.id });
 
   cookies.staff = await signInAs(me.id);
@@ -82,8 +82,8 @@ beforeAll(async () => {
   cookies.admin = await signInAs(admin.id);
   cookies.requester = await signInAs(requester.id);
 
-  categoryId = (await prisma.category.findFirstOrThrow({ where: { isActive: true } })).id;
-  relatedSystemId = (await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true } })).id;
+  categoryId = (await prisma.category.findFirstOrThrow({ where: { isActive: true }, orderBy: { id: "asc" } })).id;
+  relatedSystemId = (await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true }, orderBy: { id: "asc" } })).id;
 });
 
 afterAll(async () => {

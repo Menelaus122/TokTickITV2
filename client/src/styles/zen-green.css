@@ -272,7 +272,7 @@ textarea.tt-field__control {
 .tt-thread__list { list-style: none; margin: 0 0 var(--tt-space-4); padding: 0; }
 .tt-thread__entry { padding: var(--tt-space-3) 0; border-bottom: 1px solid var(--tt-border); }
 .tt-thread__entry:last-child { border-bottom: 0; }
-.tt-thread__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tt-space-2); font-size: 14px; }
+.tt-thread__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tt-space-2); font-size: var(--tt-font-label); }
 .tt-thread__meta time { color: var(--tt-text-muted); }
 /* Text, never HTML; line breaks the author typed are kept (BR-43). */
 .tt-thread__body { margin: var(--tt-space-1) 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -289,7 +289,7 @@ textarea.tt-field__control {
 
 /* Problem Appears Resolved (§5.1) */
 .tt-resolved .tt-btn--primary { margin-top: var(--tt-space-2); }
-.tt-resolved__helper { margin: var(--tt-space-3) 0 0; font-size: 14px; color: var(--tt-text-muted); }
+.tt-resolved__helper { margin: var(--tt-space-3) 0 0; font-size: var(--tt-font-label); color: var(--tt-text-muted); }
 
 /* --- States (ui-spec.md 6) ----------------------------------------------- */
 
@@ -682,7 +682,8 @@ html, body { overflow-x: hidden; }
 .tt-queue-table .tt-queue__col-6 { width: 150px; }
 .tt-queue-table .tt-queue__col-7 { width: 120px; white-space: nowrap; }
 
-.tt-queue__number { font-family: var(--bs-font-monospace, monospace); font-weight: 600; color: var(--tt-green-primary); }
+/* A Ticket Number is one token: it never breaks across lines. */
+.tt-queue__number { font-family: var(--bs-font-monospace, monospace); font-weight: 600; color: var(--tt-green-primary); white-space: nowrap; }
 .tt-queue__summary { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .tt-queue__resolved { display: block; color: var(--tt-success); font-size: var(--tt-font-help); }
 .tt-queue__secondary { display: none; }
@@ -701,7 +702,7 @@ html, body { overflow-x: hidden; }
   .tt-queue-table .tt-queue__col-3,
   .tt-queue-table .tt-queue__col-7 { display: none; }
   .tt-queue__summary { white-space: normal; }
-  .tt-queue-table .tt-queue__col-1 { width: 130px; }
+  .tt-queue-table .tt-queue__col-1 { width: 150px; }
   .tt-queue-table .tt-queue__col-5 { width: 130px; }
   .tt-queue-table .tt-queue__col-6 { width: 130px; }
   .tt-queue__secondary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tt-space-2); margin-top: var(--tt-space-1); color: var(--tt-text-muted); font-size: var(--tt-font-help); }

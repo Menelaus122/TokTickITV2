@@ -95,8 +95,8 @@ beforeAll(async () => {
   requesterA = (await prisma.user.findUniqueOrThrow({ where: { email: "anucha.wong@kmutt.ac.th" } })).id;
   requesterB = (await prisma.user.findUniqueOrThrow({ where: { email: "kanya.sris@kmutt.ac.th" } })).id;
 
-  const category = await prisma.category.findFirstOrThrow({ where: { isActive: true } });
-  const system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true } });
+  const category = await prisma.category.findFirstOrThrow({ where: { isActive: true }, orderBy: { id: "asc" } });
+  const system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true }, orderBy: { id: "asc" } });
   const stamp = Date.now() % 90000;
   const makeTicket = (requesterId: number, n: number) =>
     prisma.ticket.create({
@@ -193,7 +193,7 @@ describe("guards on every protected route family (BR-18, BR-21)", () => {
     // The queue (Issue 8), the ticket detail (Issue 9), and user management
     // (Issue 10) all answer: the right role gets past the guard to the route.
     expect((await call("GET", "/api/staff/tickets", cookies.staff)).status).toBe(200);
-    const ticket = await prisma.ticket.findFirstOrThrow({ select: { id: true } });
+    const ticket = await prisma.ticket.findFirstOrThrow({ select: { id: true }, orderBy: { id: "asc" } });
     expect((await call("GET", `/api/staff/tickets/${ticket.id}`, cookies.staff)).status).toBe(200);
     expect((await call("GET", "/api/admin/users", cookies.admin)).status).toBe(200);
   });
@@ -247,8 +247,8 @@ describe("Requester ownership through the session (BR-03, BR-22)", () => {
     const owners = await prisma.ticket.findMany({ where: { id: { in: list.body.data.map((t: { id: number }) => t.id) } }, select: { requesterId: true } });
     expect(owners.every((t) => t.requesterId === requesterA)).toBe(true);
 
-    const category = await prisma.category.findFirstOrThrow({ where: { isActive: true } });
-    const system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true } });
+    const category = await prisma.category.findFirstOrThrow({ where: { isActive: true }, orderBy: { id: "asc" } });
+    const system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true }, orderBy: { id: "asc" } });
     const created = await request(app)
       .post("/api/tickets")
       .set("Cookie", cookies.requesterA)
@@ -285,7 +285,7 @@ describe("Internal Notes are closed to Requesters (BR-23, AC-08)", () => {
     // Seeded so there is something to leak: a note on the Requester's own
     // ticket and on another Requester's.
     const ownTicket = createdTicketIds[0];
-    const staffId = (await prisma.user.findFirstOrThrow({ where: { role: "IT_STAFF", isActive: true } })).id;
+    const staffId = (await prisma.user.findFirstOrThrow({ where: { role: "IT_STAFF", isActive: true }, orderBy: { id: "asc" } })).id;
     const secret = "SEC-05 internal detail that must stay internal.";
     await prisma.internalNote.createMany({
       data: [
