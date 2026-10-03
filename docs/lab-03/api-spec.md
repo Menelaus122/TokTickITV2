@@ -455,11 +455,14 @@ that does not exist.
 ### 5.3 `PATCH /api/staff/tickets/:id/owner` — claim, assign, reassign
 
 ```json
-{ "ownerId": 7 }
+{ "ownerId": 7, "expectedOwnerId": null }
 ```
 
-`{ "ownerId": null }` unassigns. Omitting the field is a validation error rather
-than an implicit claim.
+`{ "ownerId": null }` unassigns. Omitting `ownerId` is a validation error rather
+than an implicit claim. `expectedOwnerId` is optional: the owner the screen was
+showing, `null` for a claim. When present and the ticket's owner no longer
+matches, the request is refused rather than overwriting someone else's change
+(D-26). The screen always sends it.
 
 **200** with the updated ticket, including `currentStatus` — which may have moved
 from `NEW` to `OPEN` in the same transaction (BR-34, AC-22).
@@ -467,12 +470,19 @@ from `NEW` to `OPEN` in the same transaction (BR-34, AC-22).
 | Condition | Response |
 | :--- | :--- |
 | Ticket already has a different owner and the request is a claim of an unassigned ticket | `409 TICKET_ALREADY_OWNED` (AC-23) |
+| `expectedOwnerId` given and no longer the ticket's owner | `409 TICKET_ALREADY_OWNED` (D-26) |
+| `ownerId: null` on a `RESOLVED` or `CLOSED` ticket | `409 OWNER_REQUIRED` — both keep an owner (BR-35, D-26) |
+| `ownerId` or `expectedOwnerId` neither null nor an integer id | `400 VALIDATION_FAILED` |
 | `ownerId` is not an active IT Staff member or Administrator | `409 OWNER_NOT_ASSIGNABLE` (BR-24) |
 | `ownerId` refers to a user that does not exist | `400 VALIDATION_FAILED` |
 | Ticket is `CANCELLED` | `409 INVALID_TRANSITION` — a cancelled ticket is terminal |
 
 The claim path is a single conditional update (`WHERE id = :id AND ownerId IS
-NULL`) so two simultaneous claims cannot both succeed.
+NULL`) so two simultaneous claims cannot both succeed. Any first owner of a `NEW`
+ticket, claimed or assigned, moves it to `OPEN` in that update (BR-34). Every
+write in §5.3–§5.5 also locks the ticket's row for its transaction, so two IT
+Staff acting at once are serialised and the second is judged against the first's
+result.
 
 ### 5.4 `PATCH /api/staff/tickets/:id/it-priority`
 
@@ -508,6 +518,18 @@ AC-24). An unknown value is `400 VALIDATION_FAILED`.
 
 A successful transition clears `requesterResolvedAt` (BR-30) and, where a reason
 was required, creates the Public Comment in the same transaction (D-08).
+
+`reason` is read only for `RESOLVED`, `CANCELLED`, and `REOPENED`; on any other
+target it is ignored and `comment` is `null`. Both PATCH responses in §5.3 and
+§5.4 return `{ "ticket": … }` in the §5.2 shape, and §5.5 returns the same
+`ticket` beside `comment`, so the screen replaces its copy with the server's.
+
+### 5.5a `GET /api/staff/attachments/:id/download`
+
+Streams an active Lab 2 attachment of any ticket to IT Staff (FR-36, AC-27,
+D-25). **410 `ATTACHMENT_REMOVED`** once removed, **404** for an unknown id. The
+§5.2 attachment list advertises this route in `downloadUrl`. IT Staff still have
+no route to add or remove an attachment (BR-18).
 
 ### 5.6 `GET /api/staff/assignable-users`
 
@@ -632,6 +654,7 @@ requires knowing the current one.
 | `PATCH` | `/api/staff/tickets/:id/owner` | yes | IT Staff |
 | `PATCH` | `/api/staff/tickets/:id/it-priority` | yes | IT Staff |
 | `PATCH` | `/api/staff/tickets/:id/status` | yes | IT Staff |
+| `GET` | `/api/staff/attachments/:id/download` | yes | IT Staff |
 | `GET` | `/api/staff/assignable-users` | yes | IT Staff |
 | `GET` `POST` | `/api/admin/users` | yes | Administrator |
 | `PATCH` | `/api/admin/users/:id` | yes | Administrator |
