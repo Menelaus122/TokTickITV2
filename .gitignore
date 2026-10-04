@@ -39,3 +39,11 @@ test-results/
 docs/lab-02/*.docx
 docs/lab-03/*.docx
 ~$*.docx
+
+# Screenshots captured for the submission PDFs. They are embedded in the
+# .docx, so the repository does not need them. The Lab 2 images that
+# docs/lab-02/submission.md links to were committed before this rule and
+# stay tracked; an ignore rule never untracks a committed file.
+docs/lab-02/image/
+docs/lab-03/image/
+~$*.docx
