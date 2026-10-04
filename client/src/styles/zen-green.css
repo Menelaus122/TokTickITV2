@@ -678,8 +678,10 @@ html, body { overflow-x: hidden; }
 .tt-queue-table .tt-queue__col-1 { width: 140px; }
 .tt-queue-table .tt-queue__col-3 { width: 100px; }
 .tt-queue-table .tt-queue__col-4 { width: 92px; }
-.tt-queue-table .tt-queue__col-5 { width: 150px; }
-.tt-queue-table .tt-queue__col-6 { width: 150px; }
+/* 170px holds the longest status badge, "Waiting for Requester" (142px), inside
+   the cell padding; owner names wrap instead. */
+.tt-queue-table .tt-queue__col-5 { width: 170px; }
+.tt-queue-table .tt-queue__col-6 { width: 140px; }
 .tt-queue-table .tt-queue__col-7 { width: 120px; white-space: nowrap; }
 
 /* A Ticket Number is one token: it never breaks across lines. */
@@ -703,8 +705,8 @@ html, body { overflow-x: hidden; }
   .tt-queue-table .tt-queue__col-7 { display: none; }
   .tt-queue__summary { white-space: normal; }
   .tt-queue-table .tt-queue__col-1 { width: 150px; }
-  .tt-queue-table .tt-queue__col-5 { width: 130px; }
-  .tt-queue-table .tt-queue__col-6 { width: 130px; }
+  .tt-queue-table .tt-queue__col-5 { width: 170px; }
+  .tt-queue-table .tt-queue__col-6 { width: 115px; }
   .tt-queue__secondary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tt-space-2); margin-top: var(--tt-space-1); color: var(--tt-text-muted); font-size: var(--tt-font-help); }
 }
 
