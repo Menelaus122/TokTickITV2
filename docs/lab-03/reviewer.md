@@ -26,8 +26,9 @@ oldest first, so the record can be checked against each Pull Request.
 | [#61](https://github.com/Menelaus122/TokTickITV2/pull/61) | `docs/lab3-final-delivery` | Approved | @WirachatTH |
 | [#62](https://github.com/Menelaus122/TokTickITV2/pull/62) | `lab3-staging → main` | Approved | @WirachatTH |
 | [#63](https://github.com/Menelaus122/TokTickITV2/pull/63) | `docs/lab3-review-record-update` | Changes requested → Approved | @WirachatTH |
+| [#64](https://github.com/Menelaus122/TokTickITV2/pull/64) | `docs/lab3-review-record-final` | Approved | @WirachatTH |
 
-All 16 Pull Requests were approved **and merged** by [@WirachatTH](https://github.com/WirachatTH), never by me,
+All 17 Pull Requests were approved **and merged** by [@WirachatTH](https://github.com/WirachatTH), never by me,
 per the Part 9 agreement in the workflow guide. 8 of them needed at least one round of
 **Changes requested** first; each fix was pushed to the same branch, answered on the
 thread, and re-reviewed before approval. Each PR is linked to its GitHub Issue through
@@ -1643,6 +1644,29 @@ Request — nothing was pushed directly to `lab3-staging` or `main`. (PR #33,
 > My #63 staying out until it's reviewed is correct.
 >
 > Approving. I'll merge this before approving #62, as your note 1 asks. 🙌
+> Wirachat 67070501041
+
+### [#64](https://github.com/Menelaus122/TokTickITV2/pull/64) — Update reviewer.md with the latest reviews
+
+**Verdict:** Approved · **merged** 2026-10-04 by @WirachatTH
+
+**Review — Approved** (2026-10-04, @WirachatTH)
+
+> Approved! Thanks for closing the record out! I checked `docs/lab3-review-record-final` at `c828e1c` the same way as #61 and #63: every body fetched straight from the REST API, then tested word for word inside its own PR's section of the file.
+>
+> ### Verified
+> - **Verbatim:** all **92 of 92** non-empty review, comment, and inline bodies across the 30 PRs in the record (your 16, my 14) appear exactly, ignoring only whitespace and the `> ` blockquote markers. Every PR's entries read oldest first, and the file has no NUL bytes. Your "92 of 92" is right.
+> - **The new entries:** your #62 (release) and #63, and my #63 (pre-release recheck) and #64 (release).
+> - **Both summary tables match GitHub** for every new row: base branch, head branch, review sequence, and who merged.
+>   - "All 16 … 8 of them needed at least one round of Changes requested" is correct (#46, #50, #52, #53, #54, #57, #60, #63).
+>   - "I merged all 14 … 6 of the 14 needed a round of Changes requested" is correct (#51, #52, #55, #57, #59, #63).
+>   - Both release PRs are shown as `lab3-staging → main`, approved, and merged by the other partner.
+> - **Scope:** only `docs/lab-03/reviewer.md` changes, so there's nothing to re-run.
+>
+> ### One thing to decide (not blocking)
+> **`main` won't see this update on its own.** The release (#62) already merged, and `main` and `lab3-staging` are currently identical. This PR targets `lab3-staging`, so after it merges, `main` keeps the earlier `reviewer.md` without the two release entries. If anyone reads the record from `main`, a one-commit follow-up `lab3-staging` → `main` PR (the same release path, docs only) would bring it level. If the submission links to `lab3-staging`, nothing more is needed. Either way, the PDF should link to whichever branch has the final record.
+>
+> Approving. The record is complete and checkable end to end now. 🙌
 > Wirachat 67070501041
 
 ## Pull Requests I reviewed for my partner
