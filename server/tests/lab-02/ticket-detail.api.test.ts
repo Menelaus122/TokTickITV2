@@ -2,12 +2,21 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
+import { endTestSessions, signInAll } from "../helpers/signIn.js";
 
 // API-16 to API-18 — GET /api/tickets/:id, and the ownership rule that a
 // ticket belonging to someone else is indistinguishable from one that does not
 // exist (BR-16).
 
 const prisma = getPrisma();
+
+// Lab 3, Issue 6 — each Requester signs in; the session is the identity.
+let cookies = new Map<number, string>();
+function cookieOf(requesterId: number | string): string {
+  const cookie = cookies.get(Number(requesterId));
+  if (!cookie) throw new Error(`no session for requester ${requesterId}`);
+  return cookie;
+}
 
 let requesterA: number;
 let requesterB: number;
@@ -17,18 +26,18 @@ const createdIds: number[] = [];
 
 function detail(requesterId: number | null, id: number | string) {
   const req = request(app).get(`/api/tickets/${id}`);
-  if (requesterId !== null) req.set("X-Requester-Id", String(requesterId));
+  if (requesterId !== null) req.set("Cookie", cookieOf(requesterId));
   return req;
 }
 
 beforeAll(async () => {
-  const [a, b] = await prisma.requesterUser.findMany({
-    where: { isActive: true },
+  const [a, b] = await prisma.user.findMany({
+    where: { isActive: true, role: "REQUESTER" },
     orderBy: { id: "asc" },
     take: 2,
   });
-  const category = await prisma.category.findFirstOrThrow({ where: { isActive: true } });
-  const system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true } });
+  const category = await prisma.category.findFirstOrThrow({ where: { isActive: true }, orderBy: { id: "asc" } });
+  const system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true }, orderBy: { id: "asc" } });
 
   requesterA = a.id;
   requesterB = b.id;
@@ -44,6 +53,7 @@ beforeAll(async () => {
       summary: "Detail suite ticket for requester A",
       description: "Created by the ticket-detail API suite.",
       requestedPriority: "MEDIUM",
+      itPriority: "MEDIUM",
     },
   });
 
@@ -56,16 +66,20 @@ beforeAll(async () => {
       summary: "Detail suite ticket for requester B",
       description: "Requester A must never be able to read this row.",
       requestedPriority: "URGENT",
+      itPriority: "URGENT",
     },
   });
 
   ticketOfA = ticketA.id;
   ticketOfB = ticketB.id;
   createdIds.push(ticketA.id, ticketB.id);
+
+  cookies = await signInAll(requesterA, requesterB);
 });
 
 afterAll(async () => {
   await prisma.ticket.deleteMany({ where: { id: { in: createdIds } } });
+  await endTestSessions();
   await prisma.$disconnect();
 });
 
@@ -123,11 +137,11 @@ describe("ownership", () => {
     expect(res.body.id).toBe(ticketOfB);
   });
 
-  it("refuses a request with no requester context", async () => {
+  it("refuses a request with no session", async () => {
     const res = await detail(null, ticketOfA);
 
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe("REQUESTER_CONTEXT_REQUIRED");
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe("AUTH_REQUIRED");
   });
 
   it("rejects a malformed ticket id", async () => {

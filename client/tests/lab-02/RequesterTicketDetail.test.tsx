@@ -4,8 +4,6 @@ import userEvent from "@testing-library/user-event";
 import { RequesterTicketDetail } from "../../src/screens/RequesterTicketDetail.js";
 import {
   RequesterProvider,
-  STORAGE_KEY,
-  useRequester,
 } from "../../src/context/RequesterContext.js";
 import * as api from "../../src/api.js";
 import { AttachmentError } from "../../src/api.js";
@@ -48,12 +46,16 @@ function ticket(attachments: Attachment[] = []): TicketDetail {
     relatedSystem: { id: 2, name: "Corporate Laptop" },
     createdAt: "2026-08-25T09:14:22.310Z",
     updatedAt: "2026-08-25T09:14:22.310Z",
+    requesterResolvedAt: null,
     attachments,
   };
 }
 
 beforeEach(() => {
   window.localStorage.clear();
+  // Lab 3, Issue 7 added a Public Comments thread to this screen; these Lab 2
+  // tests are about the ticket and its attachments, so the thread is empty.
+  vi.spyOn(api, "fetchComments").mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -61,18 +63,13 @@ afterEach(() => {
   window.localStorage.clear();
 });
 
-function Gate({ children }: { children: React.ReactNode }) {
-  const { requester } = useRequester();
-  return requester ? <>{children}</> : null;
-}
-
+// Mirrors how the application mounts these screens since Lab 3, Issue 6: the
+// signed-in Requester is handed to RequesterProvider by the route guard.
+// There is no selector and nothing in localStorage.
 function renderScreen(props: Partial<Parameters<typeof RequesterTicketDetail>[0]> = {}) {
-  window.localStorage.setItem(STORAGE_KEY, String(REQUESTER.id));
   return render(
-    <RequesterProvider available={[REQUESTER]}>
-      <Gate>
+    <RequesterProvider requester={REQUESTER}>
         <RequesterTicketDetail ticketId={42} {...props} />
-      </Gate>
     </RequesterProvider>,
   );
 }
@@ -125,7 +122,7 @@ describe("read-only ticket information", () => {
     renderScreen();
 
     await screen.findByTestId("detail-ticket-number");
-    expect(spy).toHaveBeenCalledWith(REQUESTER.id, 42);
+    expect(spy).toHaveBeenCalledWith(42);
   });
 });
 
@@ -201,7 +198,7 @@ describe("attachment lifecycle on the detail screen", () => {
     const file = new File([new Uint8Array([1, 2, 3])], "new.pdf", { type: "application/pdf" });
     await userEvent.upload(screen.getByLabelText("Choose a file to attach"), file);
 
-    await waitFor(() => expect(uploadSpy).toHaveBeenCalledWith(REQUESTER.id, 42, file));
+    await waitFor(() => expect(uploadSpy).toHaveBeenCalledWith(42, file));
     expect(await screen.findByText("new.pdf")).toBeInTheDocument();
   });
 
@@ -277,7 +274,7 @@ describe("attachment lifecycle on the detail screen", () => {
     await userEvent.click(screen.getByRole("button", { name: "Remove attachment" }));
 
     await waitFor(() =>
-      expect(removeSpy).toHaveBeenCalledWith(REQUESTER.id, 90, "Uploaded the wrong screenshot"),
+      expect(removeSpy).toHaveBeenCalledWith(90, "Uploaded the wrong screenshot"),
     );
 
     // Metadata is retained and the reason is shown (BR-40).

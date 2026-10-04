@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Category,
   PERMITTED_PAGE_SIZES,
@@ -11,7 +11,6 @@ import {
   fetchMyTickets,
   fetchRelatedSystems,
 } from "../api.js";
-import { useRequester } from "../context/RequesterContext.js";
 import {
   Button,
   Card,
@@ -21,13 +20,16 @@ import {
   NoResultsState,
   PriorityBadge,
   ResponsiveList,
+  STATUS_LABEL,
   StatusBadge,
+  TICKET_STATUSES,
+  type TicketStatus,
 } from "../components/index.js";
 
 // My Tickets (ui-spec.md 10).
 //
-// Every list read is scoped to the current Development Requester by the server;
-// this screen simply asks for "my tickets" and never sees anyone else's.
+// Every list read is scoped to the signed-in Requester by the server; this
+// screen simply asks for "my tickets" and never sees anyone else's.
 
 const SORT_OPTIONS = [
   { value: "createdAt:desc", label: "Newest first" },
@@ -86,7 +88,6 @@ export function MyTickets({
   onOpenTicket?: (ticket: TicketListItem) => void;
   onCreateTicket?: () => void;
 }) {
-  const { requester } = useRequester();
 
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -98,26 +99,22 @@ export function MyTickets({
   const [categories, setCategories] = useState<Category[]>([]);
   const [systems, setSystems] = useState<RelatedSystem[]>([]);
 
-  // Typing should not fire a request per keystroke.
+  // Typing should not fire a request per keystroke. Any change to what is
+  // being asked for returns to the first page, otherwise a narrowed result set
+  // can leave the user stranded on a page that no longer exists; the page
+  // resets in the same update as the question, so no request for the new
+  // question on the old page is ever sent.
+  const appliedSearch = useRef("");
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(filters.search.trim()), SEARCH_DEBOUNCE_MS);
+    const term = filters.search.trim();
+    const timer = setTimeout(() => {
+      if (term === appliedSearch.current) return;
+      appliedSearch.current = term;
+      setDebouncedSearch(term);
+      setPage(1);
+    }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [filters.search]);
-
-  // Any change to what is being asked for returns to the first page, otherwise
-  // a narrowed result set can leave the user stranded on a page that no longer
-  // exists.
-  useEffect(() => {
-    setPage(1);
-  }, [
-    debouncedSearch,
-    filters.categoryId,
-    filters.relatedSystemId,
-    filters.requestedPriority,
-    filters.currentStatus,
-    filters.sort,
-    filters.pageSize,
-  ]);
 
   useEffect(() => {
     // Filter options come from the database like every other reference list.
@@ -145,7 +142,7 @@ export function MyTickets({
       categoryId: filters.categoryId ? Number(filters.categoryId) : undefined,
       relatedSystemId: filters.relatedSystemId ? Number(filters.relatedSystemId) : undefined,
       requestedPriority: (filters.requestedPriority || undefined) as RequestedPriority | undefined,
-      currentStatus: (filters.currentStatus || undefined) as "NEW" | undefined,
+      currentStatus: (filters.currentStatus || undefined) as TicketStatus | undefined,
       sortBy,
       sortDir,
       page,
@@ -164,19 +161,25 @@ export function MyTickets({
     ],
   );
 
+  // Only the latest request may set what is shown: an earlier one that
+  // answers late would otherwise replace the right page with a stale one.
+  const latestRequest = useRef(0);
+
   const load = useCallback(async () => {
-    if (!requester) return;
+    const request = ++latestRequest.current;
     setStatus("loading");
     try {
-      setResult(await fetchMyTickets(requester.id, params));
+      const response = await fetchMyTickets(params);
+      if (request !== latestRequest.current) return;
+      setResult(response);
       setStatus("ready");
     } catch {
-      // Nothing from a previous requester or a previous query may linger on a
-      // failed load.
+      if (request !== latestRequest.current) return;
+      // Nothing from a previous query may linger on a failed load.
       setResult(null);
       setStatus("error");
     }
-  }, [requester, params]);
+  }, [params]);
 
   useEffect(() => {
     void load();
@@ -184,10 +187,13 @@ export function MyTickets({
 
   function update<K extends keyof Filters>(key: K, value: Filters[K]) {
     setFilters((current) => ({ ...current, [key]: value }));
+    // Search returns to page 1 when its debounced term changes, above.
+    if (key !== "search") setPage(1);
   }
 
   function clearFilters() {
     setFilters(DEFAULT_FILTERS);
+    setPage(1);
   }
 
   const filtering = hasActiveFilters(filters);
@@ -255,7 +261,11 @@ export function MyTickets({
           onChange={(event) => update("currentStatus", event.target.value)}
         >
           <option value="">All Statuses</option>
-          <option value="NEW">NEW</option>
+          {TICKET_STATUSES.map((value) => (
+            <option key={value} value={value}>
+              {STATUS_LABEL[value]}
+            </option>
+          ))}
         </select>
 
         <select

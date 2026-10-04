@@ -257,6 +257,39 @@ textarea.tt-field__control {
 .tt-badge--green   { background: var(--tt-green-pale); color: var(--tt-green-primary); border-color: var(--tt-green-pale); }
 .tt-badge--amber   { background: var(--tt-warning-bg); color: var(--tt-warning); border-color: var(--tt-warning-bg); }
 .tt-badge--red     { background: var(--tt-error-bg); color: var(--tt-error); border-color: var(--tt-error); }
+/* Lab 3 role badges (ui-spec §1.1): Requester on the read-only tone, IT Staff on
+   pale green, Administrator solid green. */
+.tt-badge--readonly { background: var(--tt-readonly-bg); color: var(--tt-text); border-color: var(--tt-border); }
+.tt-badge--solid    { background: var(--tt-green-primary); color: #fff; border-color: var(--tt-green-primary); }
+/* Lab 3 status badges (ui-spec §1.3): the label is shown as written, in title
+   case ("Waiting for Requester"), and never breaks across lines. */
+.tt-badge[data-badge="status"] { text-transform: none; letter-spacing: 0; white-space: nowrap; }
+.tt-badge--outline  { background: var(--tt-surface); color: var(--tt-green-secondary); border-color: var(--tt-green-secondary); }
+.tt-badge--success  { background: var(--tt-success-bg); color: var(--tt-success); border-color: var(--tt-success-bg); }
+
+/* --- Conversation threads (Lab 3 ui-spec §5.2, §7.1, §1.4) ----------------- */
+
+.tt-thread__list { list-style: none; margin: 0 0 var(--tt-space-4); padding: 0; }
+.tt-thread__entry { padding: var(--tt-space-3) 0; border-bottom: 1px solid var(--tt-border); }
+.tt-thread__entry:last-child { border-bottom: 0; }
+.tt-thread__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tt-space-2); font-size: var(--tt-font-label); }
+.tt-thread__meta time { color: var(--tt-text-muted); }
+/* Text, never HTML; line breaks the author typed are kept (BR-43). */
+.tt-thread__body { margin: var(--tt-space-1) 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tt-thread__empty { color: var(--tt-text-muted); margin: 0 0 var(--tt-space-4); }
+.tt-thread__composer .tt-btn { margin-top: var(--tt-space-2); }
+
+/* The internal region (§1.4): read-only background, dashed left edge, and a
+   caption in words so the restriction survives greyscale and screen readers. */
+.tt-thread--internal {
+  background: var(--tt-readonly-bg);
+  border-left: 4px dashed var(--tt-border);
+}
+.tt-thread__caption { margin: 0 0 var(--tt-space-3); font-weight: 700; color: var(--tt-text-muted); }
+
+/* Problem Appears Resolved (§5.1) */
+.tt-resolved .tt-btn--primary { margin-top: var(--tt-space-2); }
+.tt-resolved__helper { margin: var(--tt-space-3) 0 0; font-size: var(--tt-font-label); color: var(--tt-text-muted); }
 
 /* --- States (ui-spec.md 6) ----------------------------------------------- */
 
@@ -331,7 +364,7 @@ textarea.tt-field__control {
   color: #fff;
 }
 
-.tt-shell__brand { font-size: var(--tt-font-h2); font-weight: 700; }
+.tt-shell__brand { font-size: var(--tt-font-h2); font-weight: 700; color: #fff; text-decoration: none; }
 .tt-shell__nav { display: flex; gap: var(--tt-space-4); }
 
 .tt-shell__link {
@@ -575,3 +608,188 @@ textarea.tt-field__control {
 
 /* Nothing may push the page sideways at any width. */
 html, body { overflow-x: hidden; }
+
+/* --- Lab 3: Login and Change Password (ui-spec §3, §4) --------------------- */
+
+.tt-auth {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--tt-space-4);
+}
+
+.tt-auth__card { width: 100%; max-width: 420px; }
+.tt-auth__card .tt-btn--primary { width: 100%; }
+.tt-auth__brand { font-size: var(--tt-font-h2); font-weight: 700; color: var(--tt-green-primary); margin: 0; }
+.tt-auth__lede { color: var(--tt-text-muted); margin: 0 0 var(--tt-space-4); }
+
+/* --- Lab 3: the signed-in user in the shell (ui-spec §2) ------------------- */
+
+.tt-shell__user {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--tt-space-3);
+}
+
+.tt-shell__user-name { font-weight: 600; }
+.tt-shell__action { color: #fff; text-decoration: underline; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+
+/* Below 768px the user block moves into the hamburger menu with the
+   navigation; the menu's background is the dark green, so its text stays white. */
+@media (max-width: 767px) {
+  .tt-shell__header .tt-shell__user { display: none; }
+  /* Stacked: who is signed in on one row, then each action as its own
+     touch-height row, so nothing wraps into an awkward half-row. */
+  .tt-shell__mobile-nav .tt-shell__user { display: flex; flex-direction: column; align-items: flex-start; gap: 0; margin: var(--tt-space-3) 0 var(--tt-space-2); color: #fff; }
+  .tt-shell__mobile-nav .tt-shell__action { min-height: 44px; line-height: 44px; }
+}
+/* From 768px the header's user block shows and the menu's copy does not. */
+@media (min-width: 768px) {
+  .tt-shell__mobile-nav .tt-shell__user { display: none; }
+}
+
+/* A failed Logout is said out loud under the header (FR-06). */
+.tt-shell__alert { margin: var(--tt-space-3) var(--tt-space-6) 0; }
+
+/* --- Lab 3: IT Staff Ticket Queue (ui-spec §6, §1.2) ----------------------- */
+
+/* Owner presentation: a name, or the word Unassigned — never an empty cell. */
+.tt-owner { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--tt-space-1); }
+.tt-owner--unassigned { color: var(--tt-text-muted); font-style: italic; }
+.tt-owner .tt-badge { text-transform: none; letter-spacing: 0; }
+.tt-badge[data-badge="owner-inactive"] { background: var(--tt-surface); border-color: var(--tt-border); }
+
+.tt-queue__search { flex: 1 1 260px; }
+.tt-queue__search .tt-field__control { width: 100%; }
+.tt-queue__filters .tt-field { margin-bottom: 0; }
+/* Bottom-aligned only while the toolbar is a row; in the mobile column,
+   flex-end would push every field to the right instead of stretching it. */
+@media (min-width: 768px) {
+  .tt-queue__filters { align-items: flex-end; }
+}
+.tt-queue__filters-toggle { display: none; }
+
+/* Fixed layout so the summary column can truncate instead of widening the
+   table; every other column has room for its widest badge. */
+.tt-queue-table { table-layout: fixed; }
+.tt-queue-table .tt-queue__col-1 { width: 140px; }
+.tt-queue-table .tt-queue__col-3 { width: 100px; }
+.tt-queue-table .tt-queue__col-4 { width: 92px; }
+/* 170px holds the longest status badge, "Waiting for Requester" (142px), inside
+   the cell padding; owner names wrap instead. */
+.tt-queue-table .tt-queue__col-5 { width: 170px; }
+.tt-queue-table .tt-queue__col-6 { width: 140px; }
+.tt-queue-table .tt-queue__col-7 { width: 120px; white-space: nowrap; }
+
+/* A Ticket Number is one token: it never breaks across lines. */
+.tt-queue__number { font-family: var(--bs-font-monospace, monospace); font-weight: 600; color: var(--tt-green-primary); white-space: nowrap; }
+.tt-queue__summary { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.tt-queue__resolved { display: block; color: var(--tt-success); font-size: var(--tt-font-help); }
+.tt-queue__secondary { display: none; }
+
+.tt-queue-card { margin: 0; }
+.tt-queue-card dd { margin: 0; }
+.tt-queue-card > div { margin-bottom: var(--tt-space-2); }
+.tt-queue-card__line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tt-space-2); }
+/* Line three is two groups — the priorities, then the owner — that sit side by
+   side and wrap as whole groups, so a label never parts from its value. */
+.tt-queue-card > .tt-queue-card__group { display: inline-flex; margin-right: var(--tt-space-3); }
+.tt-queue-card__line dt { font-size: var(--tt-font-help); color: var(--tt-text-muted); font-weight: 600; }
+
+/* Tablet: Requested Priority and Last Updated fold beneath the summary. */
+@media (min-width: 768px) and (max-width: 991px) {
+  .tt-queue-table .tt-queue__col-3,
+  .tt-queue-table .tt-queue__col-7 { display: none; }
+  .tt-queue__summary { white-space: normal; }
+  .tt-queue-table .tt-queue__col-1 { width: 150px; }
+  .tt-queue-table .tt-queue__col-5 { width: 170px; }
+  .tt-queue-table .tt-queue__col-6 { width: 115px; }
+  .tt-queue__secondary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tt-space-2); margin-top: var(--tt-space-1); color: var(--tt-text-muted); font-size: var(--tt-font-help); }
+}
+
+/* Mobile: the filters wait behind the Filters toggle. */
+@media (max-width: 767px) {
+  .tt-queue__filters-toggle { display: block; width: 100%; margin-bottom: var(--tt-space-3); }
+  .tt-queue__filters:not(.tt-queue__filters--open) { display: none; }
+  .tt-queue__search { flex: none; }
+}
+
+/* --- Lab 3: IT Staff Ticket Detail (ui-spec §7) ---------------------------- */
+
+.tt-h3 { font-size: var(--tt-font-body); font-weight: 700; margin: 0 0 var(--tt-space-2); }
+
+.tt-staff-detail { display: grid; grid-template-columns: 1fr; gap: var(--tt-space-4); margin-bottom: var(--tt-space-4); }
+.tt-staff-detail > .tt-card { margin: 0; min-width: 0; }
+.tt-staff-detail__region-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--tt-space-2); margin-bottom: var(--tt-space-3); }
+.tt-staff-detail__region-head .tt-h2 { margin: 0; }
+.tt-staff-detail__group { padding-top: var(--tt-space-3); margin-top: var(--tt-space-3); border-top: 1px solid var(--tt-border); }
+.tt-staff-detail__group[data-control="owner"] { border-top: 0; margin-top: 0; padding-top: 0; }
+.tt-staff-detail__group .tt-btn { margin-bottom: var(--tt-space-3); }
+.tt-staff-detail__confirm { padding: var(--tt-space-3); margin-bottom: var(--tt-space-3); background: var(--tt-readonly-bg); border: 1px solid var(--tt-border); border-radius: 6px; }
+.tt-staff-detail__confirm p { margin-top: 0; }
+.tt-staff-detail__operational .tt-field__control { width: 100%; }
+.tt-staff-detail .tt-detail__description { overflow-wrap: anywhere; }
+
+/* Below 992px the regions stack, operational first: it is why IT Staff opened
+   the screen (ui-spec §7.3). */
+.tt-staff-detail__operational { order: -1; }
+
+@media (min-width: 992px) {
+  .tt-staff-detail { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; }
+  .tt-staff-detail__operational { order: 0; }
+}
+
+@media (max-width: 767px) {
+  .tt-staff-detail .tt-detail { grid-template-columns: 1fr; }
+  .tt-staff-detail__group .tt-btn { width: 100%; }
+}
+
+/* --- Lab 3: Administrator User Management (ui-spec §8) --------------------- */
+
+.tt-users__head { display: flex; justify-content: flex-end; margin-bottom: var(--tt-space-3); }
+.tt-users__search { flex: 1 1 260px; }
+.tt-users__search .tt-field__control { width: 100%; }
+.tt-users__filters .tt-field { margin-bottom: 0; }
+.tt-users__email { overflow-wrap: anywhere; }
+.tt-users__you { margin-left: var(--tt-space-2); }
+.tt-users__card { display: flex; flex-direction: column; gap: var(--tt-space-2); align-items: flex-start; }
+.tt-users__pills { display: flex; flex-wrap: wrap; gap: var(--tt-space-2); }
+.tt-users__roles { display: flex; flex-wrap: wrap; gap: var(--tt-space-2) var(--tt-space-4); margin: 0 0 var(--tt-space-4); }
+.tt-users__roles legend { width: 100%; }
+.tt-users__radio,
+.tt-users__toggle { display: inline-flex; align-items: center; gap: var(--tt-space-2); min-height: 44px; cursor: pointer; }
+.tt-users__roles .tt-field__message { width: 100%; margin: 0; }
+.tt-users__password { margin-top: var(--tt-space-4); padding-top: var(--tt-space-4); border-top: 1px solid var(--tt-border); }
+.tt-users__confirm { padding: var(--tt-space-3); background: var(--tt-readonly-bg); border: 1px solid var(--tt-border); border-radius: var(--tt-radius); }
+.tt-users__confirm p { margin-top: 0; }
+
+/* The create/edit panel: a full-screen sheet below 992px, a right-hand drawer
+   from there up (ui-spec §8.6). */
+.tt-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: rgba(28, 43, 36, .45);
+  display: flex;
+  justify-content: flex-end;
+}
+.tt-drawer__panel {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border-radius: 0;
+  overflow-y: auto;
+}
+.tt-drawer__panel .tt-field__control { width: 100%; }
+
+/* In the mobile column the search's flex-basis would become a 260px height. */
+@media (max-width: 767px) {
+  .tt-users__search { flex: none; }
+}
+
+@media (min-width: 992px) {
+  .tt-drawer__panel { max-width: 480px; box-shadow: -4px 0 16px rgba(28, 43, 36, .15); }
+}

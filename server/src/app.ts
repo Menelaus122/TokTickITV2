@@ -1,14 +1,23 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import { getPrisma } from "./prisma.js";
-import { resolveRequester, REQUESTER_HEADER } from "./requesterContext.js";
+import { attachSession, authRouter, enforcePasswordChange, requireSession } from "./auth.js";
+import { apiNotFound, rejectForeignOrigin, requireRole, resolveRequesterIdentity, safeErrors } from "./authorization.js";
 import { validateTicketInput } from "./validation.js";
 import { nextTicketNumber } from "./ticketNumber.js";
 import { parseTicketListQuery, buildPageMeta } from "./listQuery.js";
+import { conversationRouter } from "./conversation.js";
+import { staffRouter } from "./staff.js";
+import { adminRouter } from "./admin.js";
+import { routeId } from "./routeId.js";
+import { ATTACHMENT_SELECT, UPLOAD_DIR, attachmentView, sendAttachment } from "./attachmentResponse.js";
+import { containsText } from "./queryParams.js";
 import multer from "multer";
+
+export { UPLOAD_DIR };
 import { mkdir, writeFile, unlink } from "node:fs/promises";
-import { createReadStream, existsSync } from "node:fs";
-import { join, resolve as resolvePath } from "node:path";
+import { join } from "node:path";
 import {
   MAX_ACTIVE_ATTACHMENTS,
   MAX_FILE_BYTES,
@@ -26,8 +35,39 @@ export const app = express();
 // in the way (a browser reload of /api/health should be a clean 200, not 304).
 app.set("etag", false);
 
-app.use(cors());          // already wired: lets the Vite dev server call this API
+// Lab 3 — the session lives in a cookie, and a browser only sends a cookie on a
+// cross-origin request when the API names the origin and allows credentials;
+// the wildcard Lab 2 used cannot be combined with credentials. The client runs
+// on Vite's port by default; CLIENT_ORIGINS (comma-separated) replaces the
+// default, for example for an E2E stack on non-default ports.
+//
+// Only localhost by default: a page on 127.0.0.1 calling the API on localhost
+// is cross-site, so the SameSite=Lax cookie would never be sent and sign-in
+// would silently fail even though CORS let the request through.
+const CLIENT_ORIGINS = (process.env.CLIENT_ORIGINS ?? "http://localhost:5173")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter((origin) => origin.length > 0);
+
+app.use(cors({ origin: CLIENT_ORIGINS, credentials: true }));
+// Lab 3, Issue 4 — BR-65: a state-changing request from a foreign Origin is
+// refused before anything else reads it.
+app.use(rejectForeignOrigin(CLIENT_ORIGINS));
 app.use(express.json());
+app.use(cookieParser());
+
+// Lab 3, Issue 3 — who is asking (docs/lab-03/api-spec.md §1.1, §2). The order
+// matters: the session is resolved first, then BR-14 decides whether this
+// session may reach anything other than the auth endpoints.
+app.use(attachSession);
+app.use(enforcePasswordChange);
+app.use("/api/auth", authRouter);
+
+// Lab 3, Issue 4 — the BR-18 matrix by route family. Administrators are not
+// IT Staff (BR-19), so each family admits exactly one role. Mounted here, the
+// guard covers every route Issues 8 to 10 add under these prefixes.
+app.use("/api/staff", requireRole("IT_STAFF"));
+app.use("/api/admin", requireRole("ADMINISTRATOR"));
 
 // ---------------------------------------------------------------------------
 // Issue 2 — API health check
@@ -45,8 +85,9 @@ app.get("/api/health", (_req: Request, res: Response) => {
 // Issue 4 — Category list
 // GET /api/categories reads the supported request categories from PostgreSQL
 // via Prisma and returns each { id, name } in a predictable id order.
+// Lab 3: reference data is for signed-in users only (api-spec §3).
 // ---------------------------------------------------------------------------
-app.get("/api/categories", async (_req: Request, res: Response) => {
+app.get("/api/categories", requireSession, async (_req: Request, res: Response) => {
   // Category data is small and always-fresh; skip conditional caching so a
   // browser reload comes back as a clean 200 rather than a 304 Not Modified.
   res.set("Cache-Control", "no-store");
@@ -68,43 +109,11 @@ app.get("/api/categories", async (_req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
-// Lab 2, Issue 4 — active Development Requesters
-// GET /api/requesters lists the temporary Lab 2 testing identities so the
-// Development Requester Selection screen can offer them.
-//
-// This is NOT authentication (BR-03). The response carries no password, role,
-// or token, because the model has none. Only isActive requesters are returned,
-// so a deactivated one can never be selected (BR-09).
-// ---------------------------------------------------------------------------
-app.get("/api/requesters", async (_req: Request, res: Response) => {
-  res.set("Cache-Control", "no-store");
-  try {
-    const requesters = await getPrisma().requesterUser.findMany({
-      where: { isActive: true },
-      // Sorted by name because this list is read by a human scanning a dropdown.
-      orderBy: { fullName: "asc" },
-      select: { id: true, fullName: true, email: true, department: true },
-    });
-    // An empty array is a valid answer; it drives the selection screen's empty
-    // state rather than being an error (BR-13).
-    res.status(200).json(requesters);
-  } catch {
-    // Never leak internal/database details to the client (FR-33).
-    res.status(500).json({
-      error: {
-        code: "INTERNAL_ERROR",
-        message: "Failed to load development requesters.",
-      },
-    });
-  }
-});
-
-// ---------------------------------------------------------------------------
 // Lab 2, Issue 5 — active Related Systems
 // The specific service, application, device, or platform a ticket is about.
 // Sorted by name because this list is long enough to be scanned alphabetically.
 // ---------------------------------------------------------------------------
-app.get("/api/related-systems", async (_req: Request, res: Response) => {
+app.get("/api/related-systems", requireSession, async (_req: Request, res: Response) => {
   res.set("Cache-Control", "no-store");
   try {
     const systems = await getPrisma().relatedSystem.findMany({
@@ -125,8 +134,8 @@ app.get("/api/related-systems", async (_req: Request, res: Response) => {
 //
 // The backend owns everything the Requester does not type: the official Ticket
 // Number (BR-01), the Ticket Date (BR-05), the NEW status (BR-02), and the
-// owning Requester, which comes from the X-Requester-Id header and never from
-// the body (BR-06, BR-14).
+// owning Requester, which comes from the session and never from the body
+// (BR-06; Lab 3 BR-03).
 // ---------------------------------------------------------------------------
 
 // How many times a unique-constraint collision on ticketNumber is retried
@@ -140,6 +149,8 @@ const TICKET_DETAIL_SELECT = {
   description: true,
   requestedPriority: true,
   currentStatus: true,
+  // Lab 3, Issue 7 — the Requester's own "appears resolved" signal (BR-29).
+  requesterResolvedAt: true,
   createdAt: true,
   updatedAt: true,
   requester: { select: { id: true, fullName: true } },
@@ -155,7 +166,7 @@ app.post("/api/tickets", async (req: Request, res: Response) => {
   res.set("Cache-Control", "no-store");
   const prisma = getPrisma();
 
-  const context = await resolveRequester(prisma, req.headers[REQUESTER_HEADER]);
+  const context = resolveRequesterIdentity(req);
   if (!context.ok) {
     return res
       .status(context.status)
@@ -211,6 +222,9 @@ app.post("/api/tickets", async (req: Request, res: Response) => {
               summary: input.summary,
               description: input.description,
               requestedPriority: input.requestedPriority,
+              // Lab 3 BR-28 — IT Priority starts as a copy of the Requester's
+              // choice and is IT Staff's to change from then on.
+              itPriority: input.requestedPriority,
               // currentStatus is left to its NEW default (BR-02).
             },
             select: TICKET_DETAIL_SELECT,
@@ -235,10 +249,10 @@ app.post("/api/tickets", async (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
-// Lab 2, Issue 6 — the selected Requester's Tickets
+// Lab 2, Issue 6 — the signed-in Requester's Tickets
 //
 // Search, filter, sort, and paginate, always scoped to the requester from the
-// X-Requester-Id header. The owner filter is part of the database query itself
+// session (Lab 3 BR-03). The owner filter is part of the database query itself
 // rather than a check applied afterwards (BR-15), so there is no code path that
 // can fetch another requester's rows and forget to discard them.
 // ---------------------------------------------------------------------------
@@ -263,7 +277,7 @@ app.get("/api/tickets", async (req: Request, res: Response) => {
   res.set("Cache-Control", "no-store");
   const prisma = getPrisma();
 
-  const context = await resolveRequester(prisma, req.headers[REQUESTER_HEADER]);
+  const context = resolveRequesterIdentity(req);
   if (!context.ok) {
     return res
       .status(context.status)
@@ -289,8 +303,8 @@ app.get("/api/tickets", async (req: Request, res: Response) => {
       ...(query.search
         ? {
             OR: [
-              { ticketNumber: { contains: query.search, mode: "insensitive" as const } },
-              { summary: { contains: query.search, mode: "insensitive" as const } },
+              { ticketNumber: containsText(query.search) },
+              { summary: containsText(query.search) },
             ],
           }
         : {}),
@@ -334,8 +348,6 @@ app.get("/api/tickets", async (req: Request, res: Response) => {
 // that does not exist, so the API never discloses that it is there (BR-16).
 // ---------------------------------------------------------------------------
 
-export const UPLOAD_DIR = resolvePath(process.env.UPLOAD_DIR ?? "uploads");
-
 // Files are held in memory and written only after they pass validation, so a
 // rejected upload never touches the disk and no metadata row can outlive a
 // failed write (BR-43).
@@ -348,52 +360,13 @@ const NOT_FOUND = {
   error: { code: "NOT_FOUND", message: "That ticket could not be found." },
 } as const;
 
-function attachmentView(row: {
-  id: number;
-  originalFilename: string;
-  mimeType: string;
-  sizeBytes: number;
-  uploadedAt: Date;
-  removedAt: Date | null;
-  removalReason: string | null;
-}) {
-  return {
-    id: row.id,
-    originalFilename: row.originalFilename,
-    mimeType: row.mimeType,
-    sizeBytes: row.sizeBytes,
-    uploadedAt: row.uploadedAt,
-    removedAt: row.removedAt,
-    removalReason: row.removalReason,
-    // A removed attachment reports no download URL, so a client cannot build a
-    // working link out of the response (BR-40).
-    downloadUrl: row.removedAt ? null : `/api/attachments/${row.id}/download`,
-  };
-}
-
-const ATTACHMENT_SELECT = {
-  id: true,
-  originalFilename: true,
-  mimeType: true,
-  sizeBytes: true,
-  uploadedAt: true,
-  removedAt: true,
-  removalReason: true,
-} as const;
-
-/** Parses a positive integer route parameter, or null when malformed. */
-function routeId(raw: string): number | null {
-  const id = Number(raw);
-  return Number.isInteger(id) && id > 0 ? id : null;
-}
-
 // --- GET /api/tickets/:id — one owned Ticket -------------------------------
 
 app.get("/api/tickets/:id", async (req: Request, res: Response) => {
   res.set("Cache-Control", "no-store");
   const prisma = getPrisma();
 
-  const context = await resolveRequester(prisma, req.headers[REQUESTER_HEADER]);
+  const context = resolveRequesterIdentity(req);
   if (!context.ok) {
     return res
       .status(context.status)
@@ -424,7 +397,7 @@ app.get("/api/tickets/:id", async (req: Request, res: Response) => {
     return res.status(200).json({
       ...rest,
       ticketDate: ticket.createdAt,
-      attachments: attachments.map(attachmentView),
+      attachments: attachments.map((row) => attachmentView(row)),
     });
   } catch {
     return res
@@ -439,7 +412,7 @@ app.get("/api/tickets/:id/attachments", async (req: Request, res: Response) => {
   res.set("Cache-Control", "no-store");
   const prisma = getPrisma();
 
-  const context = await resolveRequester(prisma, req.headers[REQUESTER_HEADER]);
+  const context = resolveRequesterIdentity(req);
   if (!context.ok) {
     return res
       .status(context.status)
@@ -467,7 +440,7 @@ app.get("/api/tickets/:id/attachments", async (req: Request, res: Response) => {
     });
 
     // Removed attachments stay in the listing as metadata (BR-40).
-    return res.status(200).json(attachments.map(attachmentView));
+    return res.status(200).json(attachments.map((row) => attachmentView(row)));
   } catch {
     return res
       .status(500)
@@ -495,7 +468,7 @@ app.post("/api/tickets/:id/attachments", (req: Request, res: Response) => {
 
     const prisma = getPrisma();
 
-    const context = await resolveRequester(prisma, req.headers[REQUESTER_HEADER]);
+    const context = resolveRequesterIdentity(req);
     if (!context.ok) {
       return res
         .status(context.status)
@@ -589,7 +562,7 @@ app.get("/api/attachments/:id/download", async (req: Request, res: Response) => 
   res.set("Cache-Control", "no-store");
   const prisma = getPrisma();
 
-  const context = await resolveRequester(prisma, req.headers[REQUESTER_HEADER]);
+  const context = resolveRequesterIdentity(req);
   if (!context.ok) {
     return res
       .status(context.status)
@@ -617,32 +590,7 @@ app.get("/api/attachments/:id/download", async (req: Request, res: Response) => 
       });
     }
 
-    // A removed attachment never streams bytes, whatever the UI shows (BR-41).
-    if (attachment.removedAt) {
-      return res.status(410).json({
-        error: {
-          code: "ATTACHMENT_REMOVED",
-          message: "That attachment was removed and can no longer be downloaded.",
-        },
-      });
-    }
-
-    const path = join(UPLOAD_DIR, attachment.storedFilename);
-    if (!existsSync(path)) {
-      return res
-        .status(500)
-        .json({ error: { code: "INTERNAL_ERROR", message: "The stored file is unavailable." } });
-    }
-
-    res.status(200);
-    res.set("Content-Type", attachment.mimeType);
-    res.set("Content-Length", String(attachment.sizeBytes));
-    // The original name is only ever used as a label, never as a path.
-    res.set(
-      "Content-Disposition",
-      `attachment; filename="${attachment.originalFilename.replace(/"/g, "")}"`,
-    );
-    return createReadStream(path).pipe(res);
+    return sendAttachment(res, attachment);
   } catch {
     return res
       .status(500)
@@ -656,7 +604,7 @@ app.patch("/api/attachments/:id/remove", async (req: Request, res: Response) => 
   res.set("Cache-Control", "no-store");
   const prisma = getPrisma();
 
-  const context = await resolveRequester(prisma, req.headers[REQUESTER_HEADER]);
+  const context = resolveRequesterIdentity(req);
   if (!context.ok) {
     return res
       .status(context.status)
@@ -722,5 +670,16 @@ app.patch("/api/attachments/:id/remove", async (req: Request, res: Response) => 
       .json({ error: { code: "INTERNAL_ERROR", message: "Failed to remove the attachment." } });
   }
 });
+
+// Lab 3, Issue 4 — safe errors to the very end (FR-47, api-spec §6.2).
+// Lab 3, Issue 7 — Public Comments, Internal Notes, and appears-resolved.
+app.use("/api/tickets", conversationRouter);
+// Lab 3, Issue 8 — the IT Staff queue, behind the /api/staff role guard above.
+app.use("/api/staff", staffRouter);
+// Lab 3, Issue 10 — user management, behind the /api/admin role guard above.
+app.use("/api/admin", adminRouter);
+
+app.use("/api", apiNotFound);
+app.use(safeErrors);
 
 export default app;

@@ -4,17 +4,21 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { TokTickITApp, ROUTES } from "../../src/TokTickITApp.js";
 import { AppShell, NAV_ITEMS } from "../../src/components/AppShell.js";
-import { RequesterProvider, STORAGE_KEY } from "../../src/context/RequesterContext.js";
+import { AuthProvider } from "../../src/context/AuthContext.js";
 import * as api from "../../src/api.js";
-import type { Requester, TicketListResponse } from "../../src/api.js";
+import type { AuthUser, TicketListResponse } from "../../src/api.js";
 
 // Issue 8 AC-2, AC-3, AC-4 — application shell navigation, active-page
 // indication, and the mobile menu. AC-1 (reference-data APIs) is covered by
 // the backend suite.
+//
+// Lab 3, Issue 5: the application is entered by signing in, not through the
+// Development Requester selector, so these tests start from a signed-in
+// Requester. What they check about navigation is unchanged.
 
-const REQUESTERS: Requester[] = [
-  { id: 3, fullName: "Pornchai Thana", email: "pornchai.than@kmutt.ac.th", department: "Library" },
-];
+const REQUESTER: AuthUser = {
+  id: 3, fullName: "Pornchai Thana", email: "pornchai.than@kmutt.ac.th", role: "REQUESTER", isActive: true, mustChangePassword: false,
+};
 
 const EMPTY_LIST: TicketListResponse = {
   data: [],
@@ -22,8 +26,7 @@ const EMPTY_LIST: TicketListResponse = {
 };
 
 beforeEach(() => {
-  window.localStorage.clear();
-  vi.spyOn(api, "fetchRequesters").mockResolvedValue(REQUESTERS);
+  vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(REQUESTER);
   vi.spyOn(api, "fetchMyTickets").mockResolvedValue(EMPTY_LIST);
   vi.spyOn(api, "fetchCategories").mockResolvedValue([{ id: 2, name: "Hardware" }]);
   vi.spyOn(api, "fetchRelatedSystems").mockResolvedValue([{ id: 1, name: "Email" }]);
@@ -31,12 +34,16 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
-  window.localStorage.clear();
 });
 
-/** Mounts the app at a route with a Requester already selected. */
+/** Mounts the app at a route with a Requester signed in. */
 function renderAt(path: string) {
-  window.localStorage.setItem(STORAGE_KEY, String(REQUESTERS[0].id));
+  return render(<TokTickITApp initialEntries={[path]} />);
+}
+
+/** Mounts the app at a route with nobody signed in. */
+function renderSignedOut(path: string) {
+  vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(null);
   return render(<TokTickITApp initialEntries={[path]} />);
 }
 
@@ -77,8 +84,8 @@ describe("application identity and navigation", () => {
   it("keeps the shell on every application screen", async () => {
     renderAt(ROUTES.create);
 
-    expect(await screen.findByTestId("current-requester")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Change Requester" })).toBeInTheDocument();
+    expect(await screen.findByTestId("current-user")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Logout" }).length).toBeGreaterThan(0);
   });
 });
 
@@ -189,21 +196,21 @@ describe("mobile navigation", () => {
 });
 
 describe("route guarding", () => {
-  it("redirects to the selector when no Requester is chosen", async () => {
-    render(<TokTickITApp initialEntries={[ROUTES.list]} />);
+  it("redirects to Login when nobody is signed in", async () => {
+    renderSignedOut(ROUTES.list);
 
-    expect(await screen.findByLabelText(/Development Requester/)).toBeInTheDocument();
-    expect(screen.queryByTestId("current-requester")).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Sign in" })).toBeInTheDocument();
+    expect(screen.queryByTestId("current-user")).not.toBeInTheDocument();
   });
 
   it("guards the create route too", async () => {
-    render(<TokTickITApp initialEntries={[ROUTES.create]} />);
-    expect(await screen.findByLabelText(/Development Requester/)).toBeInTheDocument();
+    renderSignedOut(ROUTES.create);
+    expect(await screen.findByRole("button", { name: "Sign in" })).toBeInTheDocument();
   });
 
   it("guards the detail route too", async () => {
-    render(<TokTickITApp initialEntries={["/tickets/42"]} />);
-    expect(await screen.findByLabelText(/Development Requester/)).toBeInTheDocument();
+    renderSignedOut("/tickets/42");
+    expect(await screen.findByRole("button", { name: "Sign in" })).toBeInTheDocument();
   });
 
   it("sends an unknown route to My Tickets", async () => {
@@ -216,28 +223,26 @@ describe("route guarding", () => {
     expect(await screen.findByLabelText("Search tickets")).toBeInTheDocument();
   });
 
-  it("skips the selector when a Requester is already chosen", async () => {
-    renderAt(ROUTES.select);
+  it("skips Login when someone is already signed in", async () => {
+    renderAt(ROUTES.login);
     expect(await screen.findByLabelText("Search tickets")).toBeInTheDocument();
   });
 
-  it("honours a deep link once the stored selection is restored", async () => {
-    // Restoring the selection takes an effect, so for one frame the guard sees
-    // no requester. It must not act on that: the user asked for Create Ticket
-    // and must arrive at Create Ticket, not the list.
+  it("honours a deep link once the session is known", async () => {
+    // Loading the session takes a request, so for one frame the guard does not
+    // know who is signed in. It must not act on that: the user asked for Create
+    // Ticket and must arrive at Create Ticket, not the list.
     renderAt(ROUTES.create);
     expect(await screen.findByLabelText(/^Ticket Summary/)).toBeInTheDocument();
   });
 
-  it("returns to the requested page after choosing a Requester", async () => {
-    // Deep link with nothing stored: selector first, then the intended page.
-    render(<TokTickITApp initialEntries={[ROUTES.create]} />);
+  it("returns to the requested page after signing in", async () => {
+    vi.spyOn(api, "login").mockResolvedValue(REQUESTER);
+    renderSignedOut(ROUTES.create);
 
-    await userEvent.selectOptions(
-      await screen.findByLabelText(/Development Requester/),
-      String(REQUESTERS[0].id),
-    );
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await userEvent.type(await screen.findByLabelText(/^Email/), REQUESTER.email);
+    await userEvent.type(screen.getByLabelText(/^Password/), "Toktickit#2026");
+    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
     expect(await screen.findByLabelText(/^Ticket Summary/)).toBeInTheDocument();
   });
@@ -246,7 +251,7 @@ describe("route guarding", () => {
 describe("shell layout at mobile size", () => {
   it("renders the menu toggle and the desktop nav as separate regions", async () => {
     const { container } = renderAt(ROUTES.list);
-    await screen.findByTestId("current-requester");
+    await screen.findByTestId("current-user");
 
     // CSS hides one or the other per breakpoint; both exist in the DOM so
     // there is no viewport measurement in JavaScript.
@@ -254,16 +259,18 @@ describe("shell layout at mobile size", () => {
     expect(container.querySelector(".tt-shell__menu-toggle")).not.toBeNull();
   });
 
-  it("renders the shell without a Requester block before selection", () => {
+  it("renders the shell without a user block when nobody is signed in", async () => {
+    vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(null);
     render(
       <MemoryRouter>
-        <RequesterProvider available={REQUESTERS}>
+        <AuthProvider>
           <AppShell>content</AppShell>
-        </RequesterProvider>
+        </AuthProvider>
       </MemoryRouter>,
     );
 
-    expect(screen.queryByTestId("current-requester")).not.toBeInTheDocument();
+    expect(await screen.findByText("content")).toBeInTheDocument();
+    expect(screen.queryByTestId("current-user")).not.toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Main" })).toBeInTheDocument();
   });
 });

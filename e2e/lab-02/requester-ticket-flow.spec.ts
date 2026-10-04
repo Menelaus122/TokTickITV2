@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { API_URL } from "../../playwright.config.js";
-import { createTicket, selectRequester, switchRequester, ticketIdFromUrl } from "./helpers.js";
+import { createTicket, selectRequester, signInApi, switchRequester, ticketIdFromUrl } from "./helpers.js";
 
 // E2E-01 to E2E-04 — the Requester journeys, against a real stack.
 
@@ -23,7 +23,7 @@ test.afterAll(() => {
 });
 
 test.describe("E2E-01 complete creation journey", () => {
-  test("select a Requester, create a Ticket, find it in My Tickets", async ({ page }) => {
+  test("sign in as a Requester, create a Ticket, find it in My Tickets", async ({ page }) => {
     await selectRequester(page, REQUESTER_A);
 
     const summary = `E2E creation ${Date.now()}`;
@@ -81,15 +81,19 @@ test.describe("E2E-02 cross-requester isolation", () => {
     const ticketId = ticketIdFromUrl(page);
     created.push(ticketId);
 
-    const asOwner = await request.get(`${API_URL}/api/tickets/${ticketId}`, {
-      headers: { "X-Requester-Id": "1" },
-    });
-    const asOther = await request.get(`${API_URL}/api/tickets/${ticketId}`, {
-      headers: { "X-Requester-Id": "2" },
+    // Lab 3, Issue 6: identity is the session. The page's own request context
+    // carries A's cookie; the bare `request` context signs in as B.
+    const asOwner = await page.request.get(`${API_URL}/api/tickets/${ticketId}`);
+    await signInApi(request, API_URL, REQUESTER_B);
+    const asOther = await request.get(`${API_URL}/api/tickets/${ticketId}`);
+    // The retired header no longer names anyone.
+    const headerOnly = await page.context().request.fetch(`${API_URL}/api/tickets/${ticketId}`, {
+      headers: { "X-Requester-Id": "1", Cookie: "" },
     });
 
     expect(asOwner.status()).toBe(200);
     expect(asOther.status()).toBe(404);
+    expect(headerOnly.status()).toBe(401);
   });
 
   test("Requester B's list never contains Requester A's ticket", async ({ page }) => {
@@ -146,7 +150,7 @@ test.describe("E2E-03 attachment lifecycle", () => {
     await expect(page.getByRole("heading", { name: /Attachments \(0 of 5 active\)/ })).toBeVisible();
   });
 
-  test("a removed attachment cannot be downloaded through the API", async ({ page, request }) => {
+  test("a removed attachment cannot be downloaded through the API", async ({ page }) => {
     await selectRequester(page, REQUESTER_A);
     await createTicket(page, `E2E removed download ${Date.now()}`);
     const ticketId = ticketIdFromUrl(page);
@@ -159,9 +163,7 @@ test.describe("E2E-03 attachment lifecycle", () => {
     });
     await expect(page.getByText("evidence.pdf")).toBeVisible();
 
-    const detail = await request.get(`${API_URL}/api/tickets/${ticketId}`, {
-      headers: { "X-Requester-Id": "1" },
-    });
+    const detail = await page.request.get(`${API_URL}/api/tickets/${ticketId}`);
     const attachmentId = (await detail.json()).attachments[0].id;
 
     await page.getByRole("button", { name: "Remove" }).click();
@@ -169,9 +171,7 @@ test.describe("E2E-03 attachment lifecycle", () => {
     await page.getByRole("button", { name: "Remove attachment" }).click();
     await expect(page.getByText(/Removed for the API check/)).toBeVisible();
 
-    const blocked = await request.get(`${API_URL}/api/attachments/${attachmentId}/download`, {
-      headers: { "X-Requester-Id": "1" },
-    });
+    const blocked = await page.request.get(`${API_URL}/api/attachments/${attachmentId}/download`);
     expect(blocked.status()).toBe(410);
   });
 
@@ -193,7 +193,7 @@ test.describe("E2E-03 attachment lifecycle", () => {
   });
 });
 
-test.describe("E2E-04 changing Requester", () => {
+test.describe("E2E-04 changing the signed-in Requester", () => {
   test("switching identity replaces the visible list", async ({ page }) => {
     await selectRequester(page, REQUESTER_A);
     const summary = `E2E switch ${Date.now()}`;
@@ -206,15 +206,15 @@ test.describe("E2E-04 changing Requester", () => {
 
     await switchRequester(page, REQUESTER_B);
 
-    await expect(page.getByTestId("current-requester")).toHaveText(REQUESTER_B);
+    await expect(page.getByTestId("current-user")).toHaveText(REQUESTER_B);
     await expect(page.getByText(summary)).toHaveCount(0);
   });
 
-  test("the selection survives a page reload", async ({ page }) => {
+  test("the session survives a page reload", async ({ page }) => {
     await selectRequester(page, REQUESTER_A);
     await page.reload();
 
-    await expect(page.getByTestId("current-requester")).toHaveText(REQUESTER_A);
+    await expect(page.getByTestId("current-user")).toHaveText(REQUESTER_A);
   });
 });
 test.describe("E2E-05 attaching while creating the ticket", () => {

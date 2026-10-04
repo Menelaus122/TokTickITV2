@@ -313,6 +313,13 @@ clear them with:
 docker exec toktickit-db psql -U toktickit -d toktickit -c 'DELETE FROM "Ticket";'
 ```
 
+> **Lab 3 note — do not run the command above on a Lab 3 database.** It was
+> right for Lab 2, when the suite's tickets were the only ones. After the Lab 3
+> migration the database also holds the tickets carried over from Lab 2 and the
+> 16 sample tickets the Lab 3 seed creates, and this command deletes them all.
+> Delete only the tickets created after a noted id instead, as `README.md`
+> describes under the E2E tests.
+
 ### Everything
 
 ```bash

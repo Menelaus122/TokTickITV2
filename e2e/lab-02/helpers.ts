@@ -1,52 +1,58 @@
-import { Page, expect } from "@playwright/test";
+import { APIRequestContext, Page, expect } from "@playwright/test";
 
 // Shared helpers for the Lab 2 end-to-end suites.
 
-export const STORAGE_KEY = "toktickit.devRequesterId";
+// Lab 3, Issue 5: the application is entered by signing in, so "selecting a
+// Requester" now means signing in as one of the seeded Requester accounts. The
+// helpers keep their Lab 2 names so the Lab 2 specs read as they did.
 
-/**
- * Chooses a Development Requester through the real selection screen, which is
- * how a person enters the application (FR-01, FR-02).
- */
+export const SEED_PASSWORD = "Toktickit#2026";
+
+const REQUESTER_EMAILS: Record<string, string> = {
+  "Anucha Wongsawat": "anucha.wong@kmutt.ac.th",
+  "Kanya Srisai": "kanya.sris@kmutt.ac.th",
+  "Pornchai Thana": "pornchai.than@kmutt.ac.th",
+  "Suchada Meesuk": "suchada.mees@kmutt.ac.th",
+};
+
+/** Signs in as a seeded Requester through the real Login screen (FR-01). */
 export async function selectRequester(page: Page, name: string) {
-  await page.goto("/select-requester");
-  await chooseFromSelector(page, name);
+  await page.goto("/login");
+  await signInOnScreen(page, name);
+}
+
+async function signInOnScreen(page: Page, name: string) {
+  const email = REQUESTER_EMAILS[name];
+  if (!email) throw new Error(`No seeded Requester account named "${name}"`);
+
+  await page.getByLabel(/^Email/).fill(email);
+  await page.getByLabel(/^Password/).fill(SEED_PASSWORD);
+  await page.getByRole("button", { name: "Sign in" }).click();
+
+  await expect(page.getByTestId("current-user")).toHaveText(name);
 }
 
 /**
- * Picks a Requester from the selector that is already on screen.
- *
- * Options read "Name — Department", so the value is looked up by text rather
- * than matching a label the seed could change.
+ * Signs a bare API request context in as a seeded Requester (Lab 3, Issue 6).
+ * The context keeps the session cookie, so its later calls act as that person
+ * — the same way the retired X-Requester-Id header used to name one.
  */
-export async function chooseFromSelector(page: Page, name: string) {
-  const dropdown = page.getByLabel(/Development Requester/);
-  await expect(dropdown).toBeVisible();
-
-  const value = await dropdown
-    .locator("option", { hasText: name })
-    .first()
-    .getAttribute("value");
-  if (!value) throw new Error(`No Development Requester option matching "${name}"`);
-
-  await dropdown.selectOption(value);
-  await page.getByRole("button", { name: "Continue" }).click();
-
-  await expect(page.getByTestId("current-requester")).toHaveText(name);
+export async function signInApi(request: APIRequestContext, apiUrl: string, name: string) {
+  const email = REQUESTER_EMAILS[name];
+  if (!email) throw new Error(`No seeded Requester account named "${name}"`);
+  const res = await request.post(`${apiUrl}/api/auth/login`, { data: { email, password: SEED_PASSWORD } });
+  expect(res.status()).toBe(201);
 }
 
-/** Uses Change Requester in the shell, then picks a different identity. */
+/** Logs out through the shell, then signs in as a different Requester. */
 export async function switchRequester(page: Page, name: string) {
-  await page.getByRole("button", { name: "Change Requester" }).click();
-  await chooseFromSelector(page, name);
-}
+  // Below 768px the Logout action lives in the menu.
+  const headerLogout = page.getByRole("banner").getByRole("button", { name: "Logout" });
+  if (!(await headerLogout.isVisible())) await page.getByRole("button", { name: "Menu" }).click();
+  await page.getByRole("button", { name: "Logout" }).filter({ visible: true }).first().click();
 
-/** Switches identity without going through Change Requester in the UI. */
-export async function setStoredRequester(page: Page, requesterId: number) {
-  await page.addInitScript(
-    ([key, id]) => window.localStorage.setItem(key as string, String(id)),
-    [STORAGE_KEY, requesterId] as const,
-  );
+  await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+  await signInOnScreen(page, name);
 }
 
 export interface CreatedTicket {

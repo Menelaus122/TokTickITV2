@@ -183,7 +183,7 @@ export function CreateTicket({
     event.preventDefault();
     // BR-30 — one in-flight submission at a time, so a double click cannot
     // create two tickets.
-    if (submitting || !requester) return;
+    if (submitting) return;
 
     setFormError(undefined);
 
@@ -205,14 +205,14 @@ export function CreateTicket({
 
     setSubmitting(true);
     try {
-      const ticket = await createTicket(requester.id, payload);
+      const ticket = await createTicket(payload);
 
       // Attachments are uploaded after the ticket exists, one request per file
       // so a partial failure can be reported per file (FR-31).
       const failures: { filename: string; message: string }[] = [];
       for (const file of files) {
         try {
-          await uploadAttachment(requester.id, ticket.id, file);
+          await uploadAttachment(ticket.id, file);
         } catch (uploadError) {
           failures.push({
             filename: file.name,
@@ -312,7 +312,7 @@ export function CreateTicket({
         <FieldGrid columns={3}>
           <ReadOnlyField label="Ticket Number" value="Generated on submit" />
           <ReadOnlyField label="Ticket Date" value="Generated on submit" />
-          <ReadOnlyField label="Requester" value={requester?.fullName ?? ""} />
+          <ReadOnlyField label="Requester" value={requester.fullName} />
         </FieldGrid>
 
         {referenceFailed && (

@@ -5,11 +5,20 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { app, UPLOAD_DIR } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
+import { endTestSessions, signInAll } from "../helpers/signIn.js";
 import { MAX_FILE_BYTES } from "../../src/attachments.js";
 
 // API-19 to API-28 — the attachment lifecycle.
 
 const prisma = getPrisma();
+
+// Lab 3, Issue 6 — each Requester signs in; the session is the identity.
+let cookies = new Map<number, string>();
+function cookieOf(requesterId: number | string): string {
+  const cookie = cookies.get(Number(requesterId));
+  if (!cookie) throw new Error(`no session for requester ${requesterId}`);
+  return cookie;
+}
 
 let requesterA: number;
 let requesterB: number;
@@ -26,32 +35,32 @@ const PNG = Buffer.from(
 
 function attach(requesterId: number | null, ticketId: number, name: string, body: Buffer, mime: string) {
   const req = request(app).post(`/api/tickets/${ticketId}/attachments`);
-  if (requesterId !== null) req.set("X-Requester-Id", String(requesterId));
+  if (requesterId !== null) req.set("Cookie", cookieOf(requesterId));
   return req.attach("file", body, { filename: name, contentType: mime });
 }
 
 function listAttachments(requesterId: number, ticketId: number) {
   return request(app)
     .get(`/api/tickets/${ticketId}/attachments`)
-    .set("X-Requester-Id", String(requesterId));
+    .set("Cookie", cookieOf(requesterId));
 }
 
 function download(requesterId: number, attachmentId: number) {
   return request(app)
     .get(`/api/attachments/${attachmentId}/download`)
-    .set("X-Requester-Id", String(requesterId));
+    .set("Cookie", cookieOf(requesterId));
 }
 
 function remove(requesterId: number, attachmentId: number, removalReason?: unknown) {
   return request(app)
     .patch(`/api/attachments/${attachmentId}/remove`)
-    .set("X-Requester-Id", String(requesterId))
+    .set("Cookie", cookieOf(requesterId))
     .send(removalReason === undefined ? {} : { removalReason });
 }
 
 async function makeTicket(requesterId: number, number: string, summary: string) {
-  const category = await prisma.category.findFirstOrThrow({ where: { isActive: true } });
-  const system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true } });
+  const category = await prisma.category.findFirstOrThrow({ where: { isActive: true }, orderBy: { id: "asc" } });
+  const system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true }, orderBy: { id: "asc" } });
   const ticket = await prisma.ticket.create({
     data: {
       ticketNumber: number,
@@ -61,6 +70,7 @@ async function makeTicket(requesterId: number, number: string, summary: string) 
       summary,
       description: "Created by the attachments API suite.",
       requestedPriority: "MEDIUM",
+      itPriority: "MEDIUM",
     },
   });
   createdTicketIds.push(ticket.id);
@@ -68,13 +78,15 @@ async function makeTicket(requesterId: number, number: string, summary: string) 
 }
 
 beforeAll(async () => {
-  const [a, b] = await prisma.requesterUser.findMany({
-    where: { isActive: true },
+  const [a, b] = await prisma.user.findMany({
+    where: { isActive: true, role: "REQUESTER" },
     orderBy: { id: "asc" },
     take: 2,
   });
   requesterA = a.id;
   requesterB = b.id;
+
+  cookies = await signInAll(requesterA, requesterB);
 });
 
 // Ticket numbers must be unique, so each test gets its own pair from a
@@ -102,6 +114,7 @@ afterAll(async () => {
   for (const row of rows) {
     await rm(join(UPLOAD_DIR, row.storedFilename), { force: true }).catch(() => {});
   }
+  await endTestSessions();
   await prisma.$disconnect();
 });
 
@@ -232,7 +245,7 @@ describe("metadata listing", () => {
   it("refuses to list another requester's attachments", async () => {
     const res = await request(app)
       .get(`/api/tickets/${ticketOfB}/attachments`)
-      .set("X-Requester-Id", String(requesterA));
+      .set("Cookie", cookieOf(requesterA));
 
     expect(res.status).toBe(404);
   });
@@ -347,7 +360,7 @@ describe("ticket detail reflects the attachment lifecycle", () => {
 
     const res = await request(app)
       .get(`/api/tickets/${ticketOfA}`)
-      .set("X-Requester-Id", String(requesterA));
+      .set("Cookie", cookieOf(requesterA));
 
     const row = res.body.attachments.find((a: { id: number }) => a.id === uploaded.body.id);
     expect(row.originalFilename).toBe("gone.pdf");

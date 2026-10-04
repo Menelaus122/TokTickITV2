@@ -1,9 +1,12 @@
 # TokTickIT
 
-An IT Service Desk application, built up over a series of issues across two labs.
-Lab 2 delivers the Requester-facing ticketing experience: choose a Development
-Requester, create a ticket with attachments, find it again in My Tickets, and
-manage its attachments from Ticket Detail.
+An IT Service Desk application, built up over a series of issues across three labs.
+Lab 2 delivered the Requester-facing ticketing experience: create a ticket with
+attachments, find it again in My Tickets, and manage its attachments from Ticket
+Detail. Lab 3 adds real users and roles: sign-in with a forced first password
+change, Public Comments and Internal Notes, an IT Staff queue and ticket detail
+for claiming, prioritising, and resolving tickets, and Administrator user
+management.
 
 - **Frontend** — React + TypeScript + Vite, React Router, Bootstrap layout with a Zen Green theme
 - **Backend** — Node.js + Express + TypeScript, Multer for uploads
@@ -34,26 +37,45 @@ manage its attachments from Ticket Detail.
 - [x] **Issue 10** — Create Ticket completion (attachments, success state, Cancel)
 - [x] **Issue 11** — Staging integration, documentation, and delivery
 
-> **Note on Lab 2 authentication.** There is none, by design. A Development
-> Requester selector stands in for login so requester-specific behaviour can be
-> tested. It is not authentication and is labelled as such throughout the app.
-> Real authentication arrives in Lab 3.
+**Lab 3 — users, roles, IT Staff ticketing, and administration**
+
+- [x] **Issue 1** — Sprint 3 engineering contract (specification, tests, UI spec, API spec)
+- [x] **Issue 2** — User model, Lab 2 migration, and seed
+- [x] **Issue 3** — Authentication API (sign-in, sign-out, current user, password change)
+- [x] **Issue 13** — Login attempt throttling
+- [x] **Issue 4** — Authorization and safe errors
+- [x] **Issue 5** — Login, mandatory password change, and app shell
+- [x] **Issue 6** — Requester regression on the authenticated identity
+- [x] **Issue 7** — Public Comments and Internal Notes
+- [x] **Issue 8** — IT Staff Ticket Queue
+- [x] **Issue 9** — IT Staff Ticket Detail operations
+- [x] **Issue 10** — Administrator User Management
+- [x] **Issue 11** — E2E suite and visual inspection evidence
+- [x] **Issue 12** — Staging integration, documentation, and delivery
+
+> **Note on Lab 2 authentication.** Lab 2 had none, by design: a Development
+> Requester selector stood in for login. Lab 3 replaced it with real sign-in;
+> since Lab 3 Issue 6 the selector, its `X-Requester-Id` header, and
+> `GET /api/requesters` are gone, and the Lab 2 screens act as the signed-in
+> Requester.
 
 ## Project layout
 
 ```
 .
 ├── client/              # React + TS + Vite frontend
-│   ├── src/components/  # Zen Green UI foundation (form, buttons, badges, states)
-│   ├── src/screens/     # Requester Selection, Create Ticket, My Tickets, Ticket Detail
-│   └── tests/lab-02/    # UI component and UI style tests
+│   ├── src/components/  # Zen Green UI foundation (form, buttons, badges, states, shell, threads)
+│   ├── src/screens/     # Login, Change Password, the Requester screens, Ticket Queue,
+│   │                    # IT Staff Ticket Detail, User Management
+│   └── tests/lab-0{1,2,3}/  # UI component and UI style tests, per lab
 ├── server/              # Express + TS backend, Prisma schema & seed
-│   ├── src/             # routes plus pure modules: validation, ticket numbers, attachments
-│   └── tests/lab-02/    # unit and API tests
-├── e2e/lab-02/          # Playwright end-to-end and responsive suites
-├── artifacts/lab-02/    # screenshots for the visual checklist
+│   ├── src/             # routes plus pure modules: validation, query parsing, transitions, user rules
+│   └── tests/lab-0{1,2,3}/  # unit, API, authorization, and migration tests, per lab
+├── e2e/lab-0{2,3}/      # Playwright end-to-end and responsive suites
+├── artifacts/lab-0{2,3}/  # screenshots for each lab's visual checklist
 ├── docs/lab-01/         # Lab 1 documentation
 ├── docs/lab-02/         # Lab 2 specification, tests, UI spec, API spec, reviewer, AI use
+├── docs/lab-03/         # Lab 3 specification, tests, UI spec, API spec, reviewer, AI use
 ├── docker-compose.yml   # db + server + client dev stack
 └── README.md
 ```
@@ -70,7 +92,7 @@ manage its attachments from Ticket Detail.
 ```bash
 docker compose up --build                              # start db + server + client
 docker compose exec server npx prisma migrate deploy   # apply migrations
-docker compose exec server npm run prisma:seed         # seed reference data and requesters
+docker compose exec server npm run prisma:seed         # seed reference data, accounts, and sample tickets
 ```
 
 Then open:
@@ -79,8 +101,8 @@ Then open:
 - Backend health check: <http://localhost:3000/api/health>
 - PostgreSQL: `localhost:5432` (user `toktickit`, password `toktickit`, db `toktickit`)
 
-The app opens on the **Development Requester Selection** screen. Pick one of the
-four seeded Requesters and press **Continue** to enter the application.
+The app opens on the **Login** screen. Sign in with any seeded account below;
+each role lands on its own home page and sees only its own navigation.
 
 Stop the stack (keeps the database volume):
 
@@ -94,42 +116,159 @@ You can also run **just the database** in Docker and the apps on your host:
 docker compose up -d db
 ```
 
+### Seeded accounts (local development only)
+
+Lab 3 adds real accounts. **Every seeded account uses the password
+`Toktickit#2026`.** These are local-development credentials, documented here on
+purpose; they are not anyone's real password and must never be reused outside a
+local database.
+
+| Role | Accounts | Notes |
+| :--- | :--- | :--- |
+| Requester | `anucha.wong@kmutt.ac.th`, `kanya.sris@kmutt.ac.th`, `pornchai.than@kmutt.ac.th`, `suchada.mees@kmutt.ac.th` | The four Lab 2 Development Requesters, carried over by the migration |
+| Requester, inactive | `wichai.boon@kmutt.ac.th` | Cannot sign in |
+| Requester, must change password | `first.login@toktickit.local` | The only account that is forced to set a new password at first sign-in |
+| IT Staff | `nattapong.it@toktickit.local`, `siriporn.it@toktickit.local`, `thanakorn.it@toktickit.local` | |
+| IT Staff, inactive | `prasert.it@toktickit.local` | Still owns a ticket, which shows that ownership survives deactivation |
+| Administrator | `malee.admin@toktickit.local`, `kittisak.admin@toktickit.local` | Two, so the last-Administrator rule can be tested |
+
+The seed also creates 16 sample tickets — two in each of the eight statuses —
+with Public Comments and Internal Notes.
+
+**The seed converges.** Every run puts each account above back to this password
+and its documented must-change setting, and resets the sample tickets' status,
+owner, and priorities. Running it after a demo or an E2E run therefore restores
+the documented state. Accounts you create yourself and tickets you raise through
+the app are never touched.
+
+> **Upgrading a Lab 2 database:** `prisma migrate deploy` renames
+> `RequesterUser` to `User` in place, so existing tickets and attachments keep
+> their Requesters. Migrated accounts have **no password** until the seed runs —
+> run `npm run prisma:seed` straight after migrating.
+>
+> The server container keeps `node_modules` in its own volume, so after pulling
+> Lab 3 it still has the Lab 2 Prisma client and answers `500`. Refresh it once:
+>
+> ```bash
+> docker compose exec server npm install
+> docker compose exec server npx prisma generate
+> docker compose exec server npx prisma migrate deploy
+> docker compose exec server npm run prisma:seed
+> docker compose restart server
+> ```
+>
+> The client container's Vite server does not always see file changes made on a
+> Windows host, so after pulling, restart it as well (`docker compose restart
+> client`) or the browser keeps getting the previous screens.
+
 ---
 
 ## API
 
-Every requester-scoped endpoint requires the current Development Requester in an
-`X-Requester-Id` header. Identity is never read from a request body or query
-string, and a ticket or attachment belonging to another Requester returns `404` —
-the same answer as one that does not exist, so the API never discloses it.
+Every endpoint except login, logout, and health requires a signed-in session
+(the `tt_sid` cookie below); without one it answers `401 AUTH_REQUIRED`. The
+Requester endpoints act for the session's user only. Identity is never read from
+a request body, query string, or header — Lab 2's `X-Requester-Id` is ignored —
+and a ticket or attachment belonging to another Requester returns `404`, the same
+answer as one that does not exist, so the API never discloses it. IT Staff and
+Administrators get `403` from the Requester endpoints: they have no tickets of
+their own.
 
-| Method | Endpoint | Requester context | Description |
+### Authentication (Lab 3)
+
+Signing in sets an `HttpOnly`, `SameSite=Lax` cookie named `tt_sid` that lasts 8
+hours. The server keeps only a SHA-256 of it, so logging out deletes the session
+for real. There is no signing secret to configure. The full contract is in
+[`docs/lab-03/api-spec.md`](docs/lab-03/api-spec.md) §2.
+
+| Method | Endpoint | Session | Description |
+|--------|----------|:--:|-------------|
+| POST | `/api/auth/login` | — | Sign in with email and password; sets the session cookie |
+| POST | `/api/auth/logout` | optional | End the session; harmless without one |
+| GET | `/api/auth/me` | ✔ | The signed-in user |
+| POST | `/api/auth/password` | ✔ | Change the password (8–72 characters, at most 72 bytes) |
+
+While an account must change its password, its session can reach only these
+four endpoints and `/api/health`; everything else answers
+`403 PASSWORD_CHANGE_REQUIRED`.
+
+Five failed sign-ins for one email within 15 minutes lock that email for 15
+minutes: every attempt, the correct password included, answers
+`429 TOO_MANY_ATTEMPTS` with a `Retry-After` header. Emails with no account are
+locked the same way, so a lock reveals nothing. The counter lives in the server's
+memory, so **restarting the server clears every lock**, which is also the quickest
+way out if you lock yourself out while testing.
+
+The browser client runs on another port, so the API names the allowed origins
+instead of answering `*`; a cookie is never sent to a wildcard. The default is
+Vite's `http://localhost:5173`. Set `CLIENT_ORIGINS` (comma-separated) in
+`server/.env` to replace it, for example for an E2E stack on different ports.
+Open the app on the same host name the API uses — `localhost` for both, or
+`127.0.0.1` for both. Across the two, the browser treats the request as
+cross-site and never sends the session cookie, so sign-in fails.
+
+### Lab 2 endpoints
+
+| Method | Endpoint | Session | Description |
 |--------|----------|:--:|-------------|
 | GET | `/api/health` | — | Backend health/liveness check |
-| GET | `/api/categories` | — | Active ticket categories |
-| GET | `/api/related-systems` | — | Active related systems |
-| GET | `/api/requesters` | — | Active Development Requesters for the selector |
-| POST | `/api/tickets` | ✔ | Create one validated ticket; the server generates the Ticket Number |
-| GET | `/api/tickets` | ✔ | The requester's tickets, with search, filters, sorting, and pagination |
-| GET | `/api/tickets/:id` | ✔ | One owned ticket, with its attachments |
-| POST | `/api/tickets/:id/attachments` | ✔ | Upload one permitted file (JPG/JPEG/PNG/WEBP/PDF, ≤ 5 MB, 5 active max) |
-| GET | `/api/tickets/:id/attachments` | ✔ | Attachment metadata, active and removed |
-| GET | `/api/attachments/:id/download` | ✔ | Download an active attachment |
-| PATCH | `/api/attachments/:id/remove` | ✔ | Soft-remove an attachment, with a required reason |
+| GET | `/api/categories` | any role | Active ticket categories |
+| GET | `/api/related-systems` | any role | Active related systems |
+| POST | `/api/tickets` | Requester | Create one validated ticket; the server generates the Ticket Number |
+| GET | `/api/tickets` | Requester | The signed-in Requester's tickets, with search, filters (any of the eight statuses), sorting, and pagination |
+| GET | `/api/tickets/:id` | Requester | One owned ticket, with its attachments |
+| POST | `/api/tickets/:id/attachments` | Requester | Upload one permitted file (JPG/JPEG/PNG/WEBP/PDF, ≤ 5 MB, 5 active max) |
+| GET | `/api/tickets/:id/attachments` | Requester | Attachment metadata, active and removed |
+| GET | `/api/attachments/:id/download` | Requester | Download an active attachment |
+| PATCH | `/api/attachments/:id/remove` | Requester | Soft-remove an attachment, with a required reason |
+| GET, POST | `/api/tickets/:id/comments` | Requester (own), IT Staff, Administrator | Public Comments — read the thread, or post 1–2000 characters (Lab 3) |
+| GET, POST | `/api/tickets/:id/notes` | IT Staff, Administrator | Internal Notes; a Requester gets `403` and learns nothing about them (Lab 3) |
+| PATCH | `/api/tickets/:id/appears-resolved` | Requester (own) | Set the "Problem Appears Resolved" signal with a 5–2000 character comment, or clear it; never changes the status (Lab 3) |
 
 ```bash
 curl http://localhost:3000/api/health
 # {"status":"ok","service":"TokTickIT API"}
 
-curl http://localhost:3000/api/requesters
-# [{"id":1,"fullName":"Anucha Wongsawat","email":"…","department":"Civil Engineering"}, …]
+# Sign in once, keeping the session cookie in a jar, then use it.
+curl -c jar.txt -H "Content-Type: application/json" \
+  -d '{"email":"anucha.wong@kmutt.ac.th","password":"Toktickit#2026"}' \
+  http://localhost:3000/api/auth/login
+curl -b jar.txt http://localhost:3000/api/tickets
+# {"data":[ … ],"meta":{"page":1,"pageSize":10,"totalItems":…,"totalPages":…,…}}
 
-curl http://localhost:3000/api/tickets -H "X-Requester-Id: 1"
-# {"data":[ … ],"meta":{"page":1,"pageSize":10,"totalItems":0,"totalPages":0,…}}
+curl http://localhost:3000/api/tickets
+# {"error":{"code":"AUTH_REQUIRED","message":"Sign in to continue."}}
 ```
 
+### IT Staff endpoints (Lab 3)
+
+IT Staff only; a Requester or an Administrator gets `403 FORBIDDEN` (BR-19).
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/staff/tickets` | The shared queue of every Requester's tickets: search, filters (status, IT Priority, category, owner), sorting, pagination |
+| GET | `/api/staff/tickets/:id` | One ticket, with its attachments and the status moves the BR-33 matrix permits from here |
+| PATCH | `/api/staff/tickets/:id/owner` | Claim, reassign, or unassign; claiming a `NEW` ticket also moves it to `OPEN` |
+| PATCH | `/api/staff/tickets/:id/it-priority` | Change IT Priority; Requested Priority is never touched |
+| PATCH | `/api/staff/tickets/:id/status` | A permitted status move; Resolved, Cancelled, and Reopened need a reason, posted as a Public Comment |
+| GET | `/api/staff/attachments/:id/download` | Download an active attachment of any ticket |
+| GET | `/api/staff/assignable-users` | Active IT Staff and Administrators, for the owner filter and picker |
+
+### Administrator endpoints (Lab 3)
+
+Administrator only; everyone else gets `403 FORBIDDEN`. There is no delete:
+deactivation is the only removal (BR-50).
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/admin/users` | Every user, searched by name or email and filtered by one role |
+| POST | `/api/admin/users` | Create a user with one role and an initial password, to be changed at first sign-in |
+| PATCH | `/api/admin/users/:id` | Edit name, email, role, or activation; never your own role or activation, never the last active Administrator |
+| POST | `/api/admin/users/:id/initial-password` | Issue a new initial password; signs the user out everywhere |
+
 The full contract — request and response shapes, query parameters, error codes,
-and status codes — is in [`docs/lab-02/api-spec.md`](docs/lab-02/api-spec.md).
+and status codes — is in [`docs/lab-02/api-spec.md`](docs/lab-02/api-spec.md),
+with the Lab 3 changes and additions in [`docs/lab-03/api-spec.md`](docs/lab-03/api-spec.md).
 
 ---
 
@@ -191,8 +330,9 @@ npm run dev             # http://localhost:5173
 ## Testing
 
 The suite runs at six levels: unit, API, UI component, UI style, responsive, and
-end-to-end. Current totals and the full runner output are recorded in
-[`docs/lab-02/tests.md`](docs/lab-02/tests.md).
+end-to-end, with every lab's tests kept and still passing. Current totals and the
+full runner output are recorded in [`docs/lab-03/tests.md`](docs/lab-03/tests.md)
+§6 (Lab 2's in [`docs/lab-02/tests.md`](docs/lab-02/tests.md)).
 
 ### Backend — unit and API
 
@@ -230,27 +370,50 @@ docker compose up -d
 docker exec toktickit-server npx prisma migrate deploy
 docker exec toktickit-server npm run prisma:seed
 npx playwright install chromium   # first run only
-npx playwright test --reporter=list
+npx playwright test --reporter=list            # Lab 2 and Lab 3
+npx playwright test e2e/lab-03 --reporter=list # Lab 3 only
 ```
 
-The suite selects a Requester and picks a Category and Related System from the
-dropdowns, so it fails on an unseeded database with nothing to select.
-Screenshots are written to `artifacts/lab-02/screenshots/`. Point the suite at a
-stack on non-default ports with `E2E_BASE_URL` and `E2E_API_URL`.
+The suites sign in as the seeded accounts and pick a Category and Related System
+from the database, so they fail on an unseeded one. Lab 2's screenshots are
+written to `artifacts/lab-02/screenshots/`, and Lab 3's to
+`artifacts/lab-03/screenshots/<area>/<shot>-<desktop|tablet|mobile>.png` at
+1440, 820, and 390 px. Both sets are committed evidence, so restore them with
+`git checkout -- artifacts` after a run you do not mean to keep. Point the
+suites at a stack on non-default ports with `E2E_BASE_URL` and `E2E_API_URL`.
+
+> If the stack was already running when you switched branches, restart it first
+> (`docker compose restart server client`): on a Windows host the containers do
+> not always see file changes, and a stale screen fails the E2E suites.
+
+The Lab 3 suites also create user accounts, under `e2e.*@example.test`. Users
+cannot be deleted (BR-50), so each spec **deactivates** the accounts it created
+when it ends, even after a failure. Deactivated, they are never picked as
+fixtures by the API suites. To start again from a clean database instead, run
+`docker exec toktickit-server npx prisma migrate reset --force`, which recreates
+it from the migrations and the seed.
 
 The E2E suite creates tickets it cannot delete — Lab 2 exposes no delete
-endpoint by design. Reset afterwards with:
+endpoint by design. Note the highest ticket id **before** the run, then delete
+only what came after it:
 
 ```bash
-docker exec toktickit-db psql -U toktickit -d toktickit -c 'DELETE FROM "Ticket";'
+docker exec toktickit-db psql -U toktickit -d toktickit -c 'SELECT max(id) FROM "Ticket";'   # before the run, e.g. 2351
+# ... run the E2E suite ...
+docker exec toktickit-db psql -U toktickit -d toktickit -c 'DELETE FROM "Ticket" WHERE id > 2351;'
 ```
 
-> This deletes **every** ticket, including any you created by hand in the
-> running app. The suite prints the ids it created, but that line is printed
-> before the responsive spec has finished creating its own, so it is not the
-> full list. To keep tickets of your own, delete by id range instead and remove
-> the matching files from `/app/uploads` in the server container — the cascade
-> clears the `Attachment` rows but not the uploaded files.
+> **Since Lab 3, never run `DELETE FROM "Ticket";`.** Lab 2's instructions used
+> it when the suite's tickets were the only ones in the database. The database
+> now also holds the tickets migrated from Lab 2 and the 16 sample tickets the
+> seed creates, and a blanket delete removes all of them. Re-running the seed
+> brings the sample tickets back; only a backup brings back the migrated ones.
+>
+> The suite prints the ids it created, but that line is printed before the
+> responsive spec has finished creating its own, so it is not the full list,
+> which is why the reset uses the id noted before the run. The cascade clears the
+> `Attachment` rows but not the uploaded files; remove those from `/app/uploads`
+> in the server container.
 
 ### Everything
 
@@ -263,8 +426,8 @@ docker exec toktickit-server npx vitest run --reporter=verbose
 npx playwright test --reporter=list
 ```
 
-Test files live under `server/tests/lab-02/`, `client/tests/lab-02/`, and
-`e2e/lab-02/`. Lab 1's suites remain under `*/tests/lab-01/` and still pass.
+Test files live under `server/tests/lab-0{1,2,3}/`, `client/tests/lab-0{1,2,3}/`,
+and `e2e/lab-0{2,3}/`. Every earlier lab's suites still pass.
 
 ---
 
@@ -277,11 +440,14 @@ PostgreSQL via `DATABASE_URL`.
 
 | Model | Purpose |
 |-------|---------|
-| `RequesterUser` | The temporary Lab 2 Development Requester. No password, role, or session column — it is a testing identity, not an account. |
+| `User` | Every account — Requester, IT Staff, or Administrator — with a bcrypt password hash and a role. Lab 2's `RequesterUser`, renamed in place by the Lab 3 migration. |
+| `Session` | A signed-in session: only the SHA-256 of the cookie token is stored, with its expiry (Lab 3) |
 | `Category` | Ticket classification (from Lab 1; Lab 2 adds `isActive`) |
 | `RelatedSystem` | The service, application, device, or platform a ticket is about |
-| `Ticket` | Unique backend-generated `ticketNumber`, `NEW` status, and foreign keys to requester, category, and related system |
+| `Ticket` | Unique backend-generated `ticketNumber`; one of eight statuses; Requested Priority and a separate IT Priority; an optional owner (Lab 3); foreign keys to requester, category, and related system |
 | `Attachment` | Upload metadata plus the soft-removal columns |
+| `PublicComment` | The conversation the Requester and IT Staff share (Lab 3) |
+| `InternalNote` | IT Staff and Administrator notes, in their own table so no Requester query can reach them (Lab 3) |
 
 Soft removal is a single nullable `removedAt` timestamp rather than a boolean
 plus a date, so `removedAt IS NULL` *is* the definition of active and the two
@@ -295,7 +461,7 @@ running it repeatedly never creates duplicates:
 
 - 4 ticket categories — Account and Access, Hardware, Software, Network
 - 7 related systems — Email, Campus Wi-Fi, VPN, LEB2 App, Grade Submission App, Printer, Corporate Laptop
-- 4 **active** Development Requesters, plus 1 **inactive** one that must never appear in the selector
+- the seeded accounts listed above, including 1 **inactive** Requester that cannot sign in
 
 ### Migrate & seed (via Docker)
 
@@ -331,3 +497,9 @@ npm run prisma:seed               # seed data
 | [`docs/lab-02/api-spec.md`](docs/lab-02/api-spec.md) | REST contract, error envelope, status codes |
 | [`docs/lab-02/reviewer.md`](docs/lab-02/reviewer.md) | Peer review record — approvals, comments, and responses |
 | [`docs/lab-02/ai-use.md`](docs/lab-02/ai-use.md) | AI use, key prompts, and reflection |
+| [`docs/lab-03/specification.md`](docs/lab-03/specification.md) | Lab 3 scope, FR/BR, the authorization matrix and status lifecycle, data and migration design, AC-01…AC-40, decisions D-01…D-27 |
+| [`docs/lab-03/tests.md`](docs/lab-03/tests.md) | Lab 3 test plan, AC traceability, visual checklist, commands, final results, and known limitations |
+| [`docs/lab-03/ui-spec.md`](docs/lab-03/ui-spec.md) | The Lab 3 screens, role navigation, badges, the internal region, and screenshot paths |
+| [`docs/lab-03/api-spec.md`](docs/lab-03/api-spec.md) | Lab 3 contract: sessions, roles, error codes, the staff and admin endpoints |
+| [`docs/lab-03/reviewer.md`](docs/lab-03/reviewer.md) | Lab 3 peer review record, both directions, quoted from GitHub |
+| [`docs/lab-03/ai-use.md`](docs/lab-03/ai-use.md) | Lab 3 AI use, key prompts, and reflection |

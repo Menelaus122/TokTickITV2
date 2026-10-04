@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
+import { endTestSessions, signInAll } from "../helpers/signIn.js";
 
 // API-10 to API-15 — GET /api/tickets.
 //
@@ -9,6 +10,14 @@ import { getPrisma } from "../../src/prisma.js";
 // them in afterAll so the database is left as it was found.
 
 const prisma = getPrisma();
+
+// Lab 3, Issue 6 — each Requester signs in; the session is the identity.
+let cookies = new Map<number, string>();
+function cookieOf(requesterId: number | string): string {
+  const cookie = cookies.get(Number(requesterId));
+  if (!cookie) throw new Error(`no session for requester ${requesterId}`);
+  return cookie;
+}
 
 let requesterA: number;
 let requesterB: number;
@@ -22,18 +31,18 @@ const A_COUNT = 12;
 
 function list(requesterId: number | null, query = "") {
   const req = request(app).get(`/api/tickets${query}`);
-  if (requesterId !== null) req.set("X-Requester-Id", String(requesterId));
+  if (requesterId !== null) req.set("Cookie", cookieOf(requesterId));
   return req;
 }
 
 beforeAll(async () => {
-  const [a, b] = await prisma.requesterUser.findMany({
-    where: { isActive: true },
+  const [a, b] = await prisma.user.findMany({
+    where: { isActive: true, role: "REQUESTER" },
     orderBy: { id: "asc" },
     take: 2,
   });
   const categories = await prisma.category.findMany({ where: { isActive: true }, take: 2 });
-  const system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true } });
+  const system = await prisma.relatedSystem.findFirstOrThrow({ where: { isActive: true }, orderBy: { id: "asc" } });
 
   requesterA = a.id;
   requesterB = b.id;
@@ -53,6 +62,7 @@ beforeAll(async () => {
         summary: i === 0 ? "Laptop battery drains quickly" : `Seeded list ticket ${i}`,
         description: "Created by the my-tickets API test suite for list behaviour.",
         requestedPriority: i % 2 === 0 ? "MEDIUM" : "HIGH",
+        itPriority: i % 2 === 0 ? "MEDIUM" : "HIGH",
       },
     });
     createdIds.push(ticket.id);
@@ -67,13 +77,17 @@ beforeAll(async () => {
       summary: "Requester B private ticket",
       description: "This row must never appear in requester A's list.",
       requestedPriority: "URGENT",
+      itPriority: "URGENT",
     },
   });
   createdIds.push(bTicket.id);
+
+  cookies = await signInAll(requesterA, requesterB);
 });
 
 afterAll(async () => {
   await prisma.ticket.deleteMany({ where: { id: { in: createdIds } } });
+  await endTestSessions();
   await prisma.$disconnect();
 });
 
@@ -120,10 +134,10 @@ describe("ownership scoping", () => {
     }
   });
 
-  it("refuses a request with no requester context", async () => {
+  it("refuses a request with no session", async () => {
     const res = await list(null);
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe("REQUESTER_CONTEXT_REQUIRED");
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe("AUTH_REQUIRED");
   });
 });
 
@@ -206,7 +220,7 @@ describe("search", () => {
   });
 
   it("matches the ticket number", async () => {
-    const anyTicket = await prisma.ticket.findFirstOrThrow({ where: { requesterId: requesterA } });
+    const anyTicket = await prisma.ticket.findFirstOrThrow({ where: { requesterId: requesterA }, orderBy: { id: "asc" } });
     const res = await list(requesterA, `?search=${anyTicket.ticketNumber}`);
 
     expect(res.body.data.map((t: { id: number }) => t.id)).toContain(anyTicket.id);
@@ -217,6 +231,15 @@ describe("search", () => {
     const blank = await list(requesterA, "?search=%20%20&pageSize=50");
 
     expect(blank.body.meta.totalItems).toBe(all.body.meta.totalItems);
+  });
+
+  it("matches % and _ literally, not as wildcards", async () => {
+    const own = await prisma.ticket.findMany({ where: { requesterId: requesterA }, select: { summary: true, ticketNumber: true } });
+    for (const char of ["%", "_"]) {
+      const expected = own.filter((t) => t.summary.includes(char) || t.ticketNumber.includes(char)).length;
+      const res = await list(requesterA, `?search=${encodeURIComponent(char)}&pageSize=50`);
+      expect(res.body.meta.totalItems, char).toBe(expected);
+    }
   });
 
   it("cannot reach another requester's ticket through search", async () => {
@@ -296,6 +319,14 @@ describe("invalid queries", () => {
   it("rejects page 0", async () => {
     const res = await list(requesterA, "?page=0");
     expect(res.status).toBe(400);
+  });
+
+  it("rejects ids and pages beyond the database's integer range, and a NUL in search, instead of a 500", async () => {
+    for (const query of ["?categoryId=9999999999", "?relatedSystemId=9999999999", "?page=99999999999999999999", "?search=a%00b"]) {
+      const res = await list(requesterA, query);
+      expect(res.status, query).toBe(400);
+      expect(res.body.error.code).toBe("INVALID_QUERY");
+    }
   });
 
   it("rejects an unknown priority", async () => {

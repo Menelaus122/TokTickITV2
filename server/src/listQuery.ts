@@ -1,4 +1,5 @@
 import { REQUESTED_PRIORITIES, type RequestedPriority } from "./validation.js";
+import { parseSearch, positiveId } from "./queryParams.js";
 
 // Query contract for GET /api/tickets (BR-18 to BR-24).
 //
@@ -17,7 +18,18 @@ export type SortField = (typeof SORTABLE_FIELDS)[number];
 export const SORT_DIRECTIONS = ["asc", "desc"] as const;
 export type SortDirection = (typeof SORT_DIRECTIONS)[number];
 
-export const TICKET_STATUSES = ["NEW"] as const;
+// Lab 3 tickets move through eight statuses, and a Requester's own list shows
+// every one of them, so the filter accepts them all (api-spec §1.5).
+export const TICKET_STATUSES = [
+  "NEW",
+  "OPEN",
+  "IN_PROGRESS",
+  "WAITING_FOR_REQUESTER",
+  "RESOLVED",
+  "CLOSED",
+  "REOPENED",
+  "CANCELLED",
+] as const;
 export type TicketStatus = (typeof TICKET_STATUSES)[number];
 
 export interface TicketListQuery {
@@ -39,13 +51,13 @@ export type ParseResult =
 type RawQuery = Record<string, unknown>;
 
 /** Express gives repeated params as arrays; only a lone string is meaningful. */
-function single(value: unknown): string | undefined {
+export function single(value: unknown): string | undefined {
   if (typeof value === "string") return value;
   if (Array.isArray(value) && value.length === 1 && typeof value[0] === "string") return value[0];
   return undefined;
 }
 
-function absent(value: unknown): boolean {
+export function absent(value: unknown): boolean {
   return value === undefined || value === null || value === "";
 }
 
@@ -53,20 +65,16 @@ export function parseTicketListQuery(raw: RawQuery): ParseResult {
   // --- search -------------------------------------------------------------
   // Trimmed; a term that is empty after trimming is ignored rather than
   // treated as a filter that matches nothing (BR-18).
-  const rawSearch = single(raw.search);
-  const trimmedSearch = rawSearch?.trim() ?? "";
-  const search = trimmedSearch.length > 0 ? trimmedSearch : null;
+  const parsedSearch = parseSearch("search", single(raw.search));
+  if (!parsedSearch.ok) return parsedSearch;
+  const search = parsedSearch.value;
 
   // --- id filters ---------------------------------------------------------
   function idFilter(name: string, value: unknown): number | null | { error: string } {
     if (absent(value)) return null;
     const text = single(value);
     if (text === undefined) return { error: `${name} must be a single value.` };
-    const parsed = Number(text);
-    if (!Number.isInteger(parsed) || parsed <= 0) {
-      return { error: `${name} must be a positive integer.` };
-    }
-    return parsed;
+    return positiveId(text) ?? { error: `${name} must be a positive integer.` };
   }
 
   const categoryId = idFilter("categoryId", raw.categoryId);
@@ -123,9 +131,8 @@ export function parseTicketListQuery(raw: RawQuery): ParseResult {
   // --- pagination ---------------------------------------------------------
   let page = DEFAULT_PAGE;
   if (!absent(raw.page)) {
-    const text = single(raw.page);
-    const parsed = text === undefined ? NaN : Number(text);
-    if (!Number.isInteger(parsed) || parsed < 1) {
+    const parsed = positiveId(single(raw.page));
+    if (parsed === null) {
       return { ok: false, message: "page must be an integer of 1 or more." };
     }
     page = parsed;
@@ -133,9 +140,8 @@ export function parseTicketListQuery(raw: RawQuery): ParseResult {
 
   let pageSize: number = DEFAULT_PAGE_SIZE;
   if (!absent(raw.pageSize)) {
-    const text = single(raw.pageSize);
-    const parsed = text === undefined ? NaN : Number(text);
-    if (!PERMITTED_PAGE_SIZES.includes(parsed as (typeof PERMITTED_PAGE_SIZES)[number])) {
+    const parsed = positiveId(single(raw.pageSize));
+    if (parsed === null || !PERMITTED_PAGE_SIZES.includes(parsed as (typeof PERMITTED_PAGE_SIZES)[number])) {
       return { ok: false, message: `pageSize must be one of ${PERMITTED_PAGE_SIZES.join(", ")}.` };
     }
     pageSize = parsed;

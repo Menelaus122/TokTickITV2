@@ -17,6 +17,8 @@ server/prisma/*.db
 docs/lab-02/Lab_02_labsheet.md
 docs/lab-02/TokTickIT_GitHub_Workflow_Guide_TH_EN.md
 docs/lab-02/MyIssue.md
+docs/lab-03/labsheet/
+docs/lab-03/MyIssue.md
 
 # uploaded attachment files (metadata lives in PostgreSQL)
 server/uploads/
@@ -26,6 +28,14 @@ server/uploads/
 client/src/**/*.js
 client/tests/**/*.js
 
-# Playwright traces and failure screenshots (the checklist screenshots are kept)
+# Playwright traces and failure screenshots, for Lab 2's and Lab 3's suites
+# alike (playwright.config.ts outputDir); the checklist screenshots under
+# artifacts/lab-0*/screenshots/ are kept.
 artifacts/lab-02/playwright-output/
 playwright-report/
+test-results/
+
+# submission working documents (the PDF is the deliverable, not its source .docx)
+docs/lab-02/*.docx
+docs/lab-03/*.docx
+~$*.docx
