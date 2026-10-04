@@ -142,6 +142,21 @@ for (const viewport of VIEWPORT_NAMES) {
       await shoot(page, "staff-queue", width < 768 ? "mobile-card-list" : "populated", viewport);
 
       if (width < 768) await page.getByRole("button", { name: "Filters" }).click();
+
+      // Every status badge stays inside its own cell; "Waiting for Requester",
+      // the longest, overlapped the owner column at 820px (found in Issue 12).
+      if (width >= 768) {
+        await page.getByLabel("Status").selectOption("WAITING_FOR_REQUESTER");
+        await expect(table.locator("tbody tr").first()).toContainText("Waiting for Requester");
+        const spills = await table.locator("td.tt-queue__col-5").evaluateAll((cells) =>
+          cells.filter((td) => {
+            const badge = td.querySelector(".tt-badge");
+            return badge && badge.getBoundingClientRect().right > td.getBoundingClientRect().right + 0.5;
+          }).length);
+        expect(spills, "status badges spilling out of their cell").toBe(0);
+        await page.getByLabel("Status").selectOption("");
+      }
+
       await page.getByLabel("Search number or summary").fill("printer");
       await expect(page.getByRole("link", { name: /^TT-/ }).filter({ visible: true }).first()).toBeVisible();
       await shoot(page, "staff-queue", "search", viewport);

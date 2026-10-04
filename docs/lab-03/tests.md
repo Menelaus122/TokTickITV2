@@ -79,10 +79,10 @@ Principles carried over from Lab 2:
 | API-14 | AC-01 | expired session | 401 `AUTH_REQUIRED` (BR-11) | 3 | Pass |
 | API-67 | BR-66 | login as a user whose `passwordHash` is null | 401 `INVALID_CREDENTIALS`, identical to a wrong password, no session created | 3 | Pass |
 | API-69 | AC-40 | five wrong passwords, then the correct one (`login-throttle.api.test.ts`) | 429 `TOO_MANY_ATTEMPTS` with `Retry-After` of about 15 minutes; no cookie, no session (BR-67) | 13 | Pass |
-| API-70 | AC-40 | the same against an email with no account | the same 429 body and `Retry-After` as a real email, so a lock reveals nothing (BR-16) | 13 | Pass |
-| API-71 | AC-40 | one email locked while another signs in; four failures, a success, four more; mixed-case spellings | only the locked email is refused; a success clears the count; spellings share one count (BR-45) | 13 | Pass |
-| API-73 | AC-40 | twenty wrong passwords at once, and nineteen wrong plus the correct one at once, with `Promise.all` | at most five passwords evaluated (401 or 201), the rest 429, and a session only if the correct one was among the five (BR-67) | 13 | Pass |
-| API-72 | BR-67 | six malformed requests, then six correct passwords for an inactive account | never 429: validation errors and an inactive account's correct password are not counted | 13 | Pass |
+| API-70 | AC-40 | the same against an email with no account (`login-throttle.api.test.ts`) | the same 429 body and `Retry-After` as a real email, so a lock reveals nothing (BR-16) | 13 | Pass |
+| API-71 | AC-40 | one email locked while another signs in; four failures, a success, four more; mixed-case spellings (`login-throttle.api.test.ts`) | only the locked email is refused; a success clears the count; spellings share one count (BR-45) | 13 | Pass |
+| API-73 | AC-40 | twenty wrong passwords at once, and nineteen wrong plus the correct one at once, with `Promise.all` (`login-throttle.api.test.ts`) | at most five passwords evaluated (401 or 201), the rest 429, and a session only if the correct one was among the five (BR-67) | 13 | Pass |
+| API-72 | BR-67 | six malformed requests, then six correct passwords for an inactive account (`login-throttle.api.test.ts`) | never 429: validation errors and an inactive account's correct password are not counted | 13 | Pass |
 
 ### 2.3 API — authorization, `server/tests/lab-03/authorization.api.test.ts`
 
@@ -95,7 +95,7 @@ Principles carried over from Lab 2:
 | SEC-05 | AC-08 | Requester reads and posts Internal Notes | 403, no note body, author, or count anywhere in the response | 7 | Pass |
 | SEC-06 | AC-11 | Requester opens another Requester's ticket, attachment list, upload, download, and removal | 404 on every route, identical to a nonexistent id. Comments are covered by API-23 when Issue 7 adds them | 4 | Pass |
 | SEC-07 | AC-07 | body carries another user's `requesterId`; header carries `X-Requester-Id` | both ignored, session identity used, no cross-Requester data returned | 4, 6 | Pass |
-| SEC-08 | AC-07 | `POST /api/tickets` with a body `ticketNumber` and `currentStatus` | both ignored, backend values win (Lab 2 BR-01) | 6 | Pass |
+| SEC-08 | AC-07 | `POST /api/tickets` with a body `ticketNumber` and `currentStatus` (`requester-regression.api.test.ts`) | both ignored, backend values win (Lab 2 BR-01) | 6 | Pass |
 | SEC-09 | AC-10 | guard order: no session **and** wrong role | 401 wins over 403 (api-spec §7) | 4 | Pass |
 | SEC-10 | AC-28 | every user-carrying response across the whole API | no `passwordHash`, no `tokenHash`, no `initialPassword` field (BR-52) | 4, 10 | Pass |
 | SEC-11 | BR-65 | `POST`, `PATCH`, and a `multipart/form-data` upload carrying a foreign `Origin` header | 403 `FORBIDDEN` before the handler runs; the same requests with the configured origin, and a `GET` with a foreign origin, succeed | 4 | Pass |
@@ -193,7 +193,7 @@ not the JSON-body message. The Lab 2 suites sign in through
 | MIG-02 | AC-35 | `itPriority` on every pre-existing ticket | equals `requestedPriority` (BR-63) | 2 | Pass |
 | MIG-03 | AC-35 | migrated Requesters immediately after the migration, before the seed | role `REQUESTER`, `mustChangePassword` true, `passwordHash` null (BR-61, D-22) | 2 | Pass |
 | MIG-04 | AC-35 | ids preserved across the rename | every `Ticket.requesterId` still resolves (BR-60) | 2 | Pass |
-| MIG-05 | AC-36 | Lab 1 and Lab 2 suites after migration | all pass (BR-64), each signing in through `POST /api/auth/login` instead of sending `X-Requester-Id` | 6 | Pass |
+| MIG-05 | AC-36 | Lab 1 and Lab 2 suites after migration: `server/tests/lab-01/`, `server/tests/lab-02/`, `client/tests/lab-01/`, `client/tests/lab-02/`, `e2e/lab-02/` | all pass (BR-64), each signing in through `POST /api/auth/login` instead of sending `X-Requester-Id` | 6 | Pass |
 | MIG-06 | BR-61 | seed run twice | the database is identical after the second run, every column of users, tickets, comments, notes, and sessions included — timestamps too, so no row is rewritten when nothing drifted (labsheet §5.3) | 2 | Pass |
 | MIG-07 | §7.5 | seed account counts, ticket spread, and timeline | ≥ 4 active Requesters + 1 inactive, ≥ 3 active IT Staff + 1 inactive, ≥ 2 active Administrators; tickets in all 8 statuses and 4 priorities; each seeded ticket's Last Updated follows its own seeded history and is never the moment the seed ran | 2 | Pass |
 | MIG-08 | D-22 | migrated Requester after the migration but before the seed, then after it | before: `passwordHash` null, so the documented password cannot verify (BR-66) — the login endpoint's own answer is API-67 in Issue 3; after: the documented password works with no forced change, and `first.login@toktickit.local` is the only seeded account that must change (BR-61, §7.5) | 2 | Pass |
@@ -339,7 +339,7 @@ alone.
 | 7 — Comments and notes | API-19 – API-29, SEC-05, UI-10, UI-11 |
 | 8 — Ticket Queue | UNIT-09, UNIT-10, API-30 – API-39, UI-12 – UI-14 |
 | 9 — Staff Ticket Detail | UNIT-06 – UNIT-08, API-40 – API-52, API-68, UI-15 – UI-19, STYLE-03, STYLE-07 |
-| 10 — User Management | API-53 – API-66, UI-20 – UI-25 |
+| 10 — User Management | UNIT-15, API-53 – API-66, UI-20 – UI-25 |
 | 11 — E2E and visual evidence | RESP-01 – RESP-06, E2E-01 – E2E-10, STYLE-01, STYLE-02, STYLE-04 – STYLE-06 |
 | 13 — Login attempt throttling | UNIT-11 – UNIT-14, API-69 – API-73 |
 

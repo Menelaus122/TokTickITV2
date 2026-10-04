@@ -1,9 +1,12 @@
 # TokTickIT
 
-An IT Service Desk application, built up over a series of issues across two labs.
-Lab 2 delivers the Requester-facing ticketing experience: choose a Development
-Requester, create a ticket with attachments, find it again in My Tickets, and
-manage its attachments from Ticket Detail.
+An IT Service Desk application, built up over a series of issues across three labs.
+Lab 2 delivered the Requester-facing ticketing experience: create a ticket with
+attachments, find it again in My Tickets, and manage its attachments from Ticket
+Detail. Lab 3 adds real users and roles: sign-in with a forced first password
+change, Public Comments and Internal Notes, an IT Staff queue and ticket detail
+for claiming, prioritising, and resolving tickets, and Administrator user
+management.
 
 - **Frontend** — React + TypeScript + Vite, React Router, Bootstrap layout with a Zen Green theme
 - **Backend** — Node.js + Express + TypeScript, Multer for uploads
@@ -34,6 +37,22 @@ manage its attachments from Ticket Detail.
 - [x] **Issue 10** — Create Ticket completion (attachments, success state, Cancel)
 - [x] **Issue 11** — Staging integration, documentation, and delivery
 
+**Lab 3 — users, roles, IT Staff ticketing, and administration**
+
+- [x] **Issue 1** — Sprint 3 engineering contract (specification, tests, UI spec, API spec)
+- [x] **Issue 2** — User model, Lab 2 migration, and seed
+- [x] **Issue 3** — Authentication API (sign-in, sign-out, current user, password change)
+- [x] **Issue 13** — Login attempt throttling
+- [x] **Issue 4** — Authorization and safe errors
+- [x] **Issue 5** — Login, mandatory password change, and app shell
+- [x] **Issue 6** — Requester regression on the authenticated identity
+- [x] **Issue 7** — Public Comments and Internal Notes
+- [x] **Issue 8** — IT Staff Ticket Queue
+- [x] **Issue 9** — IT Staff Ticket Detail operations
+- [x] **Issue 10** — Administrator User Management
+- [x] **Issue 11** — E2E suite and visual inspection evidence
+- [ ] **Issue 12** — Staging integration, documentation, and delivery
+
 > **Note on Lab 2 authentication.** Lab 2 had none, by design: a Development
 > Requester selector stood in for login. Lab 3 replaced it with real sign-in;
 > since Lab 3 Issue 6 the selector, its `X-Requester-Id` header, and
@@ -45,16 +64,18 @@ manage its attachments from Ticket Detail.
 ```
 .
 ├── client/              # React + TS + Vite frontend
-│   ├── src/components/  # Zen Green UI foundation (form, buttons, badges, states)
-│   ├── src/screens/     # Requester Selection, Create Ticket, My Tickets, Ticket Detail
-│   └── tests/lab-02/    # UI component and UI style tests
+│   ├── src/components/  # Zen Green UI foundation (form, buttons, badges, states, shell, threads)
+│   ├── src/screens/     # Login, Change Password, the Requester screens, Ticket Queue,
+│   │                    # IT Staff Ticket Detail, User Management
+│   └── tests/lab-0{1,2,3}/  # UI component and UI style tests, per lab
 ├── server/              # Express + TS backend, Prisma schema & seed
-│   ├── src/             # routes plus pure modules: validation, ticket numbers, attachments
-│   └── tests/lab-02/    # unit and API tests
-├── e2e/lab-02/          # Playwright end-to-end and responsive suites
-├── artifacts/lab-02/    # screenshots for the visual checklist
+│   ├── src/             # routes plus pure modules: validation, query parsing, transitions, user rules
+│   └── tests/lab-0{1,2,3}/  # unit, API, authorization, and migration tests, per lab
+├── e2e/lab-0{2,3}/      # Playwright end-to-end and responsive suites
+├── artifacts/lab-0{2,3}/  # screenshots for each lab's visual checklist
 ├── docs/lab-01/         # Lab 1 documentation
 ├── docs/lab-02/         # Lab 2 specification, tests, UI spec, API spec, reviewer, AI use
+├── docs/lab-03/         # Lab 3 specification, tests, UI spec, API spec, reviewer, AI use
 ├── docker-compose.yml   # db + server + client dev stack
 └── README.md
 ```
@@ -219,9 +240,35 @@ curl http://localhost:3000/api/tickets
 # {"error":{"code":"AUTH_REQUIRED","message":"Sign in to continue."}}
 ```
 
+### IT Staff endpoints (Lab 3)
+
+IT Staff only; a Requester or an Administrator gets `403 FORBIDDEN` (BR-19).
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/staff/tickets` | The shared queue of every Requester's tickets: search, filters (status, IT Priority, category, owner), sorting, pagination |
+| GET | `/api/staff/tickets/:id` | One ticket, with its attachments and the status moves the BR-33 matrix permits from here |
+| PATCH | `/api/staff/tickets/:id/owner` | Claim, reassign, or unassign; claiming a `NEW` ticket also moves it to `OPEN` |
+| PATCH | `/api/staff/tickets/:id/it-priority` | Change IT Priority; Requested Priority is never touched |
+| PATCH | `/api/staff/tickets/:id/status` | A permitted status move; Resolved, Cancelled, and Reopened need a reason, posted as a Public Comment |
+| GET | `/api/staff/attachments/:id/download` | Download an active attachment of any ticket |
+| GET | `/api/staff/assignable-users` | Active IT Staff and Administrators, for the owner filter and picker |
+
+### Administrator endpoints (Lab 3)
+
+Administrator only; everyone else gets `403 FORBIDDEN`. There is no delete:
+deactivation is the only removal (BR-50).
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/admin/users` | Every user, searched by name or email and filtered by one role |
+| POST | `/api/admin/users` | Create a user with one role and an initial password, to be changed at first sign-in |
+| PATCH | `/api/admin/users/:id` | Edit name, email, role, or activation; never your own role or activation, never the last active Administrator |
+| POST | `/api/admin/users/:id/initial-password` | Issue a new initial password; signs the user out everywhere |
+
 The full contract — request and response shapes, query parameters, error codes,
 and status codes — is in [`docs/lab-02/api-spec.md`](docs/lab-02/api-spec.md),
-with the Lab 3 changes in [`docs/lab-03/api-spec.md`](docs/lab-03/api-spec.md) §3.
+with the Lab 3 changes and additions in [`docs/lab-03/api-spec.md`](docs/lab-03/api-spec.md).
 
 ---
 
@@ -283,8 +330,9 @@ npm run dev             # http://localhost:5173
 ## Testing
 
 The suite runs at six levels: unit, API, UI component, UI style, responsive, and
-end-to-end. Current totals and the full runner output are recorded in
-[`docs/lab-02/tests.md`](docs/lab-02/tests.md).
+end-to-end, with every lab's tests kept and still passing. Current totals and the
+full runner output are recorded in [`docs/lab-03/tests.md`](docs/lab-03/tests.md)
+§6 (Lab 2's in [`docs/lab-02/tests.md`](docs/lab-02/tests.md)).
 
 ### Backend — unit and API
 
@@ -322,13 +370,28 @@ docker compose up -d
 docker exec toktickit-server npx prisma migrate deploy
 docker exec toktickit-server npm run prisma:seed
 npx playwright install chromium   # first run only
-npx playwright test --reporter=list
+npx playwright test --reporter=list            # Lab 2 and Lab 3
+npx playwright test e2e/lab-03 --reporter=list # Lab 3 only
 ```
 
-The suite selects a Requester and picks a Category and Related System from the
-dropdowns, so it fails on an unseeded database with nothing to select.
-Screenshots are written to `artifacts/lab-02/screenshots/`. Point the suite at a
-stack on non-default ports with `E2E_BASE_URL` and `E2E_API_URL`.
+The suites sign in as the seeded accounts and pick a Category and Related System
+from the database, so they fail on an unseeded one. Lab 2's screenshots are
+written to `artifacts/lab-02/screenshots/`, and Lab 3's to
+`artifacts/lab-03/screenshots/<area>/<shot>-<desktop|tablet|mobile>.png` at
+1440, 820, and 390 px. Both sets are committed evidence, so restore them with
+`git checkout -- artifacts` after a run you do not mean to keep. Point the
+suites at a stack on non-default ports with `E2E_BASE_URL` and `E2E_API_URL`.
+
+> If the stack was already running when you switched branches, restart it first
+> (`docker compose restart server client`): on a Windows host the containers do
+> not always see file changes, and a stale screen fails the E2E suites.
+
+The Lab 3 suites also create user accounts, under `e2e.*@example.test`. Users
+cannot be deleted (BR-50), so each spec **deactivates** the accounts it created
+when it ends, even after a failure. Deactivated, they are never picked as
+fixtures by the API suites. To start again from a clean database instead, run
+`docker exec toktickit-server npx prisma migrate reset --force`, which recreates
+it from the migrations and the seed.
 
 The E2E suite creates tickets it cannot delete — Lab 2 exposes no delete
 endpoint by design. Note the highest ticket id **before** the run, then delete
@@ -363,8 +426,8 @@ docker exec toktickit-server npx vitest run --reporter=verbose
 npx playwright test --reporter=list
 ```
 
-Test files live under `server/tests/lab-02/`, `client/tests/lab-02/`, and
-`e2e/lab-02/`. Lab 1's suites remain under `*/tests/lab-01/` and still pass.
+Test files live under `server/tests/lab-0{1,2,3}/`, `client/tests/lab-0{1,2,3}/`,
+and `e2e/lab-0{2,3}/`. Every earlier lab's suites still pass.
 
 ---
 
@@ -378,10 +441,13 @@ PostgreSQL via `DATABASE_URL`.
 | Model | Purpose |
 |-------|---------|
 | `User` | Every account — Requester, IT Staff, or Administrator — with a bcrypt password hash and a role. Lab 2's `RequesterUser`, renamed in place by the Lab 3 migration. |
+| `Session` | A signed-in session: only the SHA-256 of the cookie token is stored, with its expiry (Lab 3) |
 | `Category` | Ticket classification (from Lab 1; Lab 2 adds `isActive`) |
 | `RelatedSystem` | The service, application, device, or platform a ticket is about |
-| `Ticket` | Unique backend-generated `ticketNumber`, `NEW` status, and foreign keys to requester, category, and related system |
+| `Ticket` | Unique backend-generated `ticketNumber`; one of eight statuses; Requested Priority and a separate IT Priority; an optional owner (Lab 3); foreign keys to requester, category, and related system |
 | `Attachment` | Upload metadata plus the soft-removal columns |
+| `PublicComment` | The conversation the Requester and IT Staff share (Lab 3) |
+| `InternalNote` | IT Staff and Administrator notes, in their own table so no Requester query can reach them (Lab 3) |
 
 Soft removal is a single nullable `removedAt` timestamp rather than a boolean
 plus a date, so `removedAt IS NULL` *is* the definition of active and the two
@@ -431,3 +497,9 @@ npm run prisma:seed               # seed data
 | [`docs/lab-02/api-spec.md`](docs/lab-02/api-spec.md) | REST contract, error envelope, status codes |
 | [`docs/lab-02/reviewer.md`](docs/lab-02/reviewer.md) | Peer review record — approvals, comments, and responses |
 | [`docs/lab-02/ai-use.md`](docs/lab-02/ai-use.md) | AI use, key prompts, and reflection |
+| [`docs/lab-03/specification.md`](docs/lab-03/specification.md) | Lab 3 scope, FR/BR, the authorization matrix and status lifecycle, data and migration design, AC-01…AC-40, decisions D-01…D-27 |
+| [`docs/lab-03/tests.md`](docs/lab-03/tests.md) | Lab 3 test plan, AC traceability, visual checklist, commands, final results, and known limitations |
+| [`docs/lab-03/ui-spec.md`](docs/lab-03/ui-spec.md) | The Lab 3 screens, role navigation, badges, the internal region, and screenshot paths |
+| [`docs/lab-03/api-spec.md`](docs/lab-03/api-spec.md) | Lab 3 contract: sessions, roles, error codes, the staff and admin endpoints |
+| [`docs/lab-03/reviewer.md`](docs/lab-03/reviewer.md) | Lab 3 peer review record, both directions, quoted from GitHub |
+| [`docs/lab-03/ai-use.md`](docs/lab-03/ai-use.md) | Lab 3 AI use, key prompts, and reflection |
