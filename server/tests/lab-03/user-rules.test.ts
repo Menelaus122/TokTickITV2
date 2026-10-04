@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { changeRefusal, checkUserFields } from "../../src/userRules.js";
 
-// Lab 3, Issue 10 — the Administrator's user rules as pure functions
-// (specification.md §5.7). The API suite proves them over HTTP; this one
-// reaches the BR-49 case that a single request cannot, because the caller is
-// itself an active Administrator.
+// Lab 3, Issue 10 — UNIT-15 in docs/lab-03/tests.md: the Administrator's user
+// rules as pure functions (specification.md §5.7). The API suite proves them
+// over HTTP; this one reaches the BR-49 case that a single request cannot,
+// because the caller is itself an active Administrator.
 
 describe("checkUserFields", () => {
   const valid = { fullName: "  New Person ", email: " New.Person@TokTickIT.local ", role: "IT_STAFF", isActive: true };

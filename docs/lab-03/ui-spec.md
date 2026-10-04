@@ -296,7 +296,7 @@ Public Comments use the same card as §5.2. Internal Notes use the §1.4 interna
 region: dashed left edge, `--tt-readonly-bg`, lock icon, and the caption
 "Internal — not visible to the Requester". The two composers are never adjacent;
 the Public Comments composer ends well above the Internal Notes heading, and the
-Internal Notes composer's button reads **Add internal note** while the public one
+Internal Notes composer's button reads **Post internal note** while the public one
 reads **Post comment**, so the two buttons never read alike (AC-39).
 
 ### 7.2 States
@@ -370,8 +370,8 @@ the disabled state is feedback, not the boundary.
 
 ### 8.5 States
 
-Loading skeleton rows, empty ("No users match this search"), no-results with
-**Clear search**, forbidden for a non-Administrator reaching the route, validation
+Loading skeleton rows, empty ("No users yet."), no-results ("No users match this
+search") with **Clear search**, forbidden for a non-Administrator reaching the route, validation
 beneath each field, success callout after create, edit, and password issue, and an
 API-failure callout with **Try again**.
 
@@ -399,9 +399,9 @@ covered by a test:
 | IT Staff Ticket Detail | view + edit per control | loading, not found, forbidden, validation, per-action busy, success, conflict, API failure |
 | User Management | view + create + edit | loading, empty, no-results, forbidden, validation, busy, success, conflict, API failure |
 
-A conflict is always shown as its own message, never as a generic failure: "This
-ticket was claimed by someone else", "That status change is not allowed from
-Resolved", "Another user already has that email."
+A conflict is always shown as its own message, never as a generic failure:
+"Someone else claimed this ticket first.", "A RESOLVED ticket cannot move to
+IN_PROGRESS.", "Another user already has this email."
 
 ---
 
@@ -412,9 +412,9 @@ Lab 2's rules carry over in full. Lab 3 adds:
 * The mandatory Change Password redirect moves focus to the page heading and
   announces the reason, so a screen-reader user is not silently relocated.
 * Every status, priority, and role badge has text; nothing is colour-only.
-* The Internal Notes region is a `<section>` with an `aria-label` repeating
-  "Internal, not visible to the Requester", so the restriction is announced and
-  not merely drawn.
+* The Internal Notes region is a `<section>` whose `aria-label`, "Internal Notes —
+  Internal — not visible to the Requester", repeats the caption, so the restriction
+  is announced and not merely drawn.
 * The queue table uses real `<th scope="col">` headers; the mobile card list uses
   a definition list per card rather than a table forced into one column.
 * Each row's open action is a real link to `/queue/:id`, so it works with keyboard
