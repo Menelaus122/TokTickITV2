@@ -1011,22 +1011,22 @@ Request — nothing was pushed directly to `lab3-staging` or `main`. (PR #33,
 > ### 🟠 Worth a decision: two input classes that answer 500 instead of 400
 > Neither is new in this PR; both go back to Lab 2 and Issue 3. But the new endpoints inherit them, and each is a one-place fix for every route.
 >
-> **1. Text Postgres can't store.** A NUL character (`\^@`) or a lone surrogate (`\ud800`) in any free-text field reaches Prisma, and Postgres refuses it:
+> **1. Text Postgres can't store.** A NUL character (`\u0000`) or a lone surrogate (`\ud800`) in any free-text field reaches Prisma, and Postgres refuses it:
 >
 > ```text
-> POST  /api/tickets/1/comments          {"body":"abc\^@def"}             -> 500 INTERNAL_ERROR
-> POST  /api/tickets/1/notes             {"body":"note\^@x"}  (IT Staff)  -> 500
+> POST  /api/tickets/1/comments          {"body":"abc\u0000def"}             -> 500 INTERNAL_ERROR
+> POST  /api/tickets/1/notes             {"body":"note\u0000x"}  (IT Staff)  -> 500
 > POST  /api/tickets/1/comments          {"body":"lone \ud800 surrogate"}    -> 500
-> PATCH /api/tickets/1/appears-resolved  comment with \^@                 -> 500
+> PATCH /api/tickets/1/appears-resolved  comment with \u0000                 -> 500
 > --- the same class, already on lab3-staging:
-> POST  /api/tickets                     summary with \^@ or \ud800       -> 500
+> POST  /api/tickets                     summary with \u0000 or \ud800       -> 500
 > GET   /api/tickets?search=a%00b                                            -> 500
-> POST  /api/auth/login                  email with \^@                   -> 500
+> POST  /api/auth/login                  email with \u0000                   -> 500
 > ```
 >
 > Nothing crashes, and no detail leaks. But these are the client's mistakes reported as server errors, like the 413/415 point on #53.
 >
-> → Suggestion: reject them once, at parse time. For example, give `express.json()` a `verify` step (or a reviver) that refuses any string containing `\^@` or an unpaired surrogate, with `400 VALIDATION_FAILED`. Have `listQuery` refuse the same in `search`.
+> → Suggestion: reject them once, at parse time. For example, give `express.json()` a `verify` step (or a reviver) that refuses any string containing `\u0000` or an unpaired surrogate, with `400 VALIDATION_FAILED`. Have `listQuery` refuse the same in `search`.
 >
 > **2. Route ids above Int32.** `routeId` has no upper bound, so a big id reaches an `Int` column, and Prisma throws:
 >
@@ -1338,7 +1338,7 @@ Request — nothing was pushed directly to `lab3-staging` or `main`. (PR #33,
 > - (b) **refuse the demotion** while the user owns any open ticket (`409`, "Reassign their tickets first"), which keeps BR-24's "owners are IT Staff or Administrators" true.
 >
 > ### 🟡 Minor (not blocking)
-> - **A NUL character in a new free-text field is a `500`:** `POST /api/admin/users` with `"fullName": "Bad\^@Name"` → `500 INTERNAL_ERROR`. This is the same class raised on #56, #57, and #58, now in brand-new input. Rather than another per-field fix, one `verify` step on `express.json()` that refuses `\^@` (and unpaired surrogates) with `400 VALIDATION_FAILED` would close it for every body at once. Please either do that, or open the tracking issue: it has now been raised four times without one.
+> - **A NUL character in a new free-text field is a `500`:** `POST /api/admin/users` with `"fullName": "Bad\u0000Name"` → `500 INTERNAL_ERROR`. This is the same class raised on #56, #57, and #58, now in brand-new input. Rather than another per-field fix, one `verify` step on `express.json()` that refuses `\u0000` (and unpaired surrogates) with `400 VALIDATION_FAILED` would close it for every body at once. Please either do that, or open the tracking issue: it has now been raised four times without one.
 > - **The #58 assignee check is now reachable.** Now that deactivation exists, the owner PATCH's eligibility read (outside the ticket transaction) can race a deactivation. The end state, an inactive owner, is one BR-26 already allows, so the impact is low. Moving that read inside the transaction with `FOR SHARE` still keeps BR-24's "active at the time of assignment" exact.
 > - **One code covers two refusals.** A self initial-password request returns `SELF_DEACTIVATION`, which reads oddly. Something like `SELF_PASSWORD_RESET` would let a client tell the two apart.
 > - **Still open from #57:** an out-of-range `categoryId` in the `POST /api/tickets` body is still a `500` (`validation.ts`'s own `positiveInteger`).
@@ -1497,9 +1497,9 @@ Request — nothing was pushed directly to `lab3-staging` or `main`. (PR #33,
 >   - `tsc --noEmit` exits 0 on both packages, and `vite build` succeeds.
 >
 > ### 🟡 Minor (not blocking)
-> - **Two quotes aren't verbatim.** The record says "Every comment and response below is quoted exactly as it appears on GitHub", but in two of my reviews the text `\^@` became `\^@`. The escape was turned into a real NUL character somewhere in the copy step, then printed in caret notation:
->   - `reviewer.md:1013` (my #56 review): "A NUL character (`` `\^@` ``) or a lone surrogate…" — on GitHub it's `` `\^@` ``;
->   - `reviewer.md:1340` (my #59 review): `"fullName": "Bad\^@Name"` — on GitHub it's `"Bad\^@Name"`.
+> - **Two quotes aren't verbatim.** The record says "Every comment and response below is quoted exactly as it appears on GitHub", but in two of my reviews the text `\u0000` became `\^@`. The escape was turned into a real NUL character somewhere in the copy step, then printed in caret notation:
+>   - `reviewer.md:1013` (my #56 review): "A NUL character (`` `\^@` ``) or a lone surrogate…" — on GitHub it's `` `\u0000` ``;
+>   - `reviewer.md:1340` (my #59 review): `"fullName": "Bad\^@Name"` — on GitHub it's `"Bad\u0000Name"`.
 >
 >   Changing those two back makes all 67 exact. (Fittingly, it's the NUL bug, in the record of the NUL bug.)
 > - **The unticked criteria are fine as they are.** The release PR, the board, and the PDF depend on this merge, and the first row waits on my Issues 10–12 PRs. That's honest, and it's the right state for a delivery PR.
@@ -1708,6 +1708,10 @@ approved once the fixes landed on the same branch.
 >
 > Great work on this contract. Approving. 🚀
 
+**Author's response** (2026-10-04, @WirachatTH)
+
+> Thanks for the approval, and for three careful rounds on the contract!
+
 ### [#52](https://github.com/WirachatTH/toktickit/pull/52) — Issue 2: User Model, Lab 2 Migration & Seed
 
 **Verdict:** Changes requested → Approved · **merged** 2026-10-01 by @Menelaus122
@@ -1763,6 +1767,10 @@ approved once the fixes landed on the same branch.
 
 > *(no written comment)*
 
+**Author's response** (2026-10-04, @WirachatTH)
+
+> Thanks for approving, and for testing the migration in a scratch database!
+
 ### [#53](https://github.com/WirachatTH/toktickit/pull/53) — Issue 3: Authentication Foundation
 
 **Verdict:** Approved · **merged** 2026-10-01 by @Menelaus122
@@ -1797,6 +1805,10 @@ approved once the fixes landed on the same branch.
 >
 > Nice work. 🚀
 > .md
+
+**Author's response** (2026-10-04, @WirachatTH)
+
+> Thanks for the approval and for running it in an isolated work-tree. Glad the throttle and the must-change gate held up!
 
 ### [#54](https://github.com/WirachatTH/toktickit/pull/54) — Issue 4: Authorization Layer & Role-Based App Shell
 
@@ -1837,6 +1849,10 @@ approved once the fixes landed on the same branch.
 > I did not run the Lab 2 Playwright E2E journey (it needs the Docker Playwright setup), so that claim in the description is unverified by me. I also did not stop the database to repeat the "DB down gives 500" check, because the scratch database shares a container with the dev one.
 >
 > Nice work. 🚀
+
+**Author's response** (2026-10-04, @WirachatTH)
+
+> Thanks for approving! Your note was closed in Issue 5 as agreed!
 
 ### [#55](https://github.com/WirachatTH/toktickit/pull/55) — Issue 5: Requester Regression on Authenticated Identity
 
@@ -1908,6 +1924,10 @@ approved once the fixes landed on the same branch.
 
 > Re-reviewed 95afd65. Looks good: all calls go through apiFetch with credentials: "include", and the test covers every exported function and guards against new ones bypassing it. Note my earlier concern was overstated, since the relative /api URLs through the Vite proxy already sent the cookie. This is a good hardening change regardless. Only nits: apiFetch could be unexported, and the plain-string paths don't need template literals. Approving.
 
+**Author's response** (2026-10-04, @WirachatTH)
+
+> Thanks for the re-review and the approval. Routing every call through one helper made the client safer!
+
 ### [#56](https://github.com/WirachatTH/toktickit/pull/56) — Issue 6: Public Comments & Internal Notes
 
 **Verdict:** Approved · **merged** 2026-10-02 by @Menelaus122
@@ -1931,6 +1951,10 @@ approved once the fixes landed on the same branch.
 > 6. Optional: support Home/End on the tabs (WAI-ARIA tabs pattern).
 >
 > ---
+
+**Author's response** (2026-10-04, @WirachatTH)
+
+> Thanks for approving, and for the follow-ups. They were folded into Issue 7!
 
 ### [#57](https://github.com/WirachatTH/toktickit/pull/57) — Issue 7: IT Staff Ticket Queue
 
@@ -2121,6 +2145,10 @@ approved once the fixes landed on the same branch.
 >
 > Nice work on explaining why the re-check wasn't redundant and adding the test that proves it.
 
+**Author's response** (2026-10-04, @WirachatTH)
+
+> Thanks for the approval after three rounds, and for spotting the re-check I shouldn't have removed. Lesson learned!
+
 ### [#58](https://github.com/WirachatTH/toktickit/pull/58) — Issue 8: Ticket Workflow & IT Staff Ticket Detail
 
 **Verdict:** Approved · **merged** 2026-10-03 by @Menelaus122
@@ -2149,6 +2177,10 @@ approved once the fixes landed on the same branch.
 > 3. Mutation "text checked after the conflictk moved after OWNER_REQUIRED) is caught byAPI-78 only, not API-56 or API-57. How did yours differ?
 >
 > Nice work. The mutation table and the NUL-character trick for proving the same transaction were both convincing.
+
+**Author's response** (2026-10-04, @WirachatTH)
+
+> Thanks for approving the biggest issue yet, and for re-running everything yourself. Your three notes went into the follow-up PR #59!
 
 ### [#59](https://github.com/WirachatTH/toktickit/pull/59) — Issue 8 - Follow-up
 
@@ -2223,6 +2255,10 @@ approved once the fixes landed on the same branch.
 >
 > Good call writing to a draft so a failed run can't overwrite good evidence.
 
+**Author's response** (2026-10-04, @WirachatTH)
+
+> Thanks for the approval! Good call on the evidence script reporting "identical" for a missing ticket!
+
 ### [#60](https://github.com/WirachatTH/toktickit/pull/60) — Issue 9: Administrator User Management
 
 **Verdict:** Approved · **merged** 2026-10-03 by @Menelaus122
@@ -2253,6 +2289,10 @@ approved once the fixes landed on the same branch.
 > 3. If the lock plan changes three times in a row, the request ends in a plain 500. A 409 with a "try again" message would be kinder, though it's unlikely to happen.
 >
 > Really solid work. The deterministic stale-plan test, built because a mutation survived, was especially convincing.
+
+**Author's response** (2026-10-04, @WirachatTH)
+
+> Thanks for approving, and for checking every claim. Your three notes are fixed in #62!
 
 ### [#61](https://github.com/WirachatTH/toktickit/pull/61) — Issue 10: Responsive QA, Visual Checklist & E2E
 
