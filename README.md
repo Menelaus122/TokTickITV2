@@ -51,7 +51,7 @@ management.
 - [x] **Issue 9** — IT Staff Ticket Detail operations
 - [x] **Issue 10** — Administrator User Management
 - [x] **Issue 11** — E2E suite and visual inspection evidence
-- [ ] **Issue 12** — Staging integration, documentation, and delivery
+- [x] **Issue 12** — Staging integration, documentation, and delivery
 
 > **Note on Lab 2 authentication.** Lab 2 had none, by design: a Development
 > Requester selector stood in for login. Lab 3 replaced it with real sign-in;

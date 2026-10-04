@@ -23,8 +23,9 @@ oldest first, so the record can be checked against each Pull Request.
 | [#58](https://github.com/Menelaus122/TokTickITV2/pull/58) | `feature/9-staff-ticket-detail` | Approved | @WirachatTH |
 | [#59](https://github.com/Menelaus122/TokTickITV2/pull/59) | `feature/10-admin-user-management` | Approved | @WirachatTH |
 | [#60](https://github.com/Menelaus122/TokTickITV2/pull/60) | `feature/11-e2e-and-visual-evidence` | Changes requested → Approved | @WirachatTH |
+| [#61](https://github.com/Menelaus122/TokTickITV2/pull/61) | `docs/lab3-final-delivery` | Approved | @WirachatTH |
 
-All 13 Pull Requests were approved **and merged** by [@WirachatTH](https://github.com/WirachatTH), never by me,
+All 14 Pull Requests were approved **and merged** by [@WirachatTH](https://github.com/WirachatTH), never by me,
 per the Part 9 agreement in the workflow guide. 7 of them needed at least one round of
 **Changes requested** first; each fix was pushed to the same branch, answered on the
 thread, and re-reviewed before approval. Each PR is linked to its GitHub Issue through
@@ -1466,6 +1467,51 @@ Request — nothing was pushed directly to `lab3-staging` or `main`. (PR #33,
 
 > thx kub
 
+### [#61](https://github.com/Menelaus122/TokTickITV2/pull/61) — Lab 3 delivery: peer review record, AI use, README, and audit fixes (Issue 12)
+
+**Verdict:** Approved · **merged** 2026-10-04 by @WirachatTH
+
+**Review — Approved** (2026-10-04, @WirachatTH)
+
+> Approved! This is a careful delivery. The audit runs in both directions (labsheet → evidence, and contract → code). The layout bug it found came with a test that fails without the fix. And the review record promises it can be checked against GitHub, so I checked it. I cloned `docs/lab3-final-delivery` at `2ab9e3e` and ran everything on its own ports against a fresh migrated and seeded database.
+>
+> ### What I verified
+> - **`reviewer.md` against GitHub, mechanically.** I pulled every review, PR comment, and inline comment through the API for all 23 PRs (your 13, and my 10 in WirachatTH/toktickit). Then I checked that each body appears in the file word for word, ignoring only whitespace and the `> ` blockquote markers:
+>   - **65 of 67** non-empty bodies match exactly (the two that don't are below);
+>   - both summary tables match GitHub: every review sequence, and every merge made by the other partner (yours by @WirachatTH, mine by @Menelaus122);
+>   - "7 of them needed at least one round of Changes requested" is correct (#46, #50, #52, #53, #54, #57, #60).
+> - **The audit's numbers hold:**
+>   - **routes:** 30 method + path pairs in `app.ts` / `auth.ts` / `conversation.ts` / `staff.ts` / `admin.ts`, and 30 in api-spec §7 (four of its rows list `GET` `POST` together). No route is missing on either side;
+>   - **`tests.md`:** 159 ID rows, all **Pass** (your "149" is that figure without the 10 E2E rows). Every ID appears in a test file except **MIG-05**, which by design names whole suites;
+>   - **AC-01 – AC-40:** every one is traced to at least one row.
+> - **The layout fix is guarded.** With your widths, RESP-03 passes 3/3. With `lab3-staging`'s widths put back, it fails at desktop and tablet with "status badges spilling out of their cell". Mobile, which uses cards, still passes.
+> - **README and `.gitignore`:**
+>   - every `npm run …` the README gives exists in the matching `package.json`;
+>   - all **81** Lab 3 screenshots stay tracked, as do Lab 2's;
+>   - `test-results/` and `docs/lab-03/*.docx` are ignored.
+> - **`ai-use.md`:** names the models, and gives nine prompts quoted as typed (inside the 6–10 the labsheet asks for), each with what came of it, followed by the reflection.
+> - **Your numbers reproduce, in your order:**
+>   - E2E **46/46**;
+>   - then the server suite on the database E2E left: **385/385** (26 files);
+>   - client serial **350/350** (18 files);
+>   - `tsc --noEmit` exits 0 on both packages, and `vite build` succeeds.
+>
+> ### 🟡 Minor (not blocking)
+> - **Two quotes aren't verbatim.** The record says "Every comment and response below is quoted exactly as it appears on GitHub", but in two of my reviews the text `\^@` became `\^@`. The escape was turned into a real NUL character somewhere in the copy step, then printed in caret notation:
+>   - `reviewer.md:1013` (my #56 review): "A NUL character (`` `\^@` ``) or a lone surrogate…" — on GitHub it's `` `\^@` ``;
+>   - `reviewer.md:1340` (my #59 review): `"fullName": "Bad\^@Name"` — on GitHub it's `"Bad\^@Name"`.
+>
+>   Changing those two back makes all 67 exact. (Fittingly, it's the NUL bug, in the record of the NUL bug.)
+> - **The unticked criteria are fine as they are.** The release PR, the board, and the PDF depend on this merge, and the first row waits on my Issues 10–12 PRs. That's honest, and it's the right state for a delivery PR.
+> - **Still worth doing before the release PR:** the two `500`s recorded in `tests.md` §7 (NUL in body text, and an out-of-range body `categoryId`) still have no tracking issue. One small issue would let the release notes link to it rather than leave the record only in prose.
+>
+> Approving. Thanks for a delivery that can actually be checked. 🙏
+> Wirachat 67070501041
+
+**Author's response** (2026-10-04, @Menelaus122)
+
+> thx kub
+
 ## Pull Requests I reviewed for my partner
 
 Partner repository: [WirachatTH/toktickit](https://github.com/WirachatTH/toktickit) · integration branch `lab3-staging`
@@ -1482,9 +1528,11 @@ Partner repository: [WirachatTH/toktickit](https://github.com/WirachatTH/toktick
 | [#58](https://github.com/WirachatTH/toktickit/pull/58) | `feature/8-staff-ticket-detail` | Approved | @Menelaus122 |
 | [#59](https://github.com/WirachatTH/toktickit/pull/59) | `feature/8-follow-up` | Changes requested → Approved | @Menelaus122 |
 | [#60](https://github.com/WirachatTH/toktickit/pull/60) | `feature/9-user-administration` | Approved | @Menelaus122 |
+| [#61](https://github.com/WirachatTH/toktickit/pull/61) | `feature/10-responsive-e2e-qa` | Approved | @Menelaus122 |
+| [#62](https://github.com/WirachatTH/toktickit/pull/62) | `feature/follow-up-59-60` | Approved | @Menelaus122 |
 
-I merged all 10 after approving, as the author should not merge their own Pull Request.
-5 of the 10 needed a round of **Changes requested** first; each was re-reviewed and
+I merged all 12 after approving, as the author should not merge their own Pull Request.
+5 of the 12 needed a round of **Changes requested** first; each was re-reviewed and
 approved once the fixes landed on the same branch.
 
 ### [#51](https://github.com/WirachatTH/toktickit/pull/51) — Issue 1: Sprint 3 Specification & Test Plan (Spec DD)
@@ -2205,3 +2253,64 @@ approved once the fixes landed on the same branch.
 > 3. If the lock plan changes three times in a row, the request ends in a plain 500. A 409 with a "try again" message would be kinder, though it's unlikely to happen.
 >
 > Really solid work. The deterministic stale-plan test, built because a mutation survived, was especially convincing.
+
+### [#61](https://github.com/WirachatTH/toktickit/pull/61) — Issue 10: Responsive QA, Visual Checklist & E2E
+
+**Verdict:** Approved · **merged** 2026-10-04 by @Menelaus122
+
+**Review — Approved** (2026-10-04, @Menelaus122)
+
+> Review of PR #61: Issue 10, Responsive QA, Visual Checklist & E2E
+>
+> Verdict: approve. I checked every claim in the description and they hold. Three small notes below.
+>
+> I checked it out in a separate worktree with a fresh seeded Postgres, its own API and Vite, and ran everything myself.
+>
+> Verified
+>
+> - Tests and types: server 312/312 (no server changes), client 284/284 in 19 files, tsc clean on both.
+> - Red commit: on 11045f0 the 10 failing client tests are exactly STYLE-06's stylesheet check, the four UI-18 tests and the five RESP-06 tests, and your "already green" list matches. I also ran Playwright at 11045f0: the only failures were E2E-01/02 on mobile ("Email is at least 44px tall") and RESP-06 ("Show password shows a focus indicator"), as described.
+> - 7483c00 contains the corrections and additions you list.
+> - Playwright --workers=1 at the head: 28 passed, 2 skipped (RESP-06 at tablet/mobile), twice. The teardown cleaned up each time: 13 users, 18 tickets, no upload files. It only deletes the two literal prefixes, so seeded data is safe.
+> - Screenshots: all 126 files exist for the 42 states in ui-spec §13, at exactly 1280/834/375 px. I looked at the tablet queue (all seven columns fit), mobile User Management (long emails wrap), tablet Ticket Detail (controls above the information) and the stubbed last-Administrator panel.
+> - tests.md: 189/189 Pass, each Issue 10 ID appears in its named file, and every §4 cell is Pass or n/a.
+> - STYLE-06: exactly 16 #fff and the #00552F rules moved to tokens with the same values. No hex remains outside :root and the badge/pill rules, or inline in a component.
+> - Code: pageWindow (start, middle, end and single-page gaps), the dimmed reload, and Modal (focus return, innermost-only Escape and Tab, onClose through a ref) all look right.
+> - Mutations: I rebuilt and ran all 19 (12 Vitest, 7 as Playwright runs). Each is caught by the tests you name, and every file was restored.
+>
+> Notes (non-blocking)
+>
+> 1. Every Playwright run rewrites the 18 committed Lab 2 screenshots and all 126 Lab 3 ones, so "artifacts/lab-02/screenshots unchanged" only holds after restoring them by hand. Making capture opt-in (for example CAPTURE_SCREENSHOTS=1) would keep a normal test run from dirtying the tree.
+> 2. Some committed screenshots show E2E fixtures: the tablet queue has two "E2E flow ticket" rows, and the mobile user list includes about 20 e2e3. users. That's fine for layout, but a capture on a clean seed would read better as evidence.
+> 3. 7483c00 also adds a "Resolve ticket is enabled" check that isn't in the PR's list. Trivial; just for completeness.
+>
+> Great QA pass. Writing the long-address user because a mutation survived, and checking the screenshots by eye, both found real problems.
+
+**Author's response** (2026-10-04, @WirachatTH)
+
+> Thanks for the approval and the thorough QA check. Your screenshot notes will be handled in the pre-release PR.
+
+### [#62](https://github.com/WirachatTH/toktickit/pull/62) — Follow-up: review notes from #59 and #60
+
+**Verdict:** Approved · **merged** 2026-10-04 by @Menelaus122
+
+**Review — Approved** (2026-10-04, @Menelaus122)
+
+> Review of PR #62: follow-up to #59 and #60
+>
+> Verdict: approve. Everything I could check holds.
+>
+> - Tests and types: server 315/315 (23 files), client 287/287, tsc clean. On e66719b exactly the 3 retry tests and 2 of the 3 UI tests fail; the STALE_STATE banner test is already green, as you say.
+> - The refactor: git diff -w shows the transaction body unchanged. Only the retry loop moved into retryOnLockPlanChange, and the final 500 became 409 STALE_STATE. api-spec §6.3 and the code table both document it.
+> - Mutations: all 6 caught with exactly the failure counts you list (3, 1, 8, 1, 1, 1), run against the full suites.
+> - Chromium: Save is disabled while a password is typed, aria-describedby points at the hint, Enter in another field doesn't save, and clearing the field brings Save back and removes the hint.
+> - Script: no argument prints the usage message (exit 1); an empty my_id stops with the /api/auth/me message (exit 1, no file); a real run writes 16 × 403, a 401 and "identical" (exit 0).
+> - Playwright lab-03/user-administration: 10 passed, 2 skipped, with 13 users and 18 tickets left. Only the three set-initial-password screenshots changed.
+>
+> One small note: the description cites the contract audit again. On #57 you said you'd stop doing that, since reviewers can't run it.
+>
+> Reusing STALE_STATE is fine by me. It already means "someone else changed this, try again".
+
+**Author's response** (2026-10-04, @WirachatTH)
+
+> Thanks for approving! And you're right about the audit mention. Sorry about that; it won't appear in our PRs again!
