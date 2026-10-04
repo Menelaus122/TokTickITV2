@@ -24,9 +24,11 @@ oldest first, so the record can be checked against each Pull Request.
 | [#59](https://github.com/Menelaus122/TokTickITV2/pull/59) | `feature/10-admin-user-management` | Approved | @WirachatTH |
 | [#60](https://github.com/Menelaus122/TokTickITV2/pull/60) | `feature/11-e2e-and-visual-evidence` | Changes requested → Approved | @WirachatTH |
 | [#61](https://github.com/Menelaus122/TokTickITV2/pull/61) | `docs/lab3-final-delivery` | Approved | @WirachatTH |
+| [#62](https://github.com/Menelaus122/TokTickITV2/pull/62) | `lab3-staging → main` | Approved | @WirachatTH |
+| [#63](https://github.com/Menelaus122/TokTickITV2/pull/63) | `docs/lab3-review-record-update` | Changes requested → Approved | @WirachatTH |
 
-All 14 Pull Requests were approved **and merged** by [@WirachatTH](https://github.com/WirachatTH), never by me,
-per the Part 9 agreement in the workflow guide. 7 of them needed at least one round of
+All 16 Pull Requests were approved **and merged** by [@WirachatTH](https://github.com/WirachatTH), never by me,
+per the Part 9 agreement in the workflow guide. 8 of them needed at least one round of
 **Changes requested** first; each fix was pushed to the same branch, answered on the
 thread, and re-reviewed before approval. Each PR is linked to its GitHub Issue through
 the Development panel, and every feature branch reached `lab3-staging` through a Pull
@@ -1512,6 +1514,137 @@ Request — nothing was pushed directly to `lab3-staging` or `main`. (PR #33,
 
 > thx kub
 
+### [#62](https://github.com/Menelaus122/TokTickITV2/pull/62) — Lab 3 release — users, roles, IT Staff ticketing, and admin (lab3-staging → main)
+
+**Verdict:** Approved · **merged** 2026-10-04 by @WirachatTH
+
+**Review — Approved** (2026-10-04, @WirachatTH)
+
+> Approved. This is a clean release. Every feature reached `lab3-staging` through a reviewed PR, `main` is an ancestor of `lab3-staging` (so this merge can't conflict), and the known limitations are stated up front rather than buried. Because `main` still holds Lab 2, I tested the release the way it will actually be used: **upgrading a real Lab 2 database**, not only a fresh one. The release branch is at `be53a26`, which is `8ba2103` plus #63.
+>
+> ### What I verified
+> - **Only docs changed since your test run.** Between `8ba2103` (where your numbers come from) and `be53a26`, the only changes are `README.md` and `docs/lab-03/reviewer.md` (#63). So your results still apply to all the code being released, and I re-ran them anyway (below).
+> - **Upgrade from Lab 2, end to end:**
+>   1. I checked out `main`, ran its migrations and seed, started **the Lab 2 API**, and created real data through it: 3 tickets for two Requesters (via `X-Requester-Id`), an attachment, and a second attachment that I soft-removed with a reason.
+>   2. I checked out `be53a26`, then ran `prisma migrate deploy` and the seed exactly as your release notes give them.
+>   3. I compared:
+>
+>   ```text
+>   Lab 2 tickets after migrate deploy   -> identical (number, requester, status, priority, summary, createdAt, updatedAt)
+>   Lab 2 tickets after the Lab 3 seed   -> still identical
+>   attachments                          -> identical, including the removal and its reason
+>   Lab 2 requesters -> User             -> all 5 identical (email, name, department, active)
+>   seeded Lab 3 tickets                 -> numbered after them (TT-2026-00004 onward), 0 duplicate numbers
+>   the Lab 2 tickets in Lab 3           -> IT Priority = Requested Priority, unassigned
+>   Lab 2 Requester (kanya.sris) signs in -> 201, sees only her own ticket and both attachments
+>                                            (the removed one with its reason), and downloads the Lab 2 file (66 bytes)
+>   ```
+>
+> - **Your evidence, re-run on that upgraded database, in your order:**
+>   - E2E **46/46**;
+>   - then the server suite on what it left: **385/385** (26 files);
+>   - client serial **350/350** (18 files);
+>   - `tsc --noEmit` exits 0 on both packages, and `vite build` succeeds.
+> - **Release diff hygiene:**
+>   - 184 files;
+>   - the only env file is `server/.env.example`, and its only change is a commented-out `CLIENT_ORIGINS` line;
+>   - no real `.env`, keys, `.docx`/`.pdf`, `node_modules`, `dist`, or Playwright output is tracked.
+> - **Known limitations:** the three listed match `tests.md` §7.
+>
+> ### 🟡 Small corrections to the description (not blocking)
+> #63 merged into `lab3-staging` after the description was written, so a few figures have drifted:
+> - **Commits:** 68 now (50 excluding merges), not 65.
+> - **Insertions:** 18,357 (with 1,712 deletions), not 18,208. 184 files is still right.
+> - **PRs merged into staging:** 15, not 14. #63 (record update) is missing from the issue table; it could sit under Issue 12 next to #61.
+> - **"Re-run on this exact tree (`8ba2103`)":** worth adding "+ #63, docs only" so the tested tree and the merged tree visibly agree.
+> - **The `reviewer.md` box** still says "my partner's Issues 10–12 are still to be added". My #61 and #62 were added in #63, so only my #63 is outstanding now.
+>
+> Approving. Congratulations on Lab 3: this was a careful sprint from contract to release.
+> Wirachat 67070501041
+
+### [#63](https://github.com/Menelaus122/TokTickITV2/pull/63) — Record the latest reviews and mark Issue 12 done (follow-up to Issue 12)
+
+**Verdict:** Changes requested → Approved · **merged** 2026-10-04 by @WirachatTH
+
+**Review — Changes requested** (2026-10-04, @WirachatTH)
+
+> Request Changes. Thanks for keeping the record current before the release. This PR's whole job is to make `reviewer.md` match GitHub, so I checked it the same way as on #61. I pulled every review, PR comment, and inline comment through the API for all 26 PRs the record now covers (your 14, my 12), and tested each body word for word against the file, ignoring only whitespace and the `> ` blockquote markers. I checked out `docs/lab3-review-record-update` at `936b312`.
+>
+> ### What holds
+> - **70 of 83** bodies match exactly, including every new quote from your #61 and my #61 and #62 except the one below.
+> - `README.md` now ticks Issue 12, so all 13 issues read done.
+> - Only `README.md` and `docs/lab-03/reviewer.md` change, so there's nothing to re-run. Your "781 passed" is 46 + 385 + 350, which matches what I reproduced on #61.
+>
+> ### 🔴 Must fix: the record still isn't verbatim, in two ways
+>
+> **1. The `\u0000` corruption is still there, and has spread to the new quote.** Whatever copies the quotes turns the text `\u0000` into a real NUL character and then prints it as `^@`. The two spots I flagged on #61 are unchanged, and the new quote of my #61 review hit the same thing. It's now meaningless, because the corruption replaced the very example that explained it:
+>
+> ```text
+> reviewer.md:1013  (my #56 review)  "A NUL character (`\^@`) …"                  GitHub: `\u0000`
+> reviewer.md:1340  (my #59 review)  "\"fullName\": \"Bad\^@Name\""               GitHub: "Bad\u0000Name"
+> reviewer.md:1500  (my #61 review)  "the text `\^@` became `\^@`"                GitHub: "the text `\u0000` became `\^@`"
+> ```
+>
+> On line 1500, only the *first* `\^@` should change back to `\u0000`. The second is really in my review.
+>
+> **2. Ten comments are missing.** On 2026-10-04, between 09:47 and 09:51 UTC (before this PR's commit at 11:46), I posted a short thank-you on each of my PRs #51–#60 in WirachatTH/toktickit. None of them is in the record. You did include my equivalent replies on #61 and #62, so these look like they were simply missed:
+>
+> ```text
+> #51 09:47 "Thanks for the approval, and for three careful rounds on the contract!"
+> #52 09:48 "Thanks for approving, and for testing the migration in a scratch database!"
+> #53 09:49 "Thanks for the approval and for running it in an isolated work-tree. …"
+> #54 09:49 "Thanks for approving! Your note was closed in Issue 5 as agreed!"
+> #55 09:49 "Thanks for the re-review and the approval. Routing every call through one hel…"
+> #56 09:50 "Thanks for approving, and for the follow-ups. They were folded into Issue 7!"
+> #57 09:50 "Thanks for the approval after three rounds, and for spotting the re-check …"
+> #58 09:50 "Thanks for approving the biggest issue yet, and for re-running everything …"
+> #59 09:50 "Thanks for the approval! Good call on the evidence script reporting \"identical\" …"
+> #60 09:51 "Thanks for approving, and for checking every claim. Your three notes are fixed …"
+> ```
+>
+> Each one goes at the end of its PR's entry, oldest first, like the others.
+>
+> → Suggestion: fetch the bodies straight from the API as JSON (`gh api repos/<repo>/issues/<n>/comments`, then `.body`), and paste them without passing them through anything that interprets escapes. Then check the file mechanically before pushing: for each body, collapse whitespace, strip `> `, and test that it's a substring of the file. That check is what found all 13 of these, and it takes seconds. With 83 bodies, it's the only realistic way to keep the promise "quoted exactly as it appears on GitHub".
+>
+> ### Note
+> Note 2 (my #63 isn't recorded yet) is right: it's still open, so leaving it out is correct.
+>
+> Fix the three quotes and add the ten comments, and I'm happy to approve. 🙏
+> Wirachat 67070501041
+
+**Author's response** (2026-10-04, @Menelaus122)
+
+> Thanks, you were right on both counts. Fixed in the latest commit on this branch:
+>
+> - **The `\u0000` corruption:** it came from the `gh` CLI, not from the copy step. `gh pr view --json` / `gh api` output turned the text `\u0000` into `\^@` before I ever saw it, and the raw REST response (`curl` on `/repos/.../pulls/56/reviews`) has `\u0000`. Every body is now fetched straight from the REST API with `curl`, so all three spots read `\u0000` again. On your #61 quote only the first one changed; the second `\^@` is really in your review and stays.
+> - **The ten missing comments:** my earlier fetch of #51–#60 ran before you posted them at 09:47–09:51. All ten are now at the end of their PR's entry, oldest first.
+> - **The check you suggested,** run on the file before pushing: for every review and comment body from the API, collapse whitespace, strip `> `, and test it's a substring. **83 bodies checked, 83 found verbatim, 0 missing, 0 NUL bytes.** The same script on the previously pushed file gives exactly your result: 70 of 83, the same 13 missing.
+>
+> Your #63 is still left out until it's reviewed.
+>
+> 🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+**Review — Approved** (2026-10-04, @WirachatTH)
+
+> Approved! Thanks, and good find on the cause! I re-checked `docs/lab3-review-record-update` at `a7a78fb` the same way as before, fetching every body straight from the REST API so nothing on my side could re-introduce the problem.
+>
+> ### Verified
+> - **Verbatim:** all **83 of 83** non-empty review, comment, and inline bodies across the 26 PRs in the record (your 14, my 12) now appear word for word, ignoring only whitespace and the `> ` blockquote markers. Last round it was 70.
+> - **The `\u0000` spots:**
+>   - lines 1014 and 1341 read `\u0000` again;
+>   - on line 1500, only the first one changed back, so it now matches my #61 review exactly;
+>   - the only `\^@` left in the file are the three inside that review, where they're genuinely part of what I wrote;
+>   - the file contains no NUL bytes.
+> - **The ten thank-you comments** on my #51–#60 are each at the end of their PR's entry, and every PR entry reads oldest first (checked within each PR's own section).
+> - **Scope:** only `README.md` (Issue 12 ticked) and `docs/lab-03/reviewer.md` change, so there's nothing to re-run.
+>
+> Your diagnosis matches what I saw: on Windows, `gh`'s output is what turns `\u0000` into `^@`. Your reply even shows up that way when I read it through `gh`. Fetching with `curl` was the right fix, and running the substring check before pushing is what makes the "quoted exactly" line trustworthy.
+>
+> My #63 staying out until it's reviewed is correct.
+>
+> Approving. I'll merge this before approving #62, as your note 1 asks. 🙌
+> Wirachat 67070501041
+
 ## Pull Requests I reviewed for my partner
 
 Partner repository: [WirachatTH/toktickit](https://github.com/WirachatTH/toktickit) · integration branch `lab3-staging`
@@ -1530,9 +1663,11 @@ Partner repository: [WirachatTH/toktickit](https://github.com/WirachatTH/toktick
 | [#60](https://github.com/WirachatTH/toktickit/pull/60) | `feature/9-user-administration` | Approved | @Menelaus122 |
 | [#61](https://github.com/WirachatTH/toktickit/pull/61) | `feature/10-responsive-e2e-qa` | Approved | @Menelaus122 |
 | [#62](https://github.com/WirachatTH/toktickit/pull/62) | `feature/follow-up-59-60` | Approved | @Menelaus122 |
+| [#63](https://github.com/WirachatTH/toktickit/pull/63) | `feature/pre-release` | Changes requested → Approved | @Menelaus122 |
+| [#64](https://github.com/WirachatTH/toktickit/pull/64) | `lab3-staging → main` | Approved | @Menelaus122 |
 
-I merged all 12 after approving, as the author should not merge their own Pull Request.
-5 of the 12 needed a round of **Changes requested** first; each was re-reviewed and
+I merged all 14 after approving, as the author should not merge their own Pull Request.
+6 of the 14 needed a round of **Changes requested** first; each was re-reviewed and
 approved once the fixes landed on the same branch.
 
 ### [#51](https://github.com/WirachatTH/toktickit/pull/51) — Issue 1: Sprint 3 Specification & Test Plan (Spec DD)
@@ -2354,3 +2489,97 @@ approved once the fixes landed on the same branch.
 **Author's response** (2026-10-04, @WirachatTH)
 
 > Thanks for approving! And you're right about the audit mention. Sorry about that; it won't appear in our PRs again!
+
+### [#63](https://github.com/WirachatTH/toktickit/pull/63) — Pre-release: Lab 3 deliverable recheck
+
+**Verdict:** Changes requested → Approved · **merged** 2026-10-04 by @Menelaus122
+
+**Review — Changes requested** (2026-10-04, @Menelaus122)
+
+> Review of PR #63: Pre-release deliverable recheck
+>
+> Verdict: request changes, for reviewer.md only. Every technical claim holds.
+>
+> I checked it out in a separate worktree with a fresh seeded Postgres, its own API and Vite, and ran everything myself.
+>
+> Verified
+>
+> - Tests and types: server 315/315, client 287/287, tsc clean. No server or client code changed.
+> - Playwright --workers=1: 36 passed, 0 skipped, twice. The global teardown found nothing ("deleted 0 ticket(s) … 0 user(s)"), and 13 users and 18 tickets remain.
+> - A normal run leaves artifacts/ untouched (0 files changed, also across four mutation runs). With CAPTURE_SCREENSHOTS=1 it regenerates exactly the 138 files at 1280/834/375 px, including the four new states.
+> - Screenshots: the queue shows the 14 seeded active tickets with no E2E rows, User Management the 13 seeded users, the login failure only "Something went wrong. Please try again.", and the busy state "Signing in…" with the form disabled.
+> - Docs: ui-spec covers every topic listed, BR-81 has the re-check and 409 STALE_STATE, tests.md is 189/189 Pass with the desktop-only note removed, and the README explains recapture.
+> - Mutations: all four rebuilt and run in Playwright, each caught where you say (RESP-06 on mobile, RESP-04, RESP-04, RESP-03).
+> - reviewer.md quotes: I checked every quoted round (37) and every quoted reply against GitHub. All match word for word, in order, and each verdict label matches the review's GitHub state. Nicely done.
+>
+> Please fix (reviewer.md)
+>
+> 1. TokTickITV2 #61 (Issue 12) is missing from "Pull Requests I reviewed for my partner". You approved it at 09:27Z and I replied at 09:42Z, both before the docs commit, so it's 14 PRs, not 13.
+> 2. Your own post-approval replies aren't recorded, but mine are. On #53, #54, #56, #58, #59, #60, #61 and #62 the response column says "—", and on #51, #52, #55 and #57 the last reply is missing. All 12 are your thank-you comments from 09:47–09:52Z. Since my "Thx kub" replies are listed, please add yours too, or drop both, so "—" doesn't read as "no response".
+>
+> Minor
+>
+> - ai-use.md: "better agent that Gemini" → "than", and "OPUS5" → "Opus 5".
+>
+> Thanks for not citing the audit this time, and for the revealing-stub idea on the login failure test.
+
+**Author's response** (2026-10-04, @WirachatTH)
+
+> Thanks for the review, and for checking all 37 quoted rounds against GitHub! All three points were right, and they're fixed in `e543df9`.
+>
+> **1. TokTickITV2 #61 was missing:** confirmed. I pulled the review data before I approved your #61, so it wasn't there. reviewer.md now lists all 14 of your PRs, including #61 with my approval and your reply.
+>
+> **2. My replies weren't recorded:** confirmed, same cause. My thank-you comments went up after I pulled the data. I regenerated the table from GitHub, so each of our PRs now ends with my reply, and no response cell reads "—" any more. The quotes are still word for word.
+>
+> **Minor:** "better agent that Gemini" → "than", and "OPUS5" → "Opus 5". Nothing else in ai-use.md changed.
+
+**Review — Approved** (2026-10-04, @Menelaus122)
+
+> Re-review of PR #63 at 7f5591b
+>
+> Verdict: approve. Both reviewer.md points are fixed, and the record now checks out completely.
+>
+> Verified
+>
+> - Docs only (reviewer.md and ai-use.md), so the test and E2E results from my first review still stand.
+> - reviewer.md: I re-pulled every review and comment from GitHub and re-checked all 26 rows (12 of yours, 14 of mine, now including TokTickITV2 #61). Every quote matches word for word, rounds are in order, each verdict label matches its GitHub state, and no response cell reads "—" any more.
+> - ai-use.md: "than Gemini" and "Opus 5" are fixed.
+>
+> Notes (non-blocking)
+>
+> 1. Your reply says "Nothing else in ai-use.md changed", but 7f5591b, pushed two minutes before it, adds a reflection paragraph on the specification agent. It's a good addition, but please mention changes like that in the reply so the reviewer knows to read them.
+> 2. 7f5591b also removes reviewer.md's line explaining that entries are quoted word for word and that "…" marks a cut. The table still uses "…", so I'd keep that line (or a shorter version) so a reader knows the quotes are trimmed.
+> 3. Nit: the new ai-use.md paragraph ends with a trailing space and no newline at the end of the file.
+>
+> Ready for the release to main from my side.
+
+**Author's response** (2026-10-04, @WirachatTH)
+
+> Thanks for the approval and the merge! You're right about note 1, sorry I didn't mention the new reflection paragraph in my reply. Notes 2 and 3 will go in the post-release docs PR.
+
+### [#64](https://github.com/WirachatTH/toktickit/pull/64) — Issue 11: Integration & Release to Main
+
+**Verdict:** Approved · **merged** 2026-10-04 by @Menelaus122
+
+**Review — Approved** (2026-10-04, @Menelaus122)
+
+> Review of PR #64: Issue 11, Integration & Release to Main
+>
+> Verdict: approve. I checked every claim on the release tip and they hold. One bookkeeping note below.
+>
+> I ran everything on 7bc2f07 in a separate worktree with a fresh seeded Postgres, its own API and Vite.
+>
+> Verified
+>
+> - Release scope: the head is the lab3-staging tip. main is an ancestor with no commits of its own, so the merge is conflict-free. All 45 commits came in through #51–#63, and each of those PRs was approved after its last commit, so nothing unreviewed is being released.
+> - Regression: server 315/315 (23 files), client 287/287 (19 files), tsc clean, Playwright 36 passed and 0 skipped, tests.md 189/189 Pass. No .skip, .only, .todo, fixme, xit/xdescribe or commented-out tests anywhere.
+> - Cold build: a --no-cache build of the server image installs and loads cookie-parser 1.4.7, and the image type-checks once the Prisma client is generated (as predev does on startup).
+> - Manual journey: I replayed it with fresh users and a fresh ticket. Forced password change; attachment, comment and appears-resolved; claim → OPEN, HIGH with Requested MEDIUM kept, In Progress, comment and note; the Requester never sees the note or an IT Priority; 7/7 wrong-role calls → 403 with the ticket unchanged; Log out → Login; deactivated → 403 ACCOUNT_INACTIVE; self-deactivation and self-demotion → 409. API-70 and API-82 also pass against the real database.
+> - Nothing left behind: 13 users, 18 tickets, 0 attachments, no upload files.
+> - Board: Issues 1–10 (#40–#49) are in Done.
+>
+> Note
+>
+> - Issue 11 (#50) was closed by hand at 12:44Z, before this PR was opened, so "Closes #50" will do nothing, and the board still shows it as Started. Please reopen it so the merge closes it, or move the card to Done after merging, so the release issue doesn't read as finished before the release.
+>
+> Great sprint. Ship it.
