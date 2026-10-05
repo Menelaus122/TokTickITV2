@@ -19,6 +19,8 @@ docs/lab-02/TokTickIT_GitHub_Workflow_Guide_TH_EN.md
 docs/lab-02/MyIssue.md
 docs/lab-03/labsheet/
 docs/lab-03/MyIssue.md
+docs/lab-04/labsheet/
+docs/lab-04/MyIssue.md
 
 # uploaded attachment files (metadata lives in PostgreSQL)
 server/uploads/
