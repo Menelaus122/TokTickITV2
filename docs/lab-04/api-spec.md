@@ -38,7 +38,7 @@ use for their author and carries no email:
 | `STALE_UPDATE` | 409 | the record changed since the caller loaded it: `expectedVersion` no longer matches (BR-26, BR-27). The body carries the current record in `error.current` |
 | `TICKET_NOT_ACTIVE` | 409 | an Action Taken was created or edited on a `RESOLVED`, `CLOSED`, or `CANCELLED` Ticket (BR-10) |
 | `ACTION_REQUIRED` | 409 | a move to `RESOLVED` with no relevant Action Taken (BR-17, BR-18) |
-| `FOLLOW_UP_PENDING` | 409 | a move to `RESOLVED` whose latest relevant Action Taken still requires follow-up (BR-17, BR-18) |
+| `FOLLOW_UP_PENDING` | 409 | a move to `RESOLVED` whose most recently recorded relevant Action Taken still requires follow-up (BR-17, BR-18) |
 | `VALIDATION_FAILED` | 400 | now also: a NUL character in any body string, or a body id outside `1`–`2147483647` (BR-52) |
 
 Every other code and status is Lab 3's. `201` is used for a created Action Taken
@@ -112,7 +112,11 @@ Owning Requester, any IT Staff member, any Administrator (BR-42).
 { "actions": [ { "...": "the §1.3 shape" } ] }
 ```
 
-Ordered by `actionAt` ascending, then `id` ascending (BR-08, AC-10). Not
+Ordered by `actionAt` ascending, then `id` ascending (BR-08, AC-10): the order for
+reading. The action the resolution gate reads is a different one, the most recently
+**recorded** (highest `createdAt`, then `id`, BR-17), and it is not always the last
+in this list, because `actionAt` is typed by the user. Every action carries
+`createdAt` and `id`, so a client can mark it. Not
 paginated: a lab Ticket does not accumulate enough work to need it. A Ticket with
 none answers `200` with `"actions": []` (FR-08).
 
@@ -155,17 +159,22 @@ session user (BR-05). No string may contain a NUL character (BR-12, BR-52).
 **201** `{ "action": { "...": "§1.3" } }`
 
 **200** `{ "action": { "...": "§1.3" } }` — the same `requestKey`, on the same
-Ticket, from the same user, was already used: the **original** action is returned
-and nothing is created (BR-28, AC-07). The body is identical to the first
-response's, so a client need not tell the two apart.
+Ticket, from the same user, was already used: the action that submission created is
+returned, as it is stored now, and nothing is created (BR-28, AC-07). A client need
+not tell the two answers apart.
 
 | Condition | Response |
 | :--- | :--- |
+| A `requestKey` already used on this Ticket by this user | `200` with the existing action — **even if the Ticket has since been resolved**, closed, or cancelled, and even if the body differs: the key names the submission (BR-28) |
 | Missing or invalid field | `400 VALIDATION_FAILED` with `fields`, one message per offending field (AC-04) |
 | `actionAt` in the future or before the Ticket existed | `400 VALIDATION_FAILED` on `actionAt` |
-| Ticket is `RESOLVED`, `CLOSED`, or `CANCELLED` | `409 TICKET_NOT_ACTIVE` (BR-10, AC-09) |
+| Ticket is `RESOLVED`, `CLOSED`, or `CANCELLED` (and the key is new) | `409 TICKET_NOT_ACTIVE` (BR-10, AC-09) |
 | Ticket does not exist | `404 NOT_FOUND` |
 | Requester, or no session | `403 FORBIDDEN`, or `401 AUTH_REQUIRED` |
+
+The checks run in this order: role, Ticket exists, **replayed key**, validation,
+Ticket active, then the insert. A replay is answered before validation and the
+status check, so a retry never turns into an error because the world moved on.
 
 Creating an action updates the Ticket's `updatedAt` and not its `version` (BR-11).
 The write runs under the Ticket's row lock (BR-29).
@@ -268,8 +277,19 @@ always the new one.
 | Status: target not reachable, or equal to the current | `409 INVALID_TRANSITION` |
 | Status: `RESOLVED` or `CLOSED` on an unowned Ticket | `409 OWNER_REQUIRED` |
 | Status: `RESOLVED` with no relevant Action Taken | `409 ACTION_REQUIRED` (AC-03) |
-| Status: `RESOLVED` whose latest relevant Action Taken requires follow-up | `409 FOLLOW_UP_PENDING` (AC-03) |
+| Status: `RESOLVED` whose most recently recorded relevant Action Taken requires follow-up | `409 FOLLOW_UP_PENDING` (AC-03) |
 | Status: `RESOLVED`, `CANCELLED`, or `REOPENED` without a 5–2000 character `reason` | `400 VALIDATION_FAILED` on `reason` |
+
+**Owner endpoint.** It reads the proposed owner's role and `isActive` **inside** the
+transaction, after the Ticket's row lock, with `SELECT … FOR SHARE` on the user's
+row (BR-29). A deactivation that commits first makes the assignment
+`409 OWNER_NOT_ASSIGNABLE`; one that arrives after leaves the new owner in place
+(Lab 3 BR-26). Lab 3 read the user before the transaction, which left a gap.
+
+**A Requester's "appears resolved" moves `version`** (BR-25), so an owner, priority,
+or status save made from a screen loaded before it is a `409 STALE_UPDATE`. That is
+intended: the staff screen should show the advisory before anyone acts on an older
+view.
 
 The status handler checks in the order BR-24 sets: validation → exists → stale →
 matrix and same-status → owner → gate. So a request that is both stale and invalid
@@ -315,10 +335,12 @@ written only by a status change (BR-21, AC-13).
 ## 4. Dashboards
 
 Both endpoints are computed on every request from the tables (BR-30), take **no
-query parameters**, and ignore any they are sent (BR-37). Every metric is
-`{ "value": <integer ≥ 0>, "href": <client route> }`. `href` is a route in the web
-client, with its query string, not an API path; following it shows a list whose
-total equals `value` (BR-40, AC-21). `generatedAt` is an ISO 8601 UTC timestamp.
+query parameters**, and ignore any they are sent (BR-37). Every metric card and
+status row is `{ "value": <integer ≥ 0>, "href": <client route> }`. `href` is a route
+in the web client, with its query string, not an API path; following it shows a list
+whose total equals `value` (BR-40, AC-21). The one exception is `userCounts`
+(§4.2), whose entries are `{ "value": <integer ≥ 0> }` and have **no** `href`.
+`generatedAt` is an ISO 8601 UTC timestamp.
 The full definitions are in §6.
 
 ### 4.1 `GET /api/dashboard/requester`
@@ -381,17 +403,18 @@ IT Staff and Administrators. A Requester is `403 FORBIDDEN`.
     }
   ],
   "userCounts": {
-    "activeRequesters":     { "value": 5, "href": "/users?role=REQUESTER" },
-    "activeItStaff":        { "value": 4, "href": "/users?role=IT_STAFF" },
-    "activeAdministrators": { "value": 2, "href": "/users?role=ADMINISTRATOR" },
-    "inactive":             { "value": 2, "href": null }
+    "activeRequesters":     { "value": 6 },
+    "activeItStaff":        { "value": 4 },
+    "activeAdministrators": { "value": 2 },
+    "inactive":             { "value": 2 }
   }
 }
 ```
 
 * `userCounts` is **present only for an Administrator** and absent for IT Staff
-  (BR-38, AC-20). `inactive` has `"href": null` because User Management has no
-  status filter (BR-40).
+  (BR-38, AC-20). None of the four entries has an `href`: `GET /api/admin/users`
+  returns inactive users too, so `/users?role=IT_STAFF` would list 5 where
+  `activeItStaff` says 4 (BR-40, D-12). The counts are plain numbers.
 * `byStatus` always has the five open statuses in this order (BR-35), `0` where
   none.
 * `myTickets`, `urgentTickets`, and `myRecentActions` hold at most 5 entries in the
@@ -423,9 +446,11 @@ equals the card's `value` (AC-21); DASH-14 checks every card against it.
 ### 5.2 Existing filters used by the links
 
 `status`, `itPriority`, and `owner` (`unassigned` | `me` | an id) are Lab 3's
-(`docs/lab-03/api-spec.md` §5.1). `GET /api/admin/users` already accepts `role`.
-Nothing else changes. The client reads these from its own URL (FR-21); that is a
-client behaviour and has no endpoint.
+(`docs/lab-03/api-spec.md` §5.1). Nothing else changes. `GET /api/admin/users` is
+untouched, and the Administrator's account counts link to nothing, because that list
+includes inactive users and no filter could make it match an *active* count (BR-40,
+D-12). The client reads the filters above from its own URL (FR-21); that is a client
+behaviour and has no endpoint.
 
 ---
 
@@ -450,7 +475,7 @@ compare. "Open group" is BR-31; all counts exclude nothing else unless stated.
 | `myTickets` | `ownerId` = caller, open group, `updatedAt` descending, `id` descending, first 5 | the row's Ticket |
 | `urgentTickets` | `itPriority` = `URGENT`, open group, `createdAt` ascending, `id` ascending, first 5 | the row's Ticket |
 | `myRecentActions` | Actions Taken with `performedById` = caller, `createdAt` descending, `id` descending, first 5 | the action's Ticket |
-| `userCounts.active*` | users with `isActive` and the role | `/users?role=<role>` |
+| `userCounts.active*` | users with `isActive` and the role | none: no list can reproduce an *active* count (BR-40) |
 | `userCounts.inactive` | users with `isActive` false | none |
 
 No definition has a date window, so none has a day boundary or a time zone

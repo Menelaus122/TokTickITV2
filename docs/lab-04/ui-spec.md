@@ -41,8 +41,8 @@ A card that is also a link. Built from Lab 2's card, so it adds no token.
   `:active` states of Lab 2's links. Its accessible name is
   "Open Tickets: 3. View all", so the number and the destination are announced
   together (FR-31).
-* A card with no destination (the inactive-user count) is a plain `<div>` with the
-  caption "No filter available" in place of "View all", so no dead link exists
+* A count with no destination (the Administrator's account counts, §3.3) is a plain
+  `<div>` with no "View all" and no link, so no dead or misleading link exists
   (BR-40).
 * A value of `0` renders as `0`, never blank (BR-39). The card keeps its link.
 * The card never encodes meaning in colour alone: the label and value carry it.
@@ -67,6 +67,10 @@ value:
 
 * Header line: Action Date/Time, then Performed by with the Lab 3 Role badge, then
   the Edit action (IT Staff and Administrators only; absent for a Requester).
+* The most recently **recorded** entry carries the text tag **Latest recorded** after
+  its Performed by. It is the one the resolution gate reads (BR-17), and it is not
+  always the last card, because Action Date/Time is typed by the user. The tag is
+  text, not colour, and appears on exactly one entry per Ticket.
 * Follow-up Note and Attachment Notes rows are **omitted** when empty rather than
   shown blank. Follow-Up Required? is always shown.
 * The footer shows "Recorded …" always and "Edited by …" only after an edit
@@ -111,12 +115,12 @@ can offer it:
 
 | Conflict | Copy |
 | :--- | :--- |
-| `STALE_UPDATE` on a Ticket | "This ticket changed while you were working on it. It is now **In Progress**, owned by Siriporn K. Review it and try again." |
+| `STALE_UPDATE` on a Ticket | "This ticket changed while you were working on it — for example a colleague moved it, or the Requester marked the problem as appearing resolved. It is now **In Progress**, owned by Siriporn K. Review it and try again." |
 | `STALE_UPDATE` on an action | "Someone else edited this action while you were working on it. Your changes are still in the form." |
 | `TICKET_ALREADY_OWNED` | "Someone else claimed this ticket first." (unchanged) |
 | `TICKET_NOT_ACTIVE` | "This ticket is Resolved, so no more actions can be recorded. Reopen it first." |
 | `ACTION_REQUIRED` | "Record at least one action before resolving this ticket." |
-| `FOLLOW_UP_PENDING` | "The latest action still needs follow-up. Record the follow-up as a new action first." |
+| `FOLLOW_UP_PENDING` | "The most recently recorded action still needs follow-up. Record the follow-up as a new action first." |
 
 A conflict never clears the form (BR-54), and never reads as a generic failure.
 
@@ -242,11 +246,15 @@ right now." The four cards and the status row always render.
 The IT Staff dashboard of §3.2, unchanged, plus one region after *By status*:
 
 ```
-│ Accounts   Requesters 5 →  ·  IT Staff 4 →  ·  Administrators 2 →  ·  Inactive 2 │
+│ Accounts   Requesters 6  ·  IT Staff 4  ·  Administrators 2  ·  Inactive 2   [Open User Management →] │
 ```
 
-Each active count is a link to `/users?role=…`; **Inactive** is not a link and
-reads "Inactive 2 — no filter available" (BR-40). IT Staff do not see this region
+All four are **plain numbers with no link**. A link to `/users?role=IT_STAFF` would
+open a list that also shows inactive staff, so it could show 5 where the number says
+4, and the contract promises that a link's list matches its number (BR-40, D-12).
+The region says "Active accounts by role, and inactive accounts counted
+separately", and offers one ordinary link, **Open User Management**, which opens
+`/users` unfiltered and claims nothing about any count. IT Staff do not see this region
 (BR-38).
 
 ### 3.4 Differences from the mockups
@@ -303,9 +311,15 @@ control's blocked-move messages link to this region.
 
 ### 4.1 List
 
-Entries are §1.2 cards in BR-08 order, oldest first, so the last card is the latest
-action — the one the gate reads. The heading shows the count: "Actions Taken (3)".
-A card never reorders itself after an edit.
+Entries are §1.2 cards in BR-08 order, **oldest Action Date/Time first**. That is the
+order for reading; it is not the order the gate uses. The gate reads the most
+recently *recorded* entry, which carries the **Latest recorded** tag (§1.2) and may
+sit above the last card when someone logged earlier work afterwards. The heading
+shows the count: "Actions Taken (3)".
+
+A card does not move when anything but its own Action Date/Time is edited. Changing
+the date re-sorts the entry; the screen says "Moved to its new position by date."
+in the status message and focus follows the card, so a re-sort is never silent.
 
 ### 4.2 Create mode
 
@@ -354,7 +368,8 @@ and **Cancel** replace the Save action buttons. Only one card is editable at a t
   user's edits**, and offers **Show latest**, which replaces the form's values with
   the server's after a confirmation that the edits will be lost.
 * On success the card returns to view mode with "Edited by …" in its footer, and
-  focus returns to its Edit button.
+  focus returns to its Edit button. If the edit changed Action Date/Time the card
+  moves to its new place (§4.1) and focus follows it.
 
 ### 4.4 States
 
@@ -437,15 +452,15 @@ an API-failure callout with **Try again** confined to the region.
 
 ## 7. Drill-down: filters read from the URL
 
-My Tickets, the Ticket Queue, and User Management read their filters from the
-query string on load and write them back as the user changes them, so a dashboard
-link, a reload, and a bookmark all show the same list (FR-21).
+My Tickets and the Ticket Queue read their filters from the query string on load and
+write them back as the user changes them, so a dashboard link, a reload, and a
+bookmark all show the same list (FR-21). User Management is **not** part of this: no
+dashboard link opens it with a filter (§3.3, BR-40).
 
 | Screen | Parameters it reads | Notes |
 | :--- | :--- | :--- |
 | My Tickets (`/tickets`) | `group`, `status`, plus Lab 2's search, sort, page | `group=open` is new |
 | Ticket Queue (`/queue`) | `group`, `status`, `itPriority`, `owner`, plus Lab 3's | `group=open` is new |
-| User Management (`/users`) | `role` | |
 
 * An active `group` appears as a removable chip, "Open tickets ✕", next to the
   other filters, so the list's scope is visible and **Clear Filters** removes it.
@@ -535,10 +550,14 @@ touches, and recorded in [`tests.md`](./tests.md) §5:
 * [ ] Every metric card has a label, a value, and a working "View all"; a zero
       shows as `0`
 * [ ] The dashboard's drill-down lists show the number on the card they came from
+* [ ] The Administrator's account counts are plain numbers with no link, and only
+      **Open User Management** is a link
 * [ ] Zero-data, loading, forbidden, and failure states are reachable and legible
       on both dashboards
 * [ ] Actions Taken: all seven fields visible, Performed by read-only, Follow-up
       Note appears with its asterisk only for Yes, empty fields omitted
+* [ ] Exactly one entry carries **Latest recorded**, also when it is not the last
+      card, and a date edit that re-sorts a card is announced
 * [ ] Editable and read-only fields are visibly different, and read-only is
       different from disabled (Requester view, a resolved Ticket)
 * [ ] The Requester Ticket Detail shows Actions Taken and Status History with no

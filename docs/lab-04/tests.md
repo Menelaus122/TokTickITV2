@@ -65,10 +65,10 @@ first, then the rule or requirement where it adds precision.
 | UNIT-02 | Unit | AC-04, BR-04, D-18 | Follow-up Note against Follow-Up Required?, including an edit that merges onto the stored record | required for Yes; ignored and cleared for No; an edit that sets Yes onto a record with no note is rejected without a note in the same request | `server/tests/lab-04/action-taken-rules.test.ts` | Planned |
 | UNIT-03 | Unit | AC-04, BR-06 | Action Date/Time bounds against an explicit clock: now + 5 min, + 5 min 1 s; the Ticket's `createdAt`, 1 ms before it; a non-ISO value | the two inner values accepted, the three outer rejected | `server/tests/lab-04/action-taken-rules.test.ts` | Planned |
 | UNIT-04 | Unit | AC-04, AC-26, BR-12 | a NUL character and whitespace-only text in every text field | rejected, never passed on to the database | `server/tests/lab-04/action-taken-rules.test.ts` | Planned |
-| UNIT-05 | Unit | AC-10, BR-08 | the ordering comparator | oldest `actionAt` first, ties by `id`, and the latest is the last | `server/tests/lab-04/action-taken-rules.test.ts` | Planned |
+| UNIT-05 | Unit | AC-10, BR-08 | the reading-order comparator | oldest `actionAt` first, ties by `id`; the order says nothing about which action is the gate's "latest" (UNIT-08) | `server/tests/lab-04/action-taken-rules.test.ts` | Planned |
 | UNIT-06 | Unit | AC-07, BR-28 | `requestKey` validation at 7/8 and 64/65 characters and over the allowed character set | 8–64 of `A–Z a–z 0–9 - _` accepted; the rest rejected | `server/tests/lab-04/action-taken-rules.test.ts` | Planned |
 | UNIT-07 | Unit | AC-03, BR-17 | the gate with no actions | `ACTION_REQUIRED` | `server/tests/lab-04/resolution-gate.test.ts` | Planned |
-| UNIT-08 | Unit | AC-03, AC-10, BR-17 | the gate against the latest action | latest follow-up Yes is `FOLLOW_UP_PENDING`; latest No passes; an earlier Yes followed by a No passes; "latest" follows BR-08 order, not insertion order | `server/tests/lab-04/resolution-gate.test.ts` | Planned |
+| UNIT-08 | Unit | AC-03, BR-17, D-07 | the gate against the most recently **recorded** action | a most-recently-recorded Yes is `FOLLOW_UP_PENDING`; a No passes; an earlier-recorded Yes followed by a No passes; "latest" is `createdAt` then `id`, never `actionAt`, so a Yes recorded last but dated earliest still blocks, and changing any `actionAt` cannot change the outcome | `server/tests/lab-04/resolution-gate.test.ts` | Planned |
 | UNIT-09 | Unit | AC-12, BR-17, D-07 | the gate across a reopen | actions created before the latest reopen are ignored, those after count, and a Ticket with no history row is treated as never reopened | `server/tests/lab-04/resolution-gate.test.ts` | Planned |
 | UNIT-10 | Unit | AC-11, AC-16, BR-15 | transition options for all 8 statuses, with and without an owner, with each gate result | permitted and blocked together are exactly the matrix row, and each blocked entry carries `OWNER_REQUIRED`, `ACTION_REQUIRED`, or `FOLLOW_UP_PENDING` | `server/tests/lab-04/resolution-gate.test.ts` | Planned |
 | UNIT-11 | Unit | AC-21, BR-31 | `group` query parsing | `open` accepted; an unknown or repeated value rejected; combines with `status` by AND | `server/tests/lab-04/group-filter.test.ts` | Planned |
@@ -90,7 +90,7 @@ first, then the rule or requirement where it adds precision.
 | API-10 | API | AC-06, BR-11, BR-27 | a successful edit | action `version` + 1; the Ticket's `updatedAt` moved; the Ticket's own `version` unchanged | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
 | API-11 | API | AC-06, BR-27 | an edit with no `expectedVersion`, then with a stale one | `400` on `expectedVersion`; then `409 STALE_UPDATE` whose `error.current` is the latest action, with the stored row unchanged | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
 | API-12 | API | AC-06, BR-29 | two simultaneous edits with the same `expectedVersion`, sent with `Promise.all` | exactly one `200` and one `409`, and the stored row holds the winner's values | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-13 | API | AC-07, BR-28, D-04 | the same `requestKey` sent twice, in sequence and with `Promise.all`; then the same key from another user | one row for the first pair, the second answer `200` with the same body; the other user's key makes a separate row | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
+| API-13 | API | AC-07, BR-28, D-04 | the same `requestKey` sent twice, in sequence and with `Promise.all`; then the same key from another user | one row for the first pair, the second answer `200` with the same body; the other user's key makes a separate row; the same key sent again **after the Ticket was resolved** is `200` with the existing action, not `TICKET_NOT_ACTIVE` | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
 | API-14 | API | AC-09, BR-10 | create and edit on `RESOLVED`, `CLOSED`, and `CANCELLED` Tickets, then on the other five statuses | `409 TICKET_NOT_ACTIVE` and nothing written; the other five succeed | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
 | API-15 | API | AC-08, BR-13, BR-44 | a Requester on their own Ticket, then writing, then another Requester's Ticket | the list returns every field of every action; `POST` and `PATCH` are `403`; the other Ticket is `404`, byte-identical to a nonexistent id | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
 | API-16 | API | AC-05, BR-01, BR-09 | `DELETE` on an action, and an `actionId` belonging to a different Ticket | the unknown-route `404`; and `404` for the other Ticket's action | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
@@ -118,20 +118,22 @@ first, then the rule or requirement where it adds precision.
 | WF-02 | Workflow | AC-11, BR-15 | every non-permitted pair, and a transition to the current status | `409 INVALID_TRANSITION`, status unchanged | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
 | WF-03 | Workflow | AC-11, AC-15, BR-16, BR-20 | a Requester calls each status route; a Requester marks "appears resolved" | `403`; the signal is recorded and `currentStatus` is unchanged | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
 | WF-04 | Workflow | AC-03, BR-17, BR-18 | `RESOLVED` on an owned Ticket with no Action Taken | `409 ACTION_REQUIRED`, status unchanged, no history row | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
-| WF-05 | Workflow | AC-03, BR-17, BR-18 | `RESOLVED` when the latest action requires follow-up, then after a closing action | `409 FOLLOW_UP_PENDING`; then `200` | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
+| WF-05 | Workflow | AC-03, BR-17, BR-18 | `RESOLVED` when the most recently recorded action requires follow-up, then after a closing action | `409 FOLLOW_UP_PENDING`; then `200` | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
 | WF-06 | Workflow | AC-03, FR-10 | the gate on a direct API call that never opened the screen, as IT Staff and as an Administrator | the same refusal as WF-04 and WF-05 | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
 | WF-07 | Workflow | AC-12, BR-17, D-07 | resolve, reopen, then resolve again with no new action, then with one | the second resolve is `409 ACTION_REQUIRED`; with a post-reopen action it is `200` | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
 | WF-08 | Workflow | AC-15, BR-20, FR-11 | "appears resolved" on a Ticket with no relevant action | status unchanged; the gate still answers `ACTION_REQUIRED` | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
 | WF-09 | Workflow | AC-13, BR-21 | a transition, a claim that moves `NEW` to `OPEN`, and a refused transition | one history row each for the first two, with from, to, actor, and time; none for the refusal | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
 | WF-10 | Workflow | AC-13, BR-22, BR-23 | read the history as the Requester, another Requester, IT Staff, and an Administrator; `PATCH` and `DELETE` a row | oldest first; own Ticket `200`; another's `404`; staff `200`; no update or delete route | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
 | WF-11 | Workflow | AC-14, BR-25 | `version` after owner, IT Priority, status, and "appears resolved" changes; after a no-op; after an action and a comment | + 1 for each real change; unchanged for the no-op, the action, and the comment | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
-| WF-12 | Workflow | AC-14, BR-26, FR-12 | a stale `expectedVersion` on each of owner, IT Priority, and status; and a stale `expectedOwnerId` | `409 STALE_UPDATE` whose `error.current` is the Ticket, the other change intact; `TICKET_ALREADY_OWNED` for the owner id, checked first | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
+| WF-12 | Workflow | AC-14, BR-26, FR-12 | a stale `expectedVersion` on each of owner, IT Priority, and status, including one made stale only by a Requester's "appears resolved"; and a stale `expectedOwnerId` | `409 STALE_UPDATE` whose `error.current` is the Ticket, the other change intact; `TICKET_ALREADY_OWNED` for the owner id, checked first | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
 | WF-13 | Workflow | AC-14, BR-29 | two simultaneous status changes with the same `expectedVersion`, sent with `Promise.all` | exactly one `200` and one `409`, and one history row | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
 | WF-14 | Workflow | AC-11, BR-24 | a request that is stale and invalid; one that is unowned and ungated | `STALE_UPDATE` first; `OWNER_REQUIRED` before the gate | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
 | WF-15 | Workflow | AC-11, BR-19 | reasons for `RESOLVED`, `CANCELLED`, and `REOPENED` (Lab 3 BR-36, BR-37 carried) | `400` without a 5–2000 character reason; a Public Comment is created in the same transaction | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
 | WF-16 | Workflow | AC-16, BR-17 | `GET /api/staff/tickets/:id` for each status, then after an action is recorded | `permittedTransitions` and `blockedTransitions` together are the matrix row; each blocked entry has its code and message; recording an action moves `RESOLVED` into `permittedTransitions` | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
 | WF-17 | Workflow | AC-14, BR-25, BR-29 | IT Priority change with a stale version; resending the same value | `409 STALE_UPDATE`; the resend is `200` with `version` unchanged; `requestedPriority` never changes | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
 | WF-18 | Workflow | AC-33, BR-55 | the owner object in the staff detail and queue for an inactive owner and for an owner whose role was changed to Requester | `role` and `isActive` present and correct in both | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
+| WF-19 | Workflow | AC-03, AC-10, BR-08, BR-17 | the gate with a backdated action: action #1 recorded first, `actionAt` 10:00, No; action #2 recorded after it, `actionAt` 09:00, Yes; then edit #1's `actionAt` earlier and later; then record a closing action | `RESOLVED` is `409 FOLLOW_UP_PENDING` although #2 sorts first in the list; no edit to any `actionAt` changes the answer; the closing action makes it `200`; the list stays in `actionAt` order throughout | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
+| WF-20 | Workflow | AC-14, BR-24, BR-29 | an assignment racing the deactivation of the proposed owner: a second transaction holds the user row's lock, the owner `PATCH` is sent, then the deactivation commits | the assignment waits for the lock and, once the deactivation has committed, answers `409 OWNER_NOT_ASSIGNABLE` with the Ticket's owner unchanged; in the other order the assignment succeeds and the owner stays (Lab 3 BR-26) | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
 
 ### 2.5 API — dashboards
 
@@ -152,8 +154,8 @@ first, then the rule or requirement where it adds precision.
 | DASH-13 | Dashboard | AC-19, BR-39 | `idle.it@toktickit.local` | `assignedToMe` is `0`; `myTickets` and `myRecentActions` are empty | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
 | DASH-14 | Dashboard | AC-19, BR-36 | the three lists, with a description over 120 characters | order and limit per BR-36; the description cut at 120 characters with an ellipsis | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
 | DASH-15 | Dashboard | AC-19, BR-31 | a `CANCELLED` Ticket with no owner and a `CANCELLED` urgent Ticket | counted in no open metric | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
-| DASH-16 | Dashboard | AC-20, BR-38 | an Administrator and an IT Staff member read the dashboard | the Administrator's `userCounts` equal the user table and `inactive.href` is `null`; IT Staff have no `userCounts` key | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
-| DASH-17 | Dashboard | AC-21, BR-40 | follow each staff `href` against `GET /api/staff/tickets` and `GET /api/admin/users` | `totalItems` or the user count equals `value` for every card, status row, and `userCounts` entry that has a link | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
+| DASH-16 | Dashboard | AC-20, BR-38 | an Administrator and an IT Staff member read the dashboard | the Administrator's `userCounts` (active per role, and inactive) equal the user table and no entry has an `href`; IT Staff have no `userCounts` key | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
+| DASH-17 | Dashboard | AC-21, BR-40 | follow each staff `href` against `GET /api/staff/tickets` | `totalItems` equals `value` for every card and status row; the account counts carry no `href`, so nothing is followed for them | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
 | DASH-18 | Dashboard | AC-21, BR-31 | `group=open` on the queue, alone, with `status`, `owner`, and `itPriority`, repeated, and unknown | AND with every filter; `400 INVALID_QUERY` for the last two | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
 | DASH-19 | Dashboard | AC-20, BR-43 | a Requester and no session call the staff dashboard | `403` and `401` | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
 
@@ -165,7 +167,7 @@ first, then the rule or requirement where it adds precision.
 | MIG-02 | Migration | AC-23, BR-46 | requester bindings, owners, and ticket numbers; every `Ticket.version` | unchanged; every `version` is 1 | `server/tests/lab-04/migration.regression.test.ts` | Planned |
 | MIG-03 | Migration | AC-23, BR-47 | open a legacy Ticket: its detail, actions, and history | the detail loads; actions and history are `[]`; no error | `server/tests/lab-04/migration.regression.test.ts` | Planned |
 | MIG-04 | Migration | AC-23, BR-48 | a legacy `RESOLVED` and `CLOSED` Ticket, and a legacy `IN_PROGRESS` one | the first two are not re-gated and can be reopened; the third is gated | `server/tests/lab-04/migration.regression.test.ts` | Planned |
-| MIG-05 | Migration | AC-23, BR-49 | apply the rollback script to a copy of the migrated database | the Lab 3 tables and rows are exactly as before; the two new tables and `version` are gone; the single-column `ownerId` index is back | `server/tests/lab-04/migration.regression.test.ts` | Planned |
+| MIG-05 | Migration | AC-23, BR-49 | snapshot the Lab 3 tables of a scratch database **in the Lab 3 state**, apply the Lab 4 migration, then run the rollback script **without** the Lab 4 seed in between | the Lab 3 tables equal the snapshot row for row; the two new tables and `version` are gone; the single-column `ownerId` index is back | `server/tests/lab-04/migration.regression.test.ts` | Planned |
 | MIG-06 | Migration | AC-24, BR-46 | run the seed twice | identical row counts after each; no duplicate account, action, or history row | `server/tests/lab-04/migration.regression.test.ts` | Planned |
 | MIG-07 | Migration | AC-24, specification §7.5 | the seeded spread | all 8 statuses, owned and unowned, zero / one / several actions, an action by a non-owner, follow-up Yes and No, both reopened cases, and the two zero-data accounts | `server/tests/lab-04/migration.regression.test.ts` | Planned |
 
@@ -184,11 +186,11 @@ first, then the rule or requirement where it adds precision.
 
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| UI-01 | UI | AC-10, AC-23, FR-01, FR-08 | the Actions Taken list, and a Ticket with none | entries in BR-08 order showing all seven fields, empty ones omitted; the explicit empty state | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
+| UI-01 | UI | AC-10, AC-23, FR-01, FR-08 | the Actions Taken list, and a Ticket with none | entries in BR-08 reading order showing all seven fields, empty ones omitted; the **Latest recorded** tag on exactly one entry, the most recently recorded, including when it is not the last card; the explicit empty state | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
 | UI-02 | UI | AC-04, FR-02 | create mode | every field present, Performed by read-only, red asterisks, Follow-up Note shown and required only for Yes | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
 | UI-03 | UI | AC-04, AC-27, BR-54 | validation and a failed save | messages beneath their own fields, focus on the first invalid field, every typed value kept | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
 | UI-04 | UI | AC-07, AC-27, BR-28 | repeated clicks on Save, then a network failure and a retry | one request per submission, Save busy and disabled; the retry reuses the same `requestKey` | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-05 | UI | AC-05, AC-06, FR-03 | edit mode | the form opens in place with the stored values; Performed by read-only; the save sends `expectedVersion`; the card returns to view mode with "Edited by" | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
+| UI-05 | UI | AC-05, AC-06, FR-03 | edit mode | the form opens in place with the stored values; Performed by read-only; the save sends `expectedVersion`; the card returns to view mode with "Edited by"; an edit that changes Action Date/Time moves the card, announces "Moved to its new position by date.", and keeps focus on it | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
 | UI-06 | UI | AC-06, AC-27, FR-07 | a `409 STALE_UPDATE` on an edit | the conflict callout inside the card, the user's edits kept, **Show latest** asks before replacing them | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
 | UI-07 | UI | AC-08, FR-04 | the Requester's view | every action read-only; no **Add action**, no **Edit**, no hint of either | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
 | UI-08 | UI | AC-09, BR-10 | a `RESOLVED`, `CLOSED`, or `CANCELLED` Ticket | **Add action** and **Edit** disabled with the explanation; the entries stay readable; a `409 TICKET_NOT_ACTIVE` shows its own message | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
@@ -207,7 +209,7 @@ first, then the rule or requirement where it adds precision.
 | UI-21 | UI | AC-22, FR-20 | loading, forbidden, failure, and Refresh | skeletons; the forbidden callout; a failure callout with **Try again**; Refresh disables itself, keeps the old numbers until the new ones arrive, and keeps them if the refresh fails | `client/tests/lab-04/RequesterDashboard.test.tsx` | Planned |
 | UI-22 | UI | AC-19, AC-21, FR-16 | the four staff cards and the status row | values and links per BR-34 and BR-35; every `href` followed unchanged | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
 | UI-23 | UI | AC-19, FR-16 | the three staff lists | rows link to the Ticket; the follow-up pill carries text; descriptions are cut | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
-| UI-24 | UI | AC-20, FR-17 | an Administrator, then IT Staff | the Administrator sees the accounts region with **Inactive** as a non-link; IT Staff do not | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
+| UI-24 | UI | AC-20, FR-17 | an Administrator, then IT Staff | the Administrator sees the accounts region with all four counts as plain numbers and only **Open User Management** as a link; IT Staff do not | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
 | UI-25 | UI | AC-22, FR-20 | loading, zero data, forbidden, failure, and Refresh | as UI-21; zero data keeps the cards and shows the staff empty messages | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
 | UI-26 | UI | AC-19, D-11 | the quick actions | **Open Ticket Queue**, **Unassigned Tickets**, and **My Queue** only; no Create Ticket, no Profile, no "from yesterday" | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
 | UI-27 | UI | AC-17, FR-23, FR-24 | the Administrator's navigation and routes | **Ticket Queue** is offered and opens; a Requester typing `/queue` or `/users` lands on their Dashboard with the forbidden callout | `client/tests/lab-04/RoleNavigation.test.tsx` | Planned |
@@ -221,7 +223,7 @@ first, then the rule or requirement where it adds precision.
 | UI-35 | UI | AC-30, FR-31 | keyboard: tab order, visible focus, labels, and the focus moves after create, edit, and **Go to Actions Taken** | every control reachable and named; focus lands where `ui-spec.md` §9 says | `client/tests/lab-04/FinalRegression.test.tsx` | Planned |
 | UI-36 | UI | AC-30, FR-31 | status, priority, role, and follow-up badges | each carries text, not colour alone | `client/tests/lab-04/FinalRegression.test.tsx` | Planned |
 | UI-37 | UI | AC-34, FR-22, D-09 | each role's navigation and landing page | **Dashboard** first and marked `aria-current="page"` on `/dashboard`; the wordmark links to it; each role lands on its own dashboard | `client/tests/lab-04/RoleNavigation.test.tsx` | Planned |
-| UI-38 | UI | AC-21, FR-21 | the Ticket Queue with `?owner=unassigned&group=open`, and User Management with `?role=IT_STAFF` | the filters read from the URL and written back; the chip shows; Clear Filters works | `client/tests/lab-04/DrillDown.test.tsx` | Planned |
+| UI-38 | UI | AC-21, FR-21 | the Ticket Queue with `?owner=unassigned&group=open` | the filters read from the URL and written back; the chip shows; Clear Filters works | `client/tests/lab-04/DrillDown.test.tsx` | Planned |
 
 ### 2.9 UI style — `client/tests/lab-04/ZenGreenLab4.test.tsx`
 
@@ -277,18 +279,18 @@ alone.
 | :--- | :--- |
 | AC-01 | API-03, API-04, API-06, E2E-01 |
 | AC-02 | DASH-01, DASH-06, SEC-07, E2E-05 |
-| AC-03 | UNIT-07, UNIT-08, WF-04, WF-05, WF-06, UI-12, E2E-02 |
+| AC-03 | UNIT-07, UNIT-08, WF-04, WF-05, WF-06, WF-19, UI-12, E2E-02 |
 | AC-04 | UNIT-01 – UNIT-04, API-07, API-08, API-09, UI-02, UI-03, STYLE-03, E2E-04 |
 | AC-05 | API-04, API-05, API-16, UI-05, E2E-01 |
 | AC-06 | API-10, API-11, API-12, UI-05, UI-06 |
 | AC-07 | UNIT-06, API-13, UI-04, E2E-04 |
 | AC-08 | API-15, SEC-02, UI-07, E2E-01 |
 | AC-09 | API-14, UI-08 |
-| AC-10 | UNIT-05, UNIT-08, API-01, API-02, UI-01 |
+| AC-10 | UNIT-05, API-01, API-02, WF-19, UI-01 |
 | AC-11 | UNIT-10, WF-01, WF-02, WF-03, WF-14, WF-15 |
 | AC-12 | UNIT-09, WF-07, E2E-08 |
 | AC-13 | WF-09, WF-10, UI-15, E2E-08 |
-| AC-14 | WF-11, WF-12, WF-13, WF-17, UI-14, E2E-03 |
+| AC-14 | WF-11, WF-12, WF-13, WF-17, WF-20, UI-14, E2E-03 |
 | AC-15 | WF-03, WF-08, UI-16, E2E-08 |
 | AC-16 | UNIT-10, WF-16, UI-10, UI-11, UI-12, UI-13 |
 | AC-17 | SEC-01 – SEC-04, SEC-06, SEC-08, SEC-09, UI-27, UI-28, E2E-07 |
@@ -312,7 +314,7 @@ alone.
 
 ### 3.1 Planned test distribution by issue
 
-149 tests are planned: 12 unit, 17 Actions Taken API, 9 authorization, 18
+151 tests are planned: 12 unit, 17 Actions Taken API, 9 authorization, 20
 workflow, 19 dashboard, 7 migration, 3 hardening, 3 performance smoke, 38 UI
 component, 6 UI style, 6 responsive, 8 E2E, and 3 regression suites.
 
@@ -322,7 +324,7 @@ component, 6 UI style, 6 responsive, 8 E2E, and 3 regression suites.
 | 3 — Actions Taken data model, migration, and seed (#69) | MIG-01 – MIG-07 |
 | 4 — Actions Taken API (#70) | UNIT-01 – UNIT-06, API-01 – API-17 |
 | 5 — Actions Taken UI on Ticket Detail (#71) | UI-01 – UI-09, STYLE-03 |
-| 6 — Ticket workflow and resolution gate (#72) | UNIT-07 – UNIT-10, WF-01 – WF-17, UI-10 – UI-16, STYLE-06 |
+| 6 — Ticket workflow and resolution gate (#72) | UNIT-07 – UNIT-10, WF-01 – WF-17, WF-19, WF-20, UI-10 – UI-16, STYLE-06 |
 | 7 — Requester Dashboard (#73) | UNIT-11, DASH-01 – DASH-09, UI-18 – UI-21, UI-29, UI-37 (Requester), STYLE-02 |
 | 8 — IT Staff and Administrator Dashboard (#74) | DASH-10 – DASH-19, UI-22 – UI-26, UI-37 (IT Staff and Administrator), UI-38 |
 | 9 — Final hardening and full regression (#75) | UNIT-12, WF-18, UI-17, HARD-01 – HARD-03, PERF-01 – PERF-03, UI-30 – UI-36, STYLE-01, STYLE-04, STYLE-05 |
@@ -439,6 +441,8 @@ forces it, and the **Status** column records it when it is done.
 | `client/tests/lab-03/RequesterRegression.test.tsx` — "a signed-in Requester lands on My Tickets" | the landing page is My Tickets | the landing page is the Dashboard | D-09 | 7 | Planned |
 | `e2e/lab-03/authentication.spec.ts` — E2E-01 and the landing-page table | the Requester's navigation is exactly My Tickets and Create Ticket; IT Staff land on `/queue` and an Administrator on `/users` | each role's navigation starts with Dashboard and each lands on `/dashboard` | D-09 | 7, 8 | Planned |
 | `client/tests/lab-02/Navigation.test.tsx` | iterates the Requester's navigation items | expected to pass unchanged because it iterates `NAV_ITEMS`; re-verified, not edited, unless it does not | D-09 | 7 | Planned |
+| `client/tests/lab-02/RequesterTicketDetail.test.tsx` | mocks each client call with `vi.spyOn(api, …)`: the ticket detail, comments, and attachments | the mocks gain the two calls the Requester Ticket Detail now makes, `fetchActionsTaken` (Issue 5) and `fetchStatusHistory` (Issue 6); no assertion changes | the screen loads two more resources; an unmocked call would reach the network | 5, 6 | Planned |
+| `client/tests/lab-03/RequesterComments.test.tsx` | the same per-call mocks, with `fetchComments` | the same two mocks are added | as above | 5, 6 | Planned |
 
 No Lab 1 test changes. A change not in this table is a defect to be fixed in the
 code, not in the test. If implementation finds a Lab 3 test that must change and
@@ -456,7 +460,7 @@ is not listed, the issue adds it here with its reason in the same pull request.
 | Accessibility | Checked by assertions on roles, labels, and focus (UI-35, UI-36, RESP-06) plus the manual checklist of §5. No automated scanner runs, and none is added (§3.2 of the specification). |
 | Concurrency | WF-13, API-12, and API-13 send two requests at once against the row lock and the unique key; sustained parallel load is not tested. |
 | Action edit history | Edits overwrite in place and are not kept (D-13); no test can assert what an action said before an edit. |
-| Rollback | MIG-05 proves the rollback on a scratch copy. Rolling back a database that has already collected real Lab 4 actions loses them by design; the dump taken before migrating is the recovery. |
+| Rollback | MIG-05 proves the rollback on a scratch database in the Lab 3 state, **before** the Lab 4 seed runs. A database seeded after migrating keeps the seed's two accounts and the moved `Ticket.updatedAt` values after a rollback, because the script undoes the migration and not the seed (`specification.md` §7.6); the dump taken before migrating is the recovery for that case, and for one that already holds real Lab 4 actions, which a rollback loses by design. |
 | Inherited | CSRF has no token test (Lab 3 D-13). The intermittent `RoleNavigation.test.tsx` and `Navigation.test.tsx` failures (Lab 3 §7) are to be investigated in Issue 9 (D-22 of the specification); if the cause is not found, this row records what was tried. |
 
 ---
