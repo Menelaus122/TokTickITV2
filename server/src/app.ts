@@ -8,6 +8,7 @@ import { validateTicketInput } from "./validation.js";
 import { nextTicketNumber } from "./ticketNumber.js";
 import { parseTicketListQuery, buildPageMeta } from "./listQuery.js";
 import { conversationRouter } from "./conversation.js";
+import { actionsTakenReadRouter, actionsTakenStaffRouter } from "./actionsTaken.js";
 import { staffRouter } from "./staff.js";
 import { adminRouter } from "./admin.js";
 import { routeId } from "./routeId.js";
@@ -677,8 +678,12 @@ app.patch("/api/attachments/:id/remove", async (req: Request, res: Response) => 
 // Lab 3, Issue 4 — safe errors to the very end (FR-47, api-spec §6.2).
 // Lab 3, Issue 7 — Public Comments, Internal Notes, and appears-resolved.
 app.use("/api/tickets", conversationRouter);
+// Lab 4, Issue 4 — the Actions Taken list of a Ticket.
+app.use("/api/tickets", actionsTakenReadRouter);
 // Lab 3, Issue 8 — the IT Staff queue, behind the /api/staff role guard above.
 app.use("/api/staff", staffRouter);
+// Lab 4, Issue 4 — recording and editing Actions Taken, behind the same role guard.
+app.use("/api/staff", actionsTakenStaffRouter);
 // Lab 3, Issue 10 — user management, behind the /api/admin role guard above.
 app.use("/api/admin", adminRouter);
 

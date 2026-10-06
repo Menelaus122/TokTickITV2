@@ -63,12 +63,12 @@ first, then the rule or requirement where it adds precision.
 
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| UNIT-01 | Unit | AC-04, BR-03 | description, result, follow-up note, and attachment-notes lengths at each boundary: description 4/5 and 2000/2001, result 1/2 and 1000/1001, note 4/5 and 1000/1001, attachment notes 500/501 | the inner values accepted, the outer rejected, one message per field | `server/tests/lab-04/action-taken-rules.test.ts` | Planned |
-| UNIT-02 | Unit | AC-04, BR-04, D-18 | Follow-up Note against Follow-Up Required?, including an edit that merges onto the stored record | required for Yes; ignored and cleared for No; an edit that sets Yes onto a record with no note is rejected without a note in the same request | `server/tests/lab-04/action-taken-rules.test.ts` | Planned |
-| UNIT-03 | Unit | AC-04, BR-06 | Action Date/Time bounds against an explicit clock: now + 5 min, + 5 min 1 s; the Ticket's `createdAt`, 1 ms before it; a non-ISO value | the two inner values accepted, the three outer rejected | `server/tests/lab-04/action-taken-rules.test.ts` | Planned |
-| UNIT-04 | Unit | AC-04, AC-26, BR-12 | a NUL character and whitespace-only text in every text field | rejected, never passed on to the database | `server/tests/lab-04/action-taken-rules.test.ts` | Planned |
-| UNIT-05 | Unit | AC-10, BR-08 | the reading-order comparator | oldest `actionAt` first, ties by `id`; the order says nothing about which action is the gate's "latest" (UNIT-08) | `server/tests/lab-04/action-taken-rules.test.ts` | Planned |
-| UNIT-06 | Unit | AC-07, BR-28 | `requestKey` validation at 7/8 and 64/65 characters and over the allowed character set | 8–64 of `A–Z a–z 0–9 - _` accepted; the rest rejected | `server/tests/lab-04/action-taken-rules.test.ts` | Planned |
+| UNIT-01 | Unit | AC-04, BR-03 | description, result, follow-up note, and attachment-notes lengths at each boundary: description 4/5 and 2000/2001, result 1/2 and 1000/1001, note 4/5 and 1000/1001, attachment notes 500/501 | the inner values accepted, the outer rejected, one message per field | `server/tests/lab-04/action-taken-rules.test.ts` | Pass |
+| UNIT-02 | Unit | AC-04, BR-04, D-18 | Follow-up Note against Follow-Up Required?, including an edit that merges onto the stored record | required for Yes; ignored and cleared for No; an edit that sets Yes onto a record with no note is rejected without a note in the same request | `server/tests/lab-04/action-taken-rules.test.ts` | Pass |
+| UNIT-03 | Unit | AC-04, BR-06 | Action Date/Time bounds against an explicit clock: now + 5 min, + 5 min 1 s; the Ticket's `createdAt`, 1 ms before it; a non-ISO value; a day that does not exist (31 February, 29 February in 2023 and 1900, the day after the end of every month) and `24:00`, each on a Ticket old enough that no other rule could refuse them | the two inner values accepted, the three outer rejected; 29 February accepted in 2024 and 2000; a date that does not exist is refused, never moved to one that does | `server/tests/lab-04/action-taken-rules.test.ts` | Pass |
+| UNIT-04 | Unit | AC-04, AC-26, BR-12 | a NUL character and whitespace-only text in every text field | rejected, never passed on to the database | `server/tests/lab-04/action-taken-rules.test.ts` | Pass |
+| UNIT-05 | Unit | AC-10, BR-08 | the reading-order comparator | oldest `actionAt` first, ties by `id`; the order says nothing about which action is the gate's "latest" (UNIT-08) | `server/tests/lab-04/action-taken-rules.test.ts` | Pass |
+| UNIT-06 | Unit | AC-07, BR-28 | `requestKey` validation at 7/8 and 64/65 characters and over the allowed character set | 8–64 of `A–Z a–z 0–9 - _` accepted; the rest rejected | `server/tests/lab-04/action-taken-rules.test.ts` | Pass |
 | UNIT-07 | Unit | AC-03, BR-17 | the gate with no actions | `ACTION_REQUIRED` | `server/tests/lab-04/resolution-gate.test.ts` | Planned |
 | UNIT-08 | Unit | AC-03, BR-17, D-07 | the gate against the most recently **recorded** action | a most-recently-recorded Yes is `FOLLOW_UP_PENDING`; a No passes; an earlier-recorded Yes followed by a No passes; "latest" is `createdAt` then `id`, never `actionAt`, so a Yes recorded last but dated earliest still blocks, and changing any `actionAt` cannot change the outcome | `server/tests/lab-04/resolution-gate.test.ts` | Planned |
 | UNIT-09 | Unit | AC-12, BR-17, D-07 | the gate across a reopen | actions created before the latest reopen are ignored, those after count, and a Ticket with no history row is treated as never reopened | `server/tests/lab-04/resolution-gate.test.ts` | Planned |
@@ -80,23 +80,23 @@ first, then the rule or requirement where it adds precision.
 
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| API-01 | API | AC-10, AC-23, FR-08 | list the Actions Taken of a Ticket that has none, including a legacy one | `200` with `"actions": []` | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-02 | API | AC-10, BR-08 | list a Ticket with several actions, two of them sharing a time | ordered by `actionAt` then `id`, identical on every read | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-03 | API | AC-01, BR-01, BR-05 | Create a valid Actions Taken as a permitted IT Staff user | `201`, created under the correct Ticket with the authenticated user as Performed by, `version` 1, and the Ticket's `updatedAt` moved | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-04 | API | AC-01, AC-05, BR-02 | create as the Ticket Owner, as a different IT Staff member, and as an Administrator | each `201`, each `performedBy` the caller, ownership unchanged | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-05 | API | AC-05, BR-09 | a different user edits an action | `200`, `performedBy` unchanged, `updatedBy` is the editor, `version` + 1 | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-06 | API | AC-01, BR-05 | a body carrying `performedBy`, `ticketId`, `createdAt`, and `version` | all ignored; the session user and the path's Ticket win | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-07 | API | AC-04, BR-03 | missing, blank, too-short, and too-long required fields | `400 VALIDATION_FAILED` with `fields`, one message per offending field | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-08 | API | AC-04, BR-04 | follow-up rules on create and edit | Yes without a note is `400`; No stores `null` for a note that was sent; an edit to No clears the stored note | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-09 | API | AC-04, BR-06 | `actionAt` in the future, before the Ticket existed, and not ISO | `400` on `actionAt` | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-10 | API | AC-06, BR-11, BR-27 | a successful edit | action `version` + 1; the Ticket's `updatedAt` moved; the Ticket's own `version` unchanged | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-11 | API | AC-06, BR-27 | an edit with no `expectedVersion`, then with a stale one | `400` on `expectedVersion`; then `409 STALE_UPDATE` whose `error.current` is the latest action, with the stored row unchanged | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-12 | API | AC-06, BR-29 | two simultaneous edits with the same `expectedVersion`, sent with `Promise.all` | exactly one `200` and one `409`, and the stored row holds the winner's values | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-13 | API | AC-07, BR-28, D-04 | the same `requestKey` sent twice, in sequence and with `Promise.all`; then the same key from another user | one row for the first pair, the second answer `200` with the same body; the other user's key makes a separate row; the same key sent again **after the Ticket was resolved** is `200` with the existing action, not `TICKET_NOT_ACTIVE` | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-14 | API | AC-09, BR-10 | create and edit on `RESOLVED`, `CLOSED`, and `CANCELLED` Tickets, then on the other five statuses | `409 TICKET_NOT_ACTIVE` and nothing written; the other five succeed | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-15 | API | AC-08, BR-13, BR-44 | a Requester on their own Ticket, then writing, then another Requester's Ticket | the list returns every field of every action; `POST` and `PATCH` are `403`; the other Ticket is `404`, byte-identical to a nonexistent id | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-16 | API | AC-05, BR-01, BR-09 | `DELETE` on an action, and an `actionId` belonging to a different Ticket | the unknown-route `404`; and `404` for the other Ticket's action | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-17 | API | AC-26, BR-52 | a NUL character in each text field, and an out-of-range id in the path | `400`, never `500` | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
+| API-01 | API | AC-10, AC-23, FR-08 | list the Actions Taken of a Ticket that has none, including a legacy one | `200` with `"actions": []` | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-02 | API | AC-10, BR-08 | list a Ticket with several actions, two of them sharing a time | ordered by `actionAt` then `id`, identical on every read | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-03 | API | AC-01, BR-01, BR-05 | Create a valid Actions Taken as a permitted IT Staff user | `201`, created under the correct Ticket with the authenticated user as Performed by, `version` 1, and the Ticket's `updatedAt` moved | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-04 | API | AC-01, AC-05, BR-02 | create as the Ticket Owner, as a different IT Staff member, and as an Administrator | each `201`, each `performedBy` the caller, ownership unchanged | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-05 | API | AC-05, BR-09 | a different user edits an action | `200`, `performedBy` unchanged, `updatedBy` is the editor, `version` + 1 | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-06 | API | AC-01, BR-05 | a body carrying `performedBy`, `ticketId`, `createdAt`, and `version` | all ignored; the session user and the path's Ticket win | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-07 | API | AC-04, BR-03 | missing, blank, too-short, and too-long required fields | `400 VALIDATION_FAILED` with `fields`, one message per offending field | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-08 | API | AC-04, BR-04 | follow-up rules on create and edit | Yes without a note is `400`; No stores `null` for a note that was sent; an edit to No clears the stored note | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-09 | API | AC-04, BR-06 | `actionAt` in the future, before the Ticket existed, and not ISO; then a date that does not exist, on create and on edit, using a Ticket old enough that the rolled-over date would be allowed | `400` on `actionAt` | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-10 | API | AC-06, BR-11, BR-27 | a successful edit | action `version` + 1; the Ticket's `updatedAt` moved; the Ticket's own `version` unchanged | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-11 | API | AC-06, BR-27 | an edit with no `expectedVersion`, then with a stale one | `400` on `expectedVersion`; then `409 STALE_UPDATE` whose `error.current` is the latest action, with the stored row unchanged | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-12 | API | AC-06, BR-29 | two simultaneous edits with the same `expectedVersion`, sent with `Promise.all` | exactly one `200` and one `409`, and the stored row holds the winner's values | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-13 | API | AC-07, BR-28, D-04 | the same `requestKey` sent twice, in sequence and with `Promise.all`; then the same key from another user | one row for the first pair, the second answer `200` with the same body; the other user's key makes a separate row; the same key sent again **after the Ticket was resolved** is `200` with the existing action, not `TICKET_NOT_ACTIVE` | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-14 | API | AC-09, BR-10 | create and edit on `RESOLVED`, `CLOSED`, and `CANCELLED` Tickets, then on the other five statuses | `409 TICKET_NOT_ACTIVE` and nothing written; the other five succeed | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-15 | API | AC-08, BR-13, BR-44 | a Requester on their own Ticket, then writing, then another Requester's Ticket | the list returns every field of every action; `POST` and `PATCH` are `403`; the other Ticket is `404`, byte-identical to a nonexistent id | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-16 | API | AC-05, BR-01, BR-09 | `DELETE` on an action, and an `actionId` belonging to a different Ticket | the unknown-route `404`; and `404` for the other Ticket's action | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-17 | API | AC-26, BR-52 | a NUL character in each text field, and an out-of-range id in the path | `400`, never `500` | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
 
 ### 2.3 API — authorization, `server/tests/lab-04/authorization.api.test.ts`
 
@@ -108,7 +108,7 @@ first, then the rule or requirement where it adds precision.
 | SEC-04 | Authorization | AC-17, BR-43 | IT Staff and a Requester call every `/api/admin/*` route | `403 FORBIDDEN` | `server/tests/lab-04/authorization.api.test.ts` | Pass |
 | SEC-05 | Authorization | AC-20, BR-42 | IT Staff and an Administrator call the Requester dashboard; a Requester calls the staff dashboard | `403 FORBIDDEN` each way | `server/tests/lab-04/authorization.api.test.ts` | Planned |
 | SEC-06 | Authorization | AC-17, BR-44 | guard order: no session and wrong role together; a Requester posting to a missing Ticket on a staff route | `401` wins over `403`; `403` wins over `404` | `server/tests/lab-04/authorization.api.test.ts` | Pass |
-| SEC-07 | Authorization | AC-02, AC-19, BR-37 | `requesterId`, `userId`, and `me` in query, body, and header on both dashboards and the Actions Taken endpoints | all ignored; the session identity is used and no other user's data appears | `server/tests/lab-04/authorization.api.test.ts` | Planned |
+| SEC-07 | Authorization | AC-02, AC-19, BR-37 | `requesterId`, `userId`, and `me` in query, body, and header on both dashboards and the Actions Taken endpoints | all ignored; the session identity is used and no other user's data appears | `server/tests/lab-04/authorization.api.test.ts` | Partial |
 | SEC-08 | Authorization | AC-17, BR-45 | an Administrator records an action, changes a status, and posts a comment | `performedBy`, `changedBy`, and the author are the Administrator | `server/tests/lab-04/authorization.api.test.ts` | Partial |
 | SEC-09 | Authorization | AC-17, Lab 3 BR-65 | `POST` and `PATCH` to the new endpoints with a foreign `Origin` | `403` before the handler runs; the configured origin succeeds; a `GET` with a foreign origin succeeds | `server/tests/lab-04/authorization.api.test.ts` | Partial |
 
@@ -346,11 +346,11 @@ that adds the thing they test, by appending a row to the route tables in
 
 | Test | Complete at Issue 2 | Completed in |
 | :--- | :--- | :--- |
-| SEC-01 | no cookie → 401 on every staff and admin route, including one that is not written | 4, 7, 8 add the Actions Taken, status-history, and dashboard routes |
+| SEC-01 | no cookie → 401 on every staff and admin route, including one that is not written | ~~4~~ (done: the Actions Taken routes), 6, 7, 8 add the status-history and dashboard routes |
 | SEC-05 | not possible: both dashboards are later | 7 (Requester half), 8 (staff half) |
-| SEC-07 | not possible: the dashboards and Actions Taken take no ids yet | 4, 7, 8 |
-| SEC-08 | an Administrator is the author of their comments and notes, and the Owner of what they claim | 4 (`performedBy`), 6 (`changedBy`) |
-| SEC-09 | a foreign `Origin` is refused on an Administrator's writes to the existing staff routes | 4 adds the Actions Taken writes |
+| SEC-07 | not possible: the dashboards and Actions Taken take no ids yet | ~~4~~ (done: the Actions Taken endpoints), 7, 8 |
+| SEC-08 | an Administrator is the author of their comments and notes, and the Owner of what they claim | ~~4~~ (done: `performedBy`), 6 (`changedBy`) |
+| SEC-09 | a foreign `Origin` is refused on an Administrator's writes to the existing staff routes | ~~4~~ (done: the Actions Taken writes) |
 | UI-27 | the Administrator's navigation and routes; the sign-in deep link; the refusals; "sent home" means the role's Lab 3 home | 7, 8: the Dashboard becomes the home (UI-37) |
 | UI-28 | the owner, IT Priority, and status controls, and the Internal Notes region | 5: the Actions Taken controls |
 
@@ -363,7 +363,7 @@ when that exists:
 
 | Test | Complete at Issue 3 (the data) | Completed in |
 | :--- | :--- | :--- |
-| MIG-03 | a legacy Ticket has no row in `ActionTaken` or `TicketStatusChange` and keeps its version 1 | 4 (the actions list answers `[]` for it), 6 (the status history answers `[]` and the detail screen loads) |
+| MIG-03 | a legacy Ticket has no row in `ActionTaken` or `TicketStatusChange` and keeps its version 1 | ~~4~~ (done: the actions list answers `[]` for a seeded legacy Ticket, in API-01), 6 (the status history answers `[]` and the detail screen loads) |
 | MIG-04 | a legacy `RESOLVED`, `CLOSED`, and `IN_PROGRESS` Ticket is exactly as it was, with its owner | 6: a legacy `RESOLVED` or `CLOSED` Ticket can be reopened, and a legacy `IN_PROGRESS` one is gated like any other |
 
 MIG-08 was added in Issue 3 for what the plan lacked: a test of the migrated

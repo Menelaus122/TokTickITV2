@@ -144,7 +144,7 @@ IT Staff or Administrator. A Requester is `403 FORBIDDEN`.
 
 | Field | Rule |
 | :--- | :--- |
-| `actionAt` | required, ISO 8601; not later than server time + 5 minutes, not before the Ticket's `createdAt` (BR-06) |
+| `actionAt` | required, ISO 8601 date and time **with a zone**, a day that exists (31 February is refused, not moved to 3 March) and a time from `00:00` to `23:59:59` (`24:00` is refused, not read as the next midnight); not later than server time + 5 minutes, not before the Ticket's `createdAt` (BR-06) |
 | `description` | required string, 5–2000 characters after trimming (BR-03) |
 | `result` | required string, 2–1000 characters after trimming (BR-03) |
 | `followUpRequired` | required boolean |
@@ -167,6 +167,8 @@ not tell the two answers apart.
 | :--- | :--- |
 | A `requestKey` already used on this Ticket by this user | `200` with the existing action — **even if the Ticket has since been resolved**, closed, or cancelled, and even if the body differs: the key names the submission (BR-28) |
 | Missing or invalid field | `400 VALIDATION_FAILED` with `fields`, one message per offending field (AC-04) |
+| A `requestKey` that is present but not 8–64 characters of `A–Z a–z 0–9 - _` (`null` counts as absent) | `400 VALIDATION_FAILED` on `requestKey` |
+| A body that is not a JSON object | `400 VALIDATION_FAILED`: a JSON array names every required field; other values get the parser's own message |
 | `actionAt` in the future or before the Ticket existed | `400 VALIDATION_FAILED` on `actionAt` |
 | Ticket is `RESOLVED`, `CLOSED`, or `CANCELLED` (and the key is new) | `409 TICKET_NOT_ACTIVE` (BR-10, AC-09) |
 | Ticket does not exist | `404 NOT_FOUND` |
@@ -203,7 +205,7 @@ result: sending `followUpRequired: true` onto an action with no note needs a
 
 | Condition | Response |
 | :--- | :--- |
-| `expectedVersion` missing or not an integer | `400 VALIDATION_FAILED` on `expectedVersion` (BR-27) |
+| `expectedVersion` missing, not an integer, or less than 1 | `400 VALIDATION_FAILED` on `expectedVersion` (BR-27) |
 | `expectedVersion` no longer matches | `409 STALE_UPDATE`, `error.current` is the latest action (AC-06) |
 | Ticket is `RESOLVED`, `CLOSED`, or `CANCELLED` | `409 TICKET_NOT_ACTIVE`, checked before the version (BR-10) |
 | Field invalid | `400 VALIDATION_FAILED` with `fields` |
@@ -213,8 +215,16 @@ result: sending `followUpRequired: true` onto an action with no note needs a
 Of two simultaneous edits carrying the same version, the row lock lets one commit
 and the other sees a newer version and answers `409 STALE_UPDATE` (BR-29, AC-06).
 
-There is **no** `DELETE` route. `DELETE .../actions-taken/:actionId` answers the
-unknown-route `404 NOT_FOUND` of Lab 3 §7 (BR-09, D-13).
+The checks run in this order: role, Ticket exists, action exists on that Ticket,
+validation (`expectedVersion` included), Ticket active, version, then the write. So
+an invalid edit of a resolved Ticket is `400`, a valid one is `409 TICKET_NOT_ACTIVE`
+whatever version it carries, and only an edit of an active Ticket can be
+`409 STALE_UPDATE`.
+
+There is **no** `DELETE` route. `DELETE .../actions-taken/:actionId` answers IT Staff
+and Administrators with the unknown-route `404 NOT_FOUND` of Lab 3 §7 (BR-09, D-13).
+A Requester is `403 FORBIDDEN` and a caller with no session `401 AUTH_REQUIRED`
+first, as on every `/api/staff` route (SEC-02, SEC-06).
 
 ---
 

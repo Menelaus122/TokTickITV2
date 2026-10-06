@@ -2,28 +2,30 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request, { type Test } from "supertest";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
+import { hashPassword } from "../../src/password.js";
+import { resetLoginThrottle } from "../../src/loginThrottle.js";
 import { endTestSessions, signInAs } from "../helpers/signIn.js";
 
-// Lab 4, Issue 2 — Administrator access to IT Staff ticket operations
-// (SEC-01 to SEC-04, SEC-06, SEC-08, and SEC-09 in docs/lab-04/tests.md §2.3;
-// specification.md BR-42 to BR-45, D-08). Needs the migrated and seeded
+// Lab 4, Issues 2 and 4 — Administrator access to IT Staff ticket operations,
+// and the same guards on the Actions Taken routes (SEC-01 to SEC-04, SEC-06 to
+// SEC-09 in docs/lab-04/tests.md §2.3; specification.md BR-42 to BR-45, D-08). Needs the migrated and seeded
 // database:
 //   cd server && npx prisma migrate deploy && npm run prisma:seed
 //
 // The seam is the HTTP boundary: a real login cookie, the real Express app, the
 // real database. Nothing here reaches into the guard to test it.
 //
-// SEC-05 and SEC-07, and the parts of SEC-01, SEC-08, and SEC-09 that concern
-// the Actions Taken and dashboard endpoints, cannot be written until those
-// endpoints exist. They arrive with Issues 4, 6, 7, and 8, which add their
-// routes to the tables below. See tests.md §3.1.
+// SEC-05, the dashboard parts of SEC-01 and SEC-07, and the status-history and
+// status-change parts of SEC-08 cannot be written until those endpoints exist.
+// They arrive with Issues 6, 7, and 8, which add their routes to the tables
+// below. See tests.md §3.1.
 
 const prisma = getPrisma();
 const ALLOWED_ORIGIN = "http://localhost:5173";
 const FOREIGN_ORIGIN = "https://evil.example";
 
 type Method = "GET" | "POST" | "PATCH";
-type Who = "requester" | "staff" | "admin";
+type Who = "requester" | "staff" | "admin" | "otherRequester";
 type Row = [Method, string];
 
 // Every route under the two guarded prefixes. Later issues append theirs here.
@@ -35,7 +37,11 @@ const STAFF_ROUTES: Row[] = [
   ["PATCH", "/api/staff/tickets/1/status"],
   ["GET", "/api/staff/assignable-users"],
   ["GET", "/api/staff/attachments/1/download"],
+  ["POST", "/api/staff/tickets/1/actions-taken"],
+  ["PATCH", "/api/staff/tickets/1/actions-taken/1"],
 ];
+// Routes that any signed-in role reaches, with ownership deciding what a Requester sees.
+const SHARED_ROUTES: Row[] = [["GET", "/api/tickets/1/actions-taken"]];
 // A path nobody has written and nobody will: the prefix guard answers for it.
 const UNWRITTEN_STAFF_ROUTE: Row = ["GET", "/api/staff/this-route-does-not-exist"];
 const ADMIN_ROUTES: Row[] = [
@@ -73,6 +79,8 @@ async function makeTicket(): Promise<number> {
       description: "Created by the Lab 4 authorization suite.",
       requestedPriority: "MEDIUM",
       itPriority: "MEDIUM",
+      // A day old, so an action dated earlier today falls after it (BR-06).
+      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
     },
   });
   ticketIds.push(ticket.id);
@@ -82,16 +90,18 @@ async function makeTicket(): Promise<number> {
 const row = (id: number) => prisma.ticket.findUniqueOrThrow({ where: { id } });
 
 beforeAll(async () => {
-  const pick = (role: "REQUESTER" | "IT_STAFF" | "ADMINISTRATOR") =>
+  const pick = (role: "REQUESTER" | "IT_STAFF" | "ADMINISTRATOR", skip = 0) =>
     prisma.user.findFirstOrThrow({
       where: { role, isActive: true, mustChangePassword: false },
       orderBy: { id: "asc" },
       select: { id: true },
+      skip,
     });
   ids.requester = (await pick("REQUESTER")).id;
+  ids.otherRequester = (await pick("REQUESTER", 1)).id;
   ids.staff = (await pick("IT_STAFF")).id;
   ids.admin = (await pick("ADMINISTRATOR")).id;
-  for (const who of ["requester", "staff", "admin"] as const) cookies[who] = await signInAs(ids[who]);
+  for (const who of ["requester", "otherRequester", "staff", "admin"] as const) cookies[who] = await signInAs(ids[who]);
 
   requesterId = ids.requester;
   categoryId = (await prisma.category.findFirstOrThrow({ where: { isActive: true }, orderBy: { id: "asc" } })).id;
@@ -106,8 +116,8 @@ afterAll(async () => {
 });
 
 describe("SEC-01 without a session every protected route answers 401, never 403 (BR-44)", () => {
-  it("covers the staff routes, the admin routes, and a staff route that does not exist", async () => {
-    for (const [method, path] of [...STAFF_ROUTES, ...ADMIN_ROUTES, UNWRITTEN_STAFF_ROUTE]) {
+  it("covers the staff routes, the admin routes, the shared routes, and a staff route that does not exist", async () => {
+    for (const [method, path] of [...STAFF_ROUTES, ...ADMIN_ROUTES, ...SHARED_ROUTES, UNWRITTEN_STAFF_ROUTE]) {
       const res = await call(method, path);
       expect(res.status, `${method} ${path}`).toBe(401);
       expect(res.body.error.code, `${method} ${path}`).toBe("AUTH_REQUIRED");
@@ -159,7 +169,7 @@ describe("SEC-03 IT Staff and an Administrator both pass the /api/staff guard (B
     const id = await makeTicket();
     const as = (method: Method, path: string, body?: object) => {
       const agent = request(app);
-      const req = method === "GET" ? agent.get(path) : agent.patch(path);
+      const req = method === "GET" ? agent.get(path) : method === "POST" ? agent.post(path) : agent.patch(path);
       req.set("Cookie", cookies[who]);
       return method === "GET" ? req : req.send(body ?? {});
     };
@@ -187,6 +197,23 @@ describe("SEC-03 IT Staff and an Administrator both pass the /api/staff guard (B
 
     const status = await as("PATCH", `/api/staff/tickets/${id}/status`, { currentStatus: "IN_PROGRESS" });
     expect(status.status).toBe(200);
+
+    // Record what was done, and read it back (Lab 4, Issue 4).
+    const recorded = await as("POST", `/api/staff/tickets/${id}/actions-taken`, {
+      actionAt: new Date(Date.now() - 60 * 1000).toISOString(),
+      description: "Checked the cabling at the desk.",
+      result: "The cable was loose and is now seated.",
+      followUpRequired: false,
+    });
+    expect(recorded.status).toBe(201);
+    expect(recorded.body.action.performedBy.id).toBe(ids[who]);
+    const edited = await as("PATCH", `/api/staff/tickets/${id}/actions-taken/${recorded.body.action.id}`, {
+      expectedVersion: 1,
+      result: "The cable was loose and is now seated; link light is green.",
+    });
+    expect(edited.status).toBe(200);
+    const listed = await as("GET", `/api/tickets/${id}/actions-taken`);
+    expect(listed.body.actions.map((a: { id: number }) => a.id)).toEqual([recorded.body.action.id]);
 
     const stored = await row(id);
     expect(stored).toMatchObject({ ownerId: ids[who], itPriority: "URGENT", currentStatus: "IN_PROGRESS", requestedPriority: "MEDIUM" });
@@ -299,5 +326,179 @@ describe("SEC-09 the Origin check still applies to an Administrator's writes (La
 
     const read = await request(app).get("/api/staff/tickets").set("Cookie", cookies.admin).set("Origin", FOREIGN_ORIGIN);
     expect(read.status).toBe(200);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Lab 4, Issue 4 — the Actions Taken routes under SEC-07, SEC-08, and SEC-09
+// ---------------------------------------------------------------------------
+
+const validAction = (overrides: Record<string, unknown> = {}) => ({
+  actionAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+  description: "Swapped the network cable at the desk.",
+  result: "The link light came back.",
+  followUpRequired: false,
+  ...overrides,
+});
+
+describe("SEC-07 a caller cannot name someone else in the Actions Taken endpoints (BR-37)", () => {
+  it("ignores requesterId, userId, me, and performedBy in the query, the body, and the headers when recording", async () => {
+    const id = await makeTicket();
+    const res = await request(app)
+      .post(`/api/staff/tickets/${id}/actions-taken?requesterId=${ids.otherRequester}&userId=${ids.admin}&me=${ids.admin}&performedBy=${ids.admin}`)
+      .set("Cookie", cookies.staff)
+      .set("X-Requester-Id", String(ids.otherRequester))
+      .set("X-User-Id", String(ids.admin))
+      .send(validAction({ requesterId: ids.otherRequester, userId: ids.admin, me: ids.admin, performedBy: { id: ids.admin }, performedById: ids.admin }));
+    expect(res.status).toBe(201);
+    expect(res.body.action.performedBy.id).toBe(ids.staff);
+  });
+
+  it("ignores them when editing: updatedBy is the session user and performedBy does not move", async () => {
+    const id = await makeTicket();
+    const created = await request(app).post(`/api/staff/tickets/${id}/actions-taken`).set("Cookie", cookies.staff).send(validAction());
+    const res = await request(app)
+      .patch(`/api/staff/tickets/${id}/actions-taken/${created.body.action.id}?userId=${ids.admin}&me=${ids.admin}`)
+      .set("Cookie", cookies.admin)
+      .set("X-User-Id", String(ids.staff))
+      .send({ expectedVersion: 1, result: "Edited by the administrator.", updatedBy: { id: ids.staff }, updatedById: ids.staff, userId: ids.staff });
+    expect(res.status).toBe(200);
+    expect(res.body.action.updatedBy.id).toBe(ids.admin);
+    expect(res.body.action.performedBy.id).toBe(ids.staff);
+  });
+
+  it("shows a Requester only their own Ticket whatever requesterId, userId, or me they send when reading", async () => {
+    const mine = await makeTicket();
+    const theirs = await prisma.ticket.create({
+      data: {
+        ticketNumber: `TT-9993-${String(numberBase + sequence++).padStart(5, "0")}`,
+        requesterId: ids.otherRequester,
+        categoryId,
+        relatedSystemId,
+        summary: "Another requester's ticket",
+        description: "Not the first requester's to see.",
+        requestedPriority: "MEDIUM",
+        itPriority: "MEDIUM",
+      },
+    });
+    ticketIds.push(theirs.id);
+    await request(app).post(`/api/staff/tickets/${theirs.id}/actions-taken`).set("Cookie", cookies.staff).send(validAction());
+
+    const claim = `requesterId=${ids.otherRequester}&userId=${ids.otherRequester}&me=${ids.otherRequester}`;
+    const blocked = await request(app)
+      .get(`/api/tickets/${theirs.id}/actions-taken?${claim}`)
+      .set("Cookie", cookies.requester)
+      .set("X-Requester-Id", String(ids.otherRequester))
+      .set("X-User-Id", String(ids.otherRequester));
+    const missing = await request(app).get(`/api/tickets/2147483647/actions-taken?${claim}`).set("Cookie", cookies.requester);
+    expect(blocked.status).toBe(404);
+    expect(blocked.body).toEqual(missing.body);
+
+    const own = await request(app).get(`/api/tickets/${mine}/actions-taken?${claim}`).set("Cookie", cookies.requester);
+    expect(own.status).toBe(200);
+  });
+});
+
+describe("SEC-08 an Administrator is the performer of the actions they record (BR-45)", () => {
+  it("is performedBy of the action they record, and updatedBy of one they edit that someone else performed", async () => {
+    const id = await makeTicket();
+    const byStaff = await request(app).post(`/api/staff/tickets/${id}/actions-taken`).set("Cookie", cookies.staff).send(validAction());
+    const byAdmin = await request(app).post(`/api/staff/tickets/${id}/actions-taken`).set("Cookie", cookies.admin).send(validAction({ description: "The administrator's own action." }));
+    expect(byAdmin.status).toBe(201);
+    expect(byAdmin.body.action.performedBy).toMatchObject({ id: ids.admin, role: "ADMINISTRATOR" });
+
+    const edited = await request(app)
+      .patch(`/api/staff/tickets/${id}/actions-taken/${byStaff.body.action.id}`)
+      .set("Cookie", cookies.admin)
+      .send({ expectedVersion: 1, result: "Confirmed by the administrator." });
+    expect(edited.status).toBe(200);
+    expect(edited.body.action.performedBy.id).toBe(ids.staff);
+    expect(edited.body.action.updatedBy).toMatchObject({ id: ids.admin, role: "ADMINISTRATOR" });
+    // Recording gave the Administrator no ownership of the Ticket.
+    expect((await row(id)).ownerId).toBeNull();
+  });
+});
+
+describe("SEC-09 the Origin check applies to the Actions Taken writes (Lab 3 BR-65)", () => {
+  it("refuses a create and an edit that name a foreign Origin, before the handler runs, and changes nothing", async () => {
+    const id = await makeTicket();
+    const created = await request(app).post(`/api/staff/tickets/${id}/actions-taken`).set("Cookie", cookies.admin).send(validAction());
+    expect(created.status).toBe(201);
+
+    const create = await request(app)
+      .post(`/api/staff/tickets/${id}/actions-taken`)
+      .set("Cookie", cookies.admin)
+      .set("Origin", FOREIGN_ORIGIN)
+      .send(validAction({ description: "A forged request." }));
+    expect(create.status).toBe(403);
+    expect(create.body.error.code).toBe("FORBIDDEN");
+
+    const edit = await request(app)
+      .patch(`/api/staff/tickets/${id}/actions-taken/${created.body.action.id}`)
+      .set("Cookie", cookies.admin)
+      .set("Origin", FOREIGN_ORIGIN)
+      .send({ expectedVersion: 1, result: "A forged edit." });
+    expect(edit.status).toBe(403);
+
+    const after = await request(app).get(`/api/tickets/${id}/actions-taken`).set("Cookie", cookies.admin);
+    expect(after.body.actions).toEqual([created.body.action]);
+  });
+
+  it("accepts the same writes from the configured origin, and a foreign-origin read", async () => {
+    const id = await makeTicket();
+    const create = await request(app)
+      .post(`/api/staff/tickets/${id}/actions-taken`)
+      .set("Cookie", cookies.admin)
+      .set("Origin", ALLOWED_ORIGIN)
+      .send(validAction());
+    expect(create.status).toBe(201);
+    const edit = await request(app)
+      .patch(`/api/staff/tickets/${id}/actions-taken/${create.body.action.id}`)
+      .set("Cookie", cookies.admin)
+      .set("Origin", ALLOWED_ORIGIN)
+      .send({ expectedVersion: 1, result: "Edited from the real client." });
+    expect(edit.status).toBe(200);
+
+    const read = await request(app).get(`/api/tickets/${id}/actions-taken`).set("Cookie", cookies.admin).set("Origin", FOREIGN_ORIGIN);
+    expect(read.status).toBe(200);
+    expect(read.body.actions).toHaveLength(1);
+  });
+});
+
+describe("The Actions Taken routes stop a session that must change its password first (Lab 3 BR-14)", () => {
+  it("answers 403 PASSWORD_CHANGE_REQUIRED on the list, the create, and the edit, and writes nothing", async () => {
+    const email = `lab4.mustchange.${Date.now().toString(36)}@example.test`;
+    const password = "Correct-horse-1";
+    const user = await prisma.user.create({
+      data: { fullName: "Lab 4 must-change", email, role: "IT_STAFF", mustChangePassword: true, passwordHash: await hashPassword(password) },
+    });
+    try {
+      const login = await request(app).post("/api/auth/login").send({ email, password });
+      expect(login.status).toBe(201);
+      const cookie = (login.headers["set-cookie"] as unknown as string[]).find((c) => c.startsWith("tt_sid="))!.split(";")[0];
+
+      const id = await makeTicket();
+      const recorded = await request(app).post(`/api/staff/tickets/${id}/actions-taken`).set("Cookie", cookies.staff).send(validAction());
+      expect(recorded.status).toBe(201);
+
+      const attempts = [
+        await request(app).get(`/api/tickets/${id}/actions-taken`).set("Cookie", cookie),
+        await request(app).post(`/api/staff/tickets/${id}/actions-taken`).set("Cookie", cookie).send(validAction({ description: "Written before changing the password." })),
+        await request(app)
+          .patch(`/api/staff/tickets/${id}/actions-taken/${recorded.body.action.id}`)
+          .set("Cookie", cookie)
+          .send({ expectedVersion: 1, result: "Edited before changing the password." }),
+      ];
+      for (const res of attempts) {
+        expect(res.status).toBe(403);
+        expect(res.body.error.code).toBe("PASSWORD_CHANGE_REQUIRED");
+      }
+      const after = await request(app).get(`/api/tickets/${id}/actions-taken`).set("Cookie", cookies.staff);
+      expect(after.body.actions).toEqual([recorded.body.action]);
+    } finally {
+      // The user's sessions go with it.
+      await prisma.user.delete({ where: { id: user.id } });
+      resetLoginThrottle();
+    }
   });
 });
