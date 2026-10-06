@@ -1,7 +1,7 @@
 # Lab 4 — Sprint Engineering Specification
 
 **Project:** TokTickIT · **Sprint:** Lab 4 — Actions Taken, Ticket Workflow, Dashboards, and Final Regression
-**Status:** Draft for review — Issue 1 ([#67](https://github.com/Menelaus122/TokTickITV2/issues/67)). It becomes *Approved before implementation* when its pull request into `lab4-staging` is approved and merged, before any implementation PR; the approval and merge commit are recorded here at that point. · **Owner:** Menelaus122
+**Status:** Approved before implementation — Issue 1 ([#67](https://github.com/Menelaus122/TokTickITV2/issues/67)), approved by @WirachatTH in [PR #78](https://github.com/Menelaus122/TokTickITV2/pull/78) on 2026-10-05 and merged into `lab4-staging` as `f14ae15`, before any implementation PR · **Owner:** Menelaus122
 
 > This document is the engineering contract for Sprint 4. Implementation may not
 > begin on a feature branch until the section covering it is approved here, and
