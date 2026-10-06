@@ -31,7 +31,7 @@ export { ROUTES };
 //   /login              Login, outside the shell
 //   /change-password    mandatory (no shell) or voluntary (in the shell)
 //   /tickets, /tickets/new, /tickets/:id    Requester
-//   /queue              IT Staff
+//   /queue, /queue/:id  IT Staff and Administrator
 //   /users              Administrator
 //
 // Every application route passes one guard, in this order: session loaded →
@@ -39,13 +39,14 @@ export { ROUTES };
 // this page (FR-09). The API enforces the same rules; the guard exists so a
 // person is never shown a page the server would refuse.
 
-// Which role owns a path, so a deep link is honoured after sign-in only when
-// it belongs to the role that signed in.
-function roleForPath(path: string): Role | null {
-  if (path.startsWith(ROUTES.list)) return "REQUESTER";
-  if (path.startsWith(ROUTES.queue)) return "IT_STAFF";
-  if (path.startsWith(ROUTES.users)) return "ADMINISTRATOR";
-  return null;
+// Which roles may open a path, so a deep link is honoured after sign-in only
+// when it belongs to the role that signed in. The queue is shared by IT Staff
+// and Administrators (Lab 4 D-08); every other page has one owner.
+function rolesForPath(path: string): Role[] {
+  if (path.startsWith(ROUTES.list)) return ["REQUESTER"];
+  if (path.startsWith(ROUTES.queue)) return ["IT_STAFF", "ADMINISTRATOR"];
+  if (path.startsWith(ROUTES.users)) return ["ADMINISTRATOR"];
+  return [];
 }
 
 function Loading() {
@@ -126,7 +127,7 @@ function LoginRoute() {
   if (user) {
     if (user.mustChangePassword) return <Navigate to={ROUTES.password} replace />;
     const from = (location.state as { from?: string } | null)?.from;
-    const destination = from && roleForPath(from) === user.role ? from : LANDING[user.role];
+    const destination = from && rolesForPath(from).includes(user.role) ? from : LANDING[user.role];
     return <Navigate to={destination} replace />;
   }
   return <Login onSignIn={signIn} />;
@@ -256,7 +257,7 @@ function AppRoutes() {
       <Route
         path={ROUTES.queue}
         element={
-          <RequireAuth roles={["IT_STAFF"]}>
+          <RequireAuth roles={["IT_STAFF", "ADMINISTRATOR"]}>
             <QueueRoute />
           </RequireAuth>
         }
@@ -264,7 +265,7 @@ function AppRoutes() {
       <Route
         path="/queue/:id"
         element={
-          <RequireAuth roles={["IT_STAFF"]}>
+          <RequireAuth roles={["IT_STAFF", "ADMINISTRATOR"]}>
             <StaffDetailRoute />
           </RequireAuth>
         }

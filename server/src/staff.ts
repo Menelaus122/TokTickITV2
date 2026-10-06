@@ -14,9 +14,10 @@ import { isPermittedTransition, permittedTransitions, requiresOwner, requiresRea
 
 // Lab 3, Issues 8 and 9 — IT Staff ticket operations (api-spec §5).
 //
-// Mounted under /api/staff, behind app.ts's requireRole("IT_STAFF"), so every
-// route here is IT Staff only before it runs (BR-19, AC-09). Nothing in this
-// router repeats that check.
+// Mounted under /api/staff, behind app.ts's requireRole("IT_STAFF",
+// "ADMINISTRATOR"), so every route here is for IT Staff and Administrators only
+// before it runs (Lab 4 BR-42, BR-43; a Requester is refused). Nothing in this
+// router repeats that check. An Administrator acts as themself here (BR-45).
 
 const SERVER_ERROR = { error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." } } as const;
 

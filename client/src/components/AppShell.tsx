@@ -18,7 +18,12 @@ export const NAV_BY_ROLE: Record<Role, { to: string; label: string }[]> = {
     { to: ROUTES.create, label: "Create Ticket" },
   ],
   IT_STAFF: [{ to: ROUTES.queue, label: "Ticket Queue" }],
-  ADMINISTRATOR: [{ to: ROUTES.users, label: "User Management" }],
+  // Lab 4 D-08: an Administrator performs IT Staff ticket operations, so the
+  // queue is theirs too. The Dashboard becomes the first item in Issue 8.
+  ADMINISTRATOR: [
+    { to: ROUTES.queue, label: "Ticket Queue" },
+    { to: ROUTES.users, label: "User Management" },
+  ],
 };
 
 /** The Requester's navigation, kept under its Lab 2 name for the Lab 2 tests. */

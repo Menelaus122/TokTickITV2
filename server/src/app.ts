@@ -63,10 +63,13 @@ app.use(attachSession);
 app.use(enforcePasswordChange);
 app.use("/api/auth", authRouter);
 
-// Lab 3, Issue 4 — the BR-18 matrix by route family. Administrators are not
-// IT Staff (BR-19), so each family admits exactly one role. Mounted here, the
-// guard covers every route Issues 8 to 10 add under these prefixes.
-app.use("/api/staff", requireRole("IT_STAFF"));
+// Lab 3, Issue 4 — the role matrix by route family, as Lab 4 BR-42 and BR-43
+// restate it. Lab 3 admitted exactly one role per family because an
+// Administrator was not IT Staff (Lab 3 BR-19). Lab 4 D-08 reverses that for
+// the ticket operations: /api/staff admits IT Staff and Administrators, and
+// /api/admin stays Administrator-only. Mounted here, the guard covers every
+// route added under these prefixes, including ones not written yet.
+app.use("/api/staff", requireRole("IT_STAFF", "ADMINISTRATOR"));
 app.use("/api/admin", requireRole("ADMINISTRATOR"));
 
 // ---------------------------------------------------------------------------

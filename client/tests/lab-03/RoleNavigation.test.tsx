@@ -14,10 +14,21 @@ const USERS: Record<Role, AuthUser> = {
   ADMINISTRATOR: { id: 9, fullName: "Malee Sutthiwong", email: "malee.admin@toktickit.local", role: "ADMINISTRATOR", isActive: true, mustChangePassword: false },
 };
 
+// Changed in Lab 4 (Issue 2, D-08, BR-42): an Administrator also has the Ticket
+// Queue. docs/lab-04/tests.md §6.
 const NAV: Record<Role, string[]> = {
   REQUESTER: ["My Tickets", "Create Ticket"],
   IT_STAFF: ["Ticket Queue"],
-  ADMINISTRATOR: ["User Management"],
+  ADMINISTRATOR: ["Ticket Queue", "User Management"],
+};
+
+// The link that is the current page after landing. Until Lab 4 this was always
+// the first link; an Administrator's first link is now the queue, but their
+// landing page is still User Management (the Dashboard replaces it in Issue 8).
+const HOME: Record<Role, string> = {
+  REQUESTER: "My Tickets",
+  IT_STAFF: "Ticket Queue",
+  ADMINISTRATOR: "User Management",
 };
 
 beforeEach(() => {
@@ -48,13 +59,15 @@ describe("UI-07 each role sees only its own destinations", () => {
     const labels = within(nav).getAllByRole("link").map((link) => link.textContent);
     expect(labels).toEqual(NAV[role]);
     // Landed on the role's own home, marked as the current page.
-    expect(within(nav).getByRole("link", { name: NAV[role][0] })).toHaveAttribute("aria-current", "page");
+    expect(within(nav).getByRole("link", { name: HOME[role] })).toHaveAttribute("aria-current", "page");
   });
 
+  // The Lab 3 row for an Administrator typing /queue is gone: the queue is open
+  // to them now, and the Lab 4 suite (client/tests/lab-04/RoleNavigation.test.tsx)
+  // covers it.
   it.each([
     ["IT_STAFF", "/tickets", "Ticket Queue"],
     ["IT_STAFF", "/users", "Ticket Queue"],
-    ["ADMINISTRATOR", "/queue", "User Management"],
     ["ADMINISTRATOR", "/tickets/new", "User Management"],
     ["REQUESTER", "/queue", "My Tickets"],
     ["REQUESTER", "/users", "My Tickets"],
