@@ -5,7 +5,9 @@ implementation, as the Test DD deliverable requires: every test below was planne
 from an acceptance criterion, not reconstructed from code an agent produced.
 
 The **Final** column reads **Planned** until the owning issue merges, then the
-real runner result. Issue 10 (#76) refreshes §8 with the full run from
+real runner result. **Partial** means the part of the test that can exist at that
+issue passes, and the rest arrives with the issue §3.1 names; it never means
+that a test fails. Issue 10 (#76) refreshes §8 with the full run from
 `lab4-staging`, and Issue 11 (#77) repeats it from `main`. Counts in §8 are only
 ever the runner's own output.
 
@@ -100,15 +102,15 @@ first, then the rule or requirement where it adds precision.
 
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| SEC-01 | Authorization | AC-17 | every Lab 4 endpoint with no cookie | `401 AUTH_REQUIRED`, never `403` | `server/tests/lab-04/authorization.api.test.ts` | Planned |
-| SEC-02 | Authorization | AC-08, AC-17, BR-43 | a Requester calls every `/api/staff/*` route, new and old | `403 FORBIDDEN` with no ticket data in the body | `server/tests/lab-04/authorization.api.test.ts` | Planned |
-| SEC-03 | Authorization | AC-17, BR-42, D-08 | IT Staff and an Administrator call every `/api/staff/*` route, read and write | both succeed on every route; the Administrator's queue, detail, owner, IT Priority, status, and Actions Taken calls all work | `server/tests/lab-04/authorization.api.test.ts` | Planned |
-| SEC-04 | Authorization | AC-17, BR-43 | IT Staff and a Requester call every `/api/admin/*` route | `403 FORBIDDEN` | `server/tests/lab-04/authorization.api.test.ts` | Planned |
+| SEC-01 | Authorization | AC-17 | every Lab 4 endpoint with no cookie | `401 AUTH_REQUIRED`, never `403` | `server/tests/lab-04/authorization.api.test.ts` | Partial |
+| SEC-02 | Authorization | AC-08, AC-17, BR-43 | a Requester calls every `/api/staff/*` route, new and old | `403 FORBIDDEN` with no ticket data in the body | `server/tests/lab-04/authorization.api.test.ts` | Pass |
+| SEC-03 | Authorization | AC-17, BR-42, D-08 | IT Staff and an Administrator call every `/api/staff/*` route, read and write | both succeed on every route; the Administrator's queue, detail, owner, IT Priority, status, and Actions Taken calls all work | `server/tests/lab-04/authorization.api.test.ts` | Pass |
+| SEC-04 | Authorization | AC-17, BR-43 | IT Staff and a Requester call every `/api/admin/*` route | `403 FORBIDDEN` | `server/tests/lab-04/authorization.api.test.ts` | Pass |
 | SEC-05 | Authorization | AC-20, BR-42 | IT Staff and an Administrator call the Requester dashboard; a Requester calls the staff dashboard | `403 FORBIDDEN` each way | `server/tests/lab-04/authorization.api.test.ts` | Planned |
-| SEC-06 | Authorization | AC-17, BR-44 | guard order: no session and wrong role together; a Requester posting to a missing Ticket on a staff route | `401` wins over `403`; `403` wins over `404` | `server/tests/lab-04/authorization.api.test.ts` | Planned |
+| SEC-06 | Authorization | AC-17, BR-44 | guard order: no session and wrong role together; a Requester posting to a missing Ticket on a staff route | `401` wins over `403`; `403` wins over `404` | `server/tests/lab-04/authorization.api.test.ts` | Pass |
 | SEC-07 | Authorization | AC-02, AC-19, BR-37 | `requesterId`, `userId`, and `me` in query, body, and header on both dashboards and the Actions Taken endpoints | all ignored; the session identity is used and no other user's data appears | `server/tests/lab-04/authorization.api.test.ts` | Planned |
-| SEC-08 | Authorization | AC-17, BR-45 | an Administrator records an action, changes a status, and posts a comment | `performedBy`, `changedBy`, and the author are the Administrator | `server/tests/lab-04/authorization.api.test.ts` | Planned |
-| SEC-09 | Authorization | AC-17, Lab 3 BR-65 | `POST` and `PATCH` to the new endpoints with a foreign `Origin` | `403` before the handler runs; the configured origin succeeds; a `GET` with a foreign origin succeeds | `server/tests/lab-04/authorization.api.test.ts` | Planned |
+| SEC-08 | Authorization | AC-17, BR-45 | an Administrator records an action, changes a status, and posts a comment | `performedBy`, `changedBy`, and the author are the Administrator | `server/tests/lab-04/authorization.api.test.ts` | Partial |
+| SEC-09 | Authorization | AC-17, Lab 3 BR-65 | `POST` and `PATCH` to the new endpoints with a foreign `Origin` | `403` before the handler runs; the configured origin succeeds; a `GET` with a foreign origin succeeds | `server/tests/lab-04/authorization.api.test.ts` | Partial |
 
 ### 2.4 API — Ticket workflow, `server/tests/lab-04/ticket-workflow.api.test.ts`
 
@@ -212,8 +214,8 @@ first, then the rule or requirement where it adds precision.
 | UI-24 | UI | AC-20, FR-17 | an Administrator, then IT Staff | the Administrator sees the accounts region with all four counts as plain numbers and only **Open User Management** as a link; IT Staff do not | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
 | UI-25 | UI | AC-22, FR-20 | loading, zero data, forbidden, failure, and Refresh | as UI-21; zero data keeps the cards and shows the staff empty messages | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
 | UI-26 | UI | AC-19, D-11 | the quick actions | **Open Ticket Queue**, **Unassigned Tickets**, and **My Queue** only; no Create Ticket, no Profile, no "from yesterday" | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
-| UI-27 | UI | AC-17, FR-23, FR-24 | the Administrator's navigation and routes | **Ticket Queue** is offered and opens; a Requester typing `/queue` or `/users` lands on their Dashboard with the forbidden callout | `client/tests/lab-04/RoleNavigation.test.tsx` | Planned |
-| UI-28 | UI | AC-17, BR-45 | an Administrator on the Ticket Detail | the owner, IT Priority, status, and Actions Taken controls are present and send requests under the session | `client/tests/lab-04/RoleNavigation.test.tsx` | Planned |
+| UI-27 | UI | AC-17, FR-23, FR-24 | the Administrator's navigation and routes | **Ticket Queue** is offered and opens; a Requester typing `/queue` or `/users` lands on their Dashboard with the forbidden callout | `client/tests/lab-04/RoleNavigation.test.tsx` | Partial |
+| UI-28 | UI | AC-17, BR-45 | an Administrator on the Ticket Detail | the owner, IT Priority, status, and Actions Taken controls are present and send requests under the session | `client/tests/lab-04/RoleNavigation.test.tsx` | Partial |
 | UI-29 | UI | AC-21, FR-21 | My Tickets opened with `?group=open&status=…` | the request carries both; the filter chip shows; Clear Filters removes it; an unknown parameter is ignored | `client/tests/lab-04/DrillDown.test.tsx` | Planned |
 | UI-30 | UI | AC-27, BR-53 | every write form: create ticket, comment, note, owner, IT Priority, status, user management, Action Taken | one request per submission under repeated clicks | `client/tests/lab-04/FinalRegression.test.tsx` | Planned |
 | UI-31 | UI | AC-27, BR-54 | a recoverable failure on the same forms | the typed values are still in the form | `client/tests/lab-04/FinalRegression.test.tsx` | Planned |
@@ -320,7 +322,7 @@ component, 6 UI style, 6 responsive, 8 E2E, and 3 regression suites.
 
 | Issue | Tests |
 | :--- | :--- |
-| 2 — Administrator access to IT Staff ticket operations (#68) | SEC-01 – SEC-09, UI-27, UI-28 |
+| 2 — Administrator access to IT Staff ticket operations (#68) | SEC-01 – SEC-04, SEC-06, SEC-08, SEC-09, UI-27, UI-28, each for the endpoints and screens that exist at Issue 2 (see below) |
 | 3 — Actions Taken data model, migration, and seed (#69) | MIG-01 – MIG-07 |
 | 4 — Actions Taken API (#70) | UNIT-01 – UNIT-06, API-01 – API-17 |
 | 5 — Actions Taken UI on Ticket Detail (#71) | UI-01 – UI-09, STYLE-03 |
@@ -333,6 +335,25 @@ component, 6 UI style, 6 responsive, 8 E2E, and 3 regression suites.
 
 Each issue also keeps every earlier test passing, and updates the old tests §6
 names in the issue that changes the behaviour they check.
+
+**Tests that grow across issues.** This table first assigned all of SEC-01 –
+SEC-09, UI-27, and UI-28 to Issue 2. Writing Issue 2 showed that parts of them
+exercise endpoints and screens that do not exist until later, so they could not
+pass, or even be written honestly, in Issue 2. They are completed in the issue
+that adds the thing they test, by appending a row to the route tables in
+`server/tests/lab-04/authorization.api.test.ts` and by extending the client test:
+
+| Test | Complete at Issue 2 | Completed in |
+| :--- | :--- | :--- |
+| SEC-01 | no cookie → 401 on every staff and admin route, including one that is not written | 4, 7, 8 add the Actions Taken, status-history, and dashboard routes |
+| SEC-05 | not possible: both dashboards are later | 7 (Requester half), 8 (staff half) |
+| SEC-07 | not possible: the dashboards and Actions Taken take no ids yet | 4, 7, 8 |
+| SEC-08 | an Administrator is the author of their comments and notes, and the Owner of what they claim | 4 (`performedBy`), 6 (`changedBy`) |
+| SEC-09 | a foreign `Origin` is refused on an Administrator's writes to the existing staff routes | 4 adds the Actions Taken writes |
+| UI-27 | the Administrator's navigation and routes; the sign-in deep link; the refusals; "sent home" means the role's Lab 3 home | 7, 8: the Dashboard becomes the home (UI-37) |
+| UI-28 | the owner, IT Priority, and status controls, and the Internal Notes region | 5: the Actions Taken controls |
+
+SEC-02, SEC-03, SEC-04, and SEC-06 are complete at Issue 2.
 
 ---
 
@@ -430,16 +451,17 @@ forces it, and the **Status** column records it when it is done.
 
 | Lab 3 test | What it asserted | Change in Lab 4 | Reason | Issue | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| `server/tests/lab-03/authorization.api.test.ts` — SEC-03 "refuses an Administrator on every IT Staff route (BR-19)" | an Administrator is `403` on every `/api/staff/*` route | an Administrator is allowed on them; the Requester and no-session cases are untouched | D-08 and BR-43: labsheet §4.3 gives Administrators IT Staff behaviour, superseding Lab 3 BR-19 | 2 | Planned |
-| `server/tests/lab-03/staff-queue.api.test.ts` — "is refused to a Requester and an Administrator" (two cases) | queue endpoints refuse an Administrator | refuse a Requester only; an Administrator reads the queue | D-08 | 2 | Planned |
-| `server/tests/lab-03/staff-ticket-detail.api.test.ts` — "is refused to a Requester and an Administrator…" and "refuses a Requester and an Administrator on each operation" | detail and every operation refuse an Administrator | refuse a Requester only | D-08 | 2 | Planned |
-| `client/tests/lab-03/RoleNavigation.test.tsx` | the Administrator's only item is User Management; an Administrator typing `/queue` is sent home; each role's list lacks Dashboard | the lists become Dashboard-first, an Administrator also has Ticket Queue, and `/queue` is allowed for an Administrator | D-08, D-09 | 2, 7, 8 | Planned |
+| `server/tests/lab-03/authorization.api.test.ts` — SEC-03 "refuses an Administrator on every IT Staff route (BR-19)" | an Administrator is `403` on every `/api/staff/*` route | an Administrator is allowed on them; the Requester and no-session cases are untouched | D-08 and BR-43: labsheet §4.3 gives Administrators IT Staff behaviour, superseding Lab 3 BR-19 | 2 | Done: now asserts the Administrator is *not* refused (the route answers), so it still guards something |
+| `server/tests/lab-03/staff-queue.api.test.ts` — "is refused to a Requester and an Administrator (BR-19)" and the same name under "assignable users" (two cases) | queue endpoints refuse an Administrator | each splits in two: refuse a Requester (unchanged assertions), and a new case that an Administrator is let in (the queue returns the same `totalItems` IT Staff see) | D-08 | 2 | Done |
+| `server/tests/lab-03/staff-ticket-detail.api.test.ts` — "is refused to a Requester and an Administrator…" and "refuses a Requester and an Administrator on each operation" | detail and every operation refuse an Administrator | refuse a Requester only (same assertions, `before`/after row unchanged); a new case that an Administrator opens the detail | D-08 | 2 | Done |
+| `server/tests/lab-03/staff-ticket-detail.api.test.ts` — "keeps the staff download to IT Staff, and keeps IT Staff off the Requester routes (BR-18)" | **not foreseen when this table was written; found by running the suite.** The staff attachment-download route refuses an Administrator | the Requester is still `403`, an Administrator now gets `200`, and IT Staff are still refused the Requester's route | D-08: the guard is on the `/api/staff` prefix, so this route opens too | 2 | Done |
+| `client/tests/lab-03/RoleNavigation.test.tsx` — UI-07 | the Administrator's only item is User Management; the first nav link is the current page after landing; an Administrator typing `/queue` is sent home | the list is Ticket Queue then User Management; the current-page assertion names the landing link (User Management) because the first link is no longer it; the `/queue` row is removed (it is allowed now and the Lab 4 suite covers it) | D-08. Landing stays User Management until the Dashboard (Issue 8) | 2 (nav and `/queue`); 7, 8 (Dashboard-first lists) | Issue 2 part Done; Dashboard part Planned |
 | `server/tests/lab-03/staff-ticket-detail.api.test.ts` — API-51 and the assertions that compare `permittedTransitions` with the bare matrix | `permittedTransitions` equals the matrix row | `permittedTransitions` plus `blockedTransitions` equals the matrix row | BR-17, api-spec §3.1: the list now excludes moves the owner rule or the gate blocks | 6 | Planned |
 | `server/tests/lab-03/staff-ticket-detail.api.test.ts` — the cases that move a Ticket to `RESOLVED` | a Ticket resolves with only an owner and a reason | the fixture records an Action Taken first; a new case proves it is refused without one | BR-17: the gate. Lab 3 D-20 said this would come | 6 | Planned |
 | `client/tests/lab-03/StaffTicketDetail.test.tsx` | the mocked detail has no `version` or `blockedTransitions` | the mock gains both | api-spec §3.1: a mock-shape change, no assertion changes | 6 | Planned |
 | `e2e/lab-03/staff-ticket-flow.spec.ts` — E2E-05 | an IT Staff member resolves a Ticket with only a reason | the journey records an Action Taken first | BR-17 | 6 | Planned |
 | `client/tests/lab-03/RequesterRegression.test.tsx` — "a signed-in Requester lands on My Tickets" | the landing page is My Tickets | the landing page is the Dashboard | D-09 | 7 | Planned |
-| `e2e/lab-03/authentication.spec.ts` — E2E-01 and the landing-page table | the Requester's navigation is exactly My Tickets and Create Ticket; IT Staff land on `/queue` and an Administrator on `/users` | each role's navigation starts with Dashboard and each lands on `/dashboard` | D-09 | 7, 8 | Planned |
+| `e2e/lab-03/authentication.spec.ts` — E2E-01 and the landing-page table | the Requester's navigation is exactly My Tickets and Create Ticket; IT Staff land on `/queue` and an Administrator on `/users` | the Administrator's list gains Ticket Queue (**Issue 2, Done**: `Ticket Queue, User Management`, landing still `/users`); then each role's navigation starts with Dashboard and each lands on `/dashboard` (Issues 7, 8) | D-08, D-09 | 2, 7, 8 | Issue 2 part Done; Dashboard part Planned |
 | `client/tests/lab-02/Navigation.test.tsx` | iterates the Requester's navigation items | expected to pass unchanged because it iterates `NAV_ITEMS`; re-verified, not edited, unless it does not | D-09 | 7 | Planned |
 | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | mocks each client call with `vi.spyOn(api, …)`: the ticket detail, comments, and attachments | the mocks gain the two calls the Requester Ticket Detail now makes, `fetchActionsTaken` (Issue 5) and `fetchStatusHistory` (Issue 6); no assertion changes | the screen loads two more resources; an unmocked call would reach the network | 5, 6 | Planned |
 | `client/tests/lab-03/RequesterComments.test.tsx` | the same per-call mocks, with `fetchComments` | the same two mocks are added | as above | 5, 6 | Planned |

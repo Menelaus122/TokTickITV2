@@ -29,7 +29,9 @@ test.describe("E2E-01 sign in, see who you are, sign out", () => {
   test("each role lands on its own screen and sees only its own navigation (AC-09)", async ({ page }) => {
     for (const [account, path, links] of [
       [ACCOUNTS.staff, /\/queue$/, ["Ticket Queue"]],
-      [ACCOUNTS.admin, /\/users$/, ["User Management"]],
+      // Changed in Lab 4 (Issue 2, D-08): an Administrator also has the Ticket
+      // Queue. Their landing page stays User Management until Issue 8.
+      [ACCOUNTS.admin, /\/users$/, ["Ticket Queue", "User Management"]],
     ] as const) {
       await signIn(page, account.email, account.name);
       await expect(page).toHaveURL(path);

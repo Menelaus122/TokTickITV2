@@ -128,14 +128,21 @@ describe("GET /api/staff/tickets/:id", () => {
     expect((await detail("abc")).status).toBe(400);
   });
 
-  it("is refused to a Requester and an Administrator with no ticket data, and 401 without a session (BR-19, BR-21)", async () => {
+  it("is refused to a Requester with no ticket data, and 401 without a session (BR-21)", async () => {
     const id = await makeTicket();
-    for (const cookie of [cookies.requester, cookies.admin]) {
-      const res = await detail(id, cookie);
-      expect(res.status).toBe(403);
-      expect(res.body.ticket).toBeUndefined();
-    }
+    const res = await detail(id, cookies.requester);
+    expect(res.status).toBe(403);
+    expect(res.body.ticket).toBeUndefined();
     expect((await request(app).get(`/api/staff/tickets/${id}`)).status).toBe(401);
+  });
+
+  // Changed in Lab 4 (Issue 2, D-08, BR-42): an Administrator opens the staff
+  // ticket detail, which supersedes Lab 3 BR-19. docs/lab-04/tests.md §6.
+  it("is open to an Administrator (Lab 4 D-08)", async () => {
+    const id = await makeTicket();
+    const res = await detail(id, cookies.admin);
+    expect(res.status).toBe(200);
+    expect(res.body.ticket.id).toBe(id);
   });
 });
 
@@ -382,19 +389,21 @@ describe("status — PATCH /api/staff/tickets/:id/status", () => {
 });
 
 describe("roles on every write", () => {
-  it("refuses a Requester and an Administrator on each operation, changing nothing (BR-18, BR-19)", async () => {
+  // Changed in Lab 4 (Issue 2, D-08, BR-42): only a Requester is refused now; an
+  // Administrator may perform each operation (the Lab 4 suite
+  // server/tests/lab-04/authorization.api.test.ts proves that end to end).
+  // docs/lab-04/tests.md §6.
+  it("refuses a Requester on each operation, changing nothing (BR-18)", async () => {
     const id = await makeTicket();
     const before = await row(id);
-    for (const cookie of [cookies.requester, cookies.admin]) {
-      for (const [action, body] of [
-        ["owner", { ownerId: ids.me }],
-        ["it-priority", { itPriority: "URGENT" }],
-        ["status", { currentStatus: "CANCELLED", reason: REASON }],
-      ] as const) {
-        const res = await patch(id, action, body, cookie);
-        expect(res.status, action).toBe(403);
-        expect(res.body.error.code).toBe("FORBIDDEN");
-      }
+    for (const [action, body] of [
+      ["owner", { ownerId: ids.me }],
+      ["it-priority", { itPriority: "URGENT" }],
+      ["status", { currentStatus: "CANCELLED", reason: REASON }],
+    ] as const) {
+      const res = await patch(id, action, body, cookies.requester);
+      expect(res.status, action).toBe(403);
+      expect(res.body.error.code).toBe("FORBIDDEN");
     }
     expect(await row(id)).toEqual(before);
   });
@@ -441,12 +450,14 @@ describe("attachments on the staff detail", () => {
     expect(gone.body.error.code).toBe("ATTACHMENT_REMOVED");
   });
 
-  it("keeps the staff download to IT Staff, and keeps IT Staff off the Requester routes (BR-18)", async () => {
+  // Changed in Lab 4 (Issue 2, D-08, BR-42): the staff download is open to an
+  // Administrator too. A Requester is still refused it, and IT Staff are still
+  // kept off the Requester's route. docs/lab-04/tests.md §6.
+  it("keeps the staff download to IT Staff and Administrators, and keeps IT Staff off the Requester routes (BR-18)", async () => {
     const id = await makeTicket();
     const active = await attach(id, false);
-    for (const cookie of [cookies.requester, cookies.admin]) {
-      expect((await request(app).get(`/api/staff/attachments/${active.id}/download`).set("Cookie", cookie)).status).toBe(403);
-    }
+    expect((await request(app).get(`/api/staff/attachments/${active.id}/download`).set("Cookie", cookies.requester)).status).toBe(403);
+    expect((await request(app).get(`/api/staff/attachments/${active.id}/download`).set("Cookie", cookies.admin)).status).toBe(200);
     expect((await request(app).get(`/api/attachments/${active.id}/download`).set("Cookie", cookies.staff)).status).toBe(403);
     expect((await request(app).get("/api/staff/attachments/2147483647/download").set("Cookie", cookies.staff)).status).toBe(404);
   });

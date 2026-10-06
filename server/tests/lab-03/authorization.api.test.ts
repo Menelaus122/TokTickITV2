@@ -171,11 +171,14 @@ describe("guards on every protected route family (BR-18, BR-21)", () => {
     }
   });
 
-  it("SEC-03 refuses an Administrator on every IT Staff route (BR-19)", async () => {
+  // Changed in Lab 4 (Issue 2, D-08, BR-42): an Administrator performs IT Staff
+  // ticket operations, which supersedes Lab 3 BR-19. The Requester and
+  // no-session cases around it are unchanged. docs/lab-04/tests.md §6.
+  it("SEC-03 lets an Administrator past the guard on every IT Staff route (Lab 4 D-08, was BR-19)", async () => {
     for (const [method, path] of STAFF_ROUTES) {
       const res = await call(method, path, cookies.admin);
-      expect(res.status, `${method} ${path}`).toBe(403);
-      expect(res.body.error.code).toBe("FORBIDDEN");
+      // The route itself answers (200, 400, or 404); only the guard's 401 or 403 would be wrong.
+      expect([401, 403], `${method} ${path}`).not.toContain(res.status);
     }
   });
 
