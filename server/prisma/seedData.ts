@@ -1,8 +1,11 @@
+import { createHash } from "node:crypto";
 import type { Priority, PrismaClient, Role, TicketStatus } from "@prisma/client";
 import { hashPassword, verifyPassword } from "../src/password.js";
 import { nextTicketNumber } from "../src/ticketNumber.js";
 
-// Lab 3 seed — docs/lab-03/specification.md §7.5.
+// Lab 3 seed — docs/lab-03/specification.md §7.5, extended by Lab 4 with Actions
+// Taken, status history, and two accounts that show an empty dashboard
+// (docs/lab-04/specification.md §7.5).
 //
 // The seed CONVERGES rather than only inserting. Every run puts each documented
 // row back into its documented state, so running it twice ends in the same
@@ -67,6 +70,13 @@ export const ACCOUNTS: SeedAccount[] = [
   // both sides (§7.5, BR-49).
   { key: "malee", fullName: "Malee Sutthiwong", email: "malee.admin@toktickit.local", department: "IT Administration", role: "ADMINISTRATOR", isActive: true, mustChangePassword: false },
   { key: "kittisak", fullName: "Kittisak Phromma", email: "kittisak.admin@toktickit.local", department: "IT Administration", role: "ADMINISTRATOR", isActive: true, mustChangePassword: false },
+
+  // Lab 4 (§7.5, D-21): two accounts with nothing to show, so the zero-data state
+  // of each dashboard can be seen by signing in. Neither owns, requests, or
+  // performs anything, and neither is ever given a ticket, comment, or action
+  // below. A Requester with no tickets, and an IT Staff member with no work.
+  { key: "noTickets", fullName: "Ratree Chaiwat", email: "no.tickets@toktickit.local", department: "Student Affairs", role: "REQUESTER", isActive: true, mustChangePassword: false },
+  { key: "idleIt", fullName: "Worawut Intarat", email: "idle.it@toktickit.local", department: "IT Service Desk", role: "IT_STAFF", isActive: true, mustChangePassword: false },
 ];
 
 type AccountKey = (typeof ACCOUNTS)[number]["key"];
@@ -75,6 +85,29 @@ interface SeedEntry {
   author: AccountKey;
   body: string;
   hoursAfter: number;
+}
+
+// One Action Taken (Lab 4 BR-03 to BR-08). `actionAfter` is the Action Date/Time
+// the person typed and `recordedAfter` is when it was recorded, both in hours
+// after the ticket was created. They differ on purpose where someone logged
+// earlier work afterwards, which is what BR-17 and WF-19 are about.
+export interface SeedAction {
+  by: AccountKey;
+  actionAfter: number;
+  recordedAfter: number;
+  description: string;
+  result: string;
+  /** Present exactly when the action says Follow-Up Required? = Yes (BR-04). */
+  followUp?: string;
+  attachmentNotes?: string;
+}
+
+// One status change (Lab 4 BR-21). The "from" is the step before it, starting
+// at NEW, so a chain cannot be written out of order or skip a status.
+export interface SeedStep {
+  by: AccountKey;
+  to: TicketStatus;
+  after: number;
 }
 
 interface SeedTicket {
@@ -91,6 +124,8 @@ interface SeedTicket {
   requesterSaysResolved?: boolean;
   comments?: SeedEntry[];
   notes?: SeedEntry[];
+  actions?: SeedAction[];
+  history?: SeedStep[];
 }
 
 // Two tickets per status, spread across the four active Requesters, every
@@ -98,7 +133,7 @@ interface SeedTicket {
 // REOPENED ticket carries the reason comment BR-36 and BR-37 require, written by
 // the IT Staff member who would have made that transition. Summaries avoid the
 // phrases the Lab 2 My Tickets suite searches for.
-export const TICKETS: SeedTicket[] = [
+const SEEDED_TICKETS: SeedTicket[] = [
   {
     requester: "anucha", category: "Account and Access", system: "Email",
     summary: "Cannot sign in to staff email since password expiry",
@@ -232,9 +267,268 @@ export const TICKETS: SeedTicket[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// Lab 4 — what was done on those tickets (specification §7.5). Keyed by summary,
+// which is already how this file identifies a seeded ticket. Times are hours
+// after the ticket was created, and each status change lines up with the reason
+// comment above where there is one (a Resolved comment at +30 h, a Resolved
+// change at +30 h).
+//
+// The spread, on purpose:
+//   * no actions on the NEW and CANCELLED tickets; one on most OPEN and CLOSED;
+//     several on the IN_PROGRESS ones, one of them by an IT Staff member who is
+//     not the Owner (BR-02);
+//   * a RESOLVED ticket whose work was recorded by an Administrator (BR-45);
+//   * the most recently recorded action needs follow-up on the WAITING tickets
+//     and on one IN_PROGRESS ticket (the gate's FOLLOW_UP_PENDING), and never on
+//     a RESOLVED one;
+//   * one REOPENED ticket with no action since the reopen (resolving is blocked)
+//     and one with a fresh action after it (resolving is allowed);
+//   * one ticket whose newest-recorded action is dated EARLIER than another, so
+//     a list ordered by date and the gate's "latest" disagree (BR-08, BR-17).
+// ---------------------------------------------------------------------------
+const ACTIVITY: Record<string, { actions?: SeedAction[]; history?: SeedStep[] }> = {
+  "Library reading room Wi-Fi drops every few minutes": {
+    history: [{ by: "nattapong", to: "OPEN", after: 2 }],
+    actions: [
+      {
+        by: "nattapong", actionAfter: 3, recordedAfter: 3.2,
+        description: "Checked the access point in the second-floor reading room and found it running old firmware.",
+        result: "A firmware update is scheduled for tonight; nothing changes for users until then.",
+        followUp: "Check the reading room Wi-Fi logs tomorrow morning to confirm the drops have stopped.",
+      },
+    ],
+  },
+  "Finance office printer jams on every second page": {
+    history: [{ by: "siriporn", to: "OPEN", after: 1 }],
+    actions: [
+      {
+        by: "siriporn", actionAfter: 2, recordedAfter: 2.1,
+        description: "Opened the printer and cleaned the paper-feed rollers.",
+        result: "A 20-page double-sided test printed without a jam.",
+      },
+    ],
+  },
+  "VPN disconnects when uploading large drawings": {
+    history: [
+      { by: "nattapong", to: "OPEN", after: 1 },
+      { by: "nattapong", to: "IN_PROGRESS", after: 3 },
+    ],
+    actions: [
+      {
+        by: "nattapong", actionAfter: 5, recordedAfter: 5.1,
+        description: "Raised the VPN idle timeout from 5 to 30 minutes on the concentrator.",
+        result: "The disconnect at the 5-minute mark is gone; uploads over 200 MB still drop.",
+      },
+      {
+        // Not the Owner: a colleague on the same ticket (BR-02).
+        by: "thanakorn", actionAfter: 22, recordedAfter: 22.1,
+        description: "Compared the MTU on the VPN concentrator with the one on the engineering subnet.",
+        result: "The engineering subnet uses 1400 and the concentrator 1500, which explains the drops on large uploads.",
+      },
+      {
+        by: "nattapong", actionAfter: 30, recordedAfter: 30.2,
+        description: "Set the concentrator MTU to 1400 and re-tested a 300 MB upload.",
+        result: "The upload finished without a disconnect.",
+        attachmentNotes: "Look for the throughput graph named vpn-upload-test.png.",
+      },
+    ],
+  },
+  "LEB2 shows the wrong timetable for semester 1": {
+    history: [
+      { by: "thanakorn", to: "OPEN", after: 1 },
+      { by: "thanakorn", to: "IN_PROGRESS", after: 2 },
+    ],
+    actions: [
+      {
+        by: "thanakorn", actionAfter: 30, recordedAfter: 30.1,
+        description: "Compared the semester selector configuration with what the registrar view requests.",
+        result: "The registrar view maps semester 1 to the wrong term code.",
+      },
+      {
+        // Recorded last but dated earlier than the entry above: a late log of
+        // yesterday's call. The newest-recorded action needs follow-up, so the
+        // gate refuses RESOLVED even though a list by date ends on the other one.
+        by: "siriporn", actionAfter: 25, recordedAfter: 40,
+        description: "Late entry for yesterday's call with the registrar about the term codes.",
+        result: "The registrar will send a corrected term-code export.",
+        followUp: "Wait for the corrected term-code export from the registrar before changing the mapping.",
+        attachmentNotes: "The call notes are in the registrar's email titled LEB2 term codes.",
+      },
+    ],
+  },
+  "Work laptop fan runs loudly and the machine overheats": {
+    history: [
+      { by: "siriporn", to: "OPEN", after: 1 },
+      { by: "siriporn", to: "IN_PROGRESS", after: 2 },
+      { by: "siriporn", to: "WAITING_FOR_REQUESTER", after: 6 },
+    ],
+    actions: [
+      {
+        by: "siriporn", actionAfter: 4, recordedAfter: 4.1,
+        description: "Ran the vendor diagnostics on the work laptop.",
+        result: "The fan sensor reports normal readings; the asset tag is needed to check the warranty.",
+        followUp: "Look up the warranty with the asset tag as soon as the Requester replies.",
+      },
+    ],
+  },
+  "Shared finance mailbox missing from Outlook": {
+    history: [
+      { by: "thanakorn", to: "OPEN", after: 1 },
+      { by: "thanakorn", to: "IN_PROGRESS", after: 2 },
+      { by: "thanakorn", to: "WAITING_FOR_REQUESTER", after: 5 },
+    ],
+    actions: [
+      {
+        by: "thanakorn", actionAfter: 4, recordedAfter: 4.1,
+        description: "Granted the shared finance mailbox permission through the admin console.",
+        result: "The mailbox is visible in the web client.",
+      },
+      {
+        by: "thanakorn", actionAfter: 24, recordedAfter: 24.1,
+        description: "Asked the Requester to restart Outlook and check the mailbox again.",
+        result: "The Requester says the mailbox appears after the restart.",
+        followUp: "Confirm the mailbox is still visible in two days before resolving.",
+      },
+    ],
+  },
+  "Calendar invites arrive one hour late": {
+    history: [
+      { by: "nattapong", to: "OPEN", after: 1 },
+      { by: "nattapong", to: "IN_PROGRESS", after: 4 },
+      { by: "nattapong", to: "RESOLVED", after: 30 },
+    ],
+    actions: [
+      {
+        by: "nattapong", actionAfter: 10, recordedAfter: 10.1,
+        description: "Compared the mail server clock with network time.",
+        result: "The mail server clock was 61 minutes behind.",
+      },
+      {
+        by: "nattapong", actionAfter: 29, recordedAfter: 29.1,
+        description: "Corrected the mail server clock and sent test invites from another faculty.",
+        result: "Invites now arrive within a minute.",
+      },
+    ],
+  },
+  "Registrar printer toner is empty": {
+    history: [
+      { by: "siriporn", to: "OPEN", after: 1 },
+      { by: "siriporn", to: "IN_PROGRESS", after: 2 },
+      { by: "siriporn", to: "RESOLVED", after: 3 },
+    ],
+    actions: [
+      {
+        // An Administrator acting as themself on a ticket they own (BR-45).
+        by: "malee", actionAfter: 2.5, recordedAfter: 2.6,
+        description: "Replaced the empty toner cartridge and printed a test page.",
+        result: "The test page printed cleanly.",
+      },
+    ],
+  },
+  "Cannot join Wi-Fi with the new library tablet": {
+    history: [
+      { by: "siriporn", to: "OPEN", after: 1 },
+      { by: "siriporn", to: "IN_PROGRESS", after: 3 },
+      { by: "siriporn", to: "RESOLVED", after: 8 },
+      { by: "siriporn", to: "CLOSED", after: 30 },
+    ],
+    actions: [
+      {
+        by: "siriporn", actionAfter: 7, recordedAfter: 7.1,
+        description: "Registered the kiosk tablet's hardware address on the staff network.",
+        result: "The tablet joins the staff Wi-Fi.",
+      },
+    ],
+  },
+  "Request access to the grade submission app": {
+    history: [
+      { by: "thanakorn", to: "OPEN", after: 1 },
+      { by: "thanakorn", to: "IN_PROGRESS", after: 3 },
+      { by: "thanakorn", to: "RESOLVED", after: 10 },
+      { by: "thanakorn", to: "CLOSED", after: 36 },
+    ],
+    actions: [
+      {
+        by: "thanakorn", actionAfter: 9, recordedAfter: 9.1,
+        description: "Granted read access to the grade submission app for the finance role.",
+        result: "The Requester confirmed the access works.",
+      },
+    ],
+  },
+  "Docking station stopped charging": {
+    // Reopened, and nothing has been recorded since: resolving it again is blocked (BR-17).
+    history: [
+      { by: "nattapong", to: "OPEN", after: 1 },
+      { by: "nattapong", to: "IN_PROGRESS", after: 3 },
+      { by: "nattapong", to: "RESOLVED", after: 6 },
+      { by: "nattapong", to: "REOPENED", after: 50 },
+    ],
+    actions: [
+      {
+        by: "nattapong", actionAfter: 4.5, recordedAfter: 5,
+        description: "Reset the docking station and updated its power profile.",
+        result: "The dock charged the laptop again.",
+      },
+    ],
+  },
+  "VPN asks for the authenticator code twice": {
+    // Reopened with a fresh action after the reopen: resolving it is allowed.
+    history: [
+      { by: "prasert", to: "OPEN", after: 1 },
+      { by: "prasert", to: "IN_PROGRESS", after: 4 },
+      { by: "prasert", to: "RESOLVED", after: 12 },
+      { by: "prasert", to: "REOPENED", after: 60 },
+    ],
+    actions: [
+      {
+        by: "prasert", actionAfter: 10, recordedAfter: 10.1,
+        description: "Changed the authenticator prompt setting in the VPN client.",
+        result: "The prompt appeared once in a test sign-in.",
+      },
+      {
+        // Typed as 63 h, recorded at 64 h: after the reopen at 60 h.
+        by: "siriporn", actionAfter: 63, recordedAfter: 64,
+        description: "Reverted the VPN client update and asked the Requester to retest.",
+        result: "The duplicate prompt no longer appears in a test sign-in.",
+      },
+    ],
+  },
+  "Duplicate request for a LEB2 password reset": {
+    history: [{ by: "siriporn", to: "CANCELLED", after: 1 }],
+  },
+  "Printer request raised in the wrong category": {
+    history: [
+      { by: "siriporn", to: "OPEN", after: 1 },
+      { by: "siriporn", to: "CANCELLED", after: 2 },
+    ],
+  },
+};
+
+// A summary that matches no ticket would attach its activity to nothing and
+// pass silently, so it is a mistake caught here, when the file loads.
+for (const summary of Object.keys(ACTIVITY)) {
+  if (!SEEDED_TICKETS.some((ticket) => ticket.summary === summary)) {
+    throw new Error(`seed activity names a ticket that does not exist: "${summary}"`);
+  }
+}
+
+export const TICKETS: SeedTicket[] = SEEDED_TICKETS.map((ticket) => ({ ...ticket, ...ACTIVITY[ticket.summary] }));
+
 export interface SeedSummary {
   usersByRole: Record<Role, { active: number; inactive: number }>;
   ticketsByStatus: Partial<Record<TicketStatus, number>>;
+  /** Rows in the database after seeding, not only the ones this seed wrote. */
+  actions: number;
+  statusChanges: number;
+}
+
+// The request key an Action Taken is recorded under (Lab 4 BR-28). It is derived
+// from the same identity the seed uses for a ticket (Requester and summary), so a
+// reordered list cannot change it, and it fits the key's 8 to 64 characters.
+function seedRequestKey(seed: SeedTicket, n: number): string {
+  const ticket = createHash("sha1").update(`${seed.requester}|${seed.summary}`).digest("hex").slice(0, 8);
+  return `seed-${ticket}-${n}`;
 }
 
 const HOUR = 60 * 60 * 1000;
@@ -309,7 +603,7 @@ async function convergeTicket(
   const existing = await prisma.ticket.findFirst({
     where: { requesterId, summary: seed.summary },
     select: {
-      id: true, createdAt: true, categoryId: true, relatedSystemId: true, description: true,
+      id: true, createdAt: true, updatedAt: true, categoryId: true, relatedSystemId: true, description: true,
       requestedPriority: true, itPriority: true, currentStatus: true, ownerId: true, requesterResolvedAt: true,
     },
   });
@@ -336,6 +630,9 @@ async function convergeTicket(
     0,
     ...(seed.comments ?? []).map((c) => c.hoursAfter),
     ...(seed.notes ?? []).map((n) => n.hoursAfter),
+    // Recording an action and changing a status both move Last Updated (BR-11).
+    ...(seed.actions ?? []).map((a) => a.recordedAfter),
+    ...(seed.history ?? []).map((step) => step.after),
     seed.requesterSaysResolved ? RESOLVED_SIGNAL_HOURS : 0,
   );
   const updatedAt = at(lastActivityHours);
@@ -353,9 +650,14 @@ async function convergeTicket(
       existing.currentStatus !== fields.currentStatus ||
       existing.ownerId !== fields.ownerId ||
       !sameTime(existing.requesterResolvedAt, fields.requesterResolvedAt);
-    // Untouched rows stay untouched, updatedAt included.
+    // Untouched rows stay untouched, updatedAt included, with one exception: a
+    // ticket whose Last Updated is older than its seeded activity is brought up
+    // to it, so a seeded action is never newer than the ticket that holds it
+    // (Lab 4 BR-11). It is a one-time catch-up; the next run finds nothing behind.
     if (drifted) {
       await prisma.ticket.update({ where: { id: existing.id }, data: { ...fields, updatedAt } });
+    } else if (existing.updatedAt.getTime() < updatedAt.getTime()) {
+      await prisma.ticket.update({ where: { id: existing.id }, data: { updatedAt } });
     }
   } else {
     const ticket = await prisma.$transaction(async (tx) => {
@@ -388,6 +690,68 @@ async function convergeTicket(
     if (!found) {
       await prisma.internalNote.create({
         data: { ticketId, authorId, body: entry.body, createdAt: new Date(ticketCreatedAt.getTime() + entry.hoursAfter * HOUR) },
+      });
+    }
+  }
+
+  // Status history is append-only too (Lab 4 BR-22), so the seed adds the steps
+  // that are missing and never removes one a demo added. A step is identified by
+  // what it is, because it has no key of its own.
+  let from: TicketStatus = "NEW";
+  for (const step of seed.history ?? []) {
+    const changedById = userIds.get(step.by)!;
+    const stepAt = at(step.after);
+    const found = await prisma.ticketStatusChange.findFirst({
+      where: { ticketId, fromStatus: from, toStatus: step.to, changedById, createdAt: stepAt },
+      select: { id: true },
+    });
+    if (!found) {
+      await prisma.ticketStatusChange.create({ data: { ticketId, fromStatus: from, toStatus: step.to, changedById, createdAt: stepAt } });
+    }
+    from = step.to;
+  }
+
+  // Actions Taken are identified by the request key they were recorded under,
+  // the same key that makes a double submit safe in the app (Lab 4 BR-28), and
+  // converge to the documented text and times if a demo edited them.
+  for (const [index, action] of (seed.actions ?? []).entries()) {
+    const performedById = userIds.get(action.by)!;
+    const requestKey = seedRequestKey(seed, index + 1);
+    const recordedAt = at(action.recordedAfter);
+    const desired = {
+      actionAt: at(action.actionAfter),
+      description: action.description,
+      result: action.result,
+      followUpRequired: action.followUp !== undefined,
+      followUpNote: action.followUp ?? null,
+      attachmentNotes: action.attachmentNotes ?? null,
+    };
+    const stored = await prisma.actionTaken.findUnique({
+      where: { ticketId_performedById_requestKey: { ticketId, performedById, requestKey } },
+    });
+
+    if (!stored) {
+      await prisma.actionTaken.create({
+        data: { ticketId, performedById, requestKey, createdAt: recordedAt, updatedAt: recordedAt, ...desired },
+      });
+      continue;
+    }
+
+    const drifted =
+      stored.actionAt.getTime() !== desired.actionAt.getTime() ||
+      stored.createdAt.getTime() !== recordedAt.getTime() ||
+      stored.description !== desired.description ||
+      stored.result !== desired.result ||
+      stored.followUpRequired !== desired.followUpRequired ||
+      stored.followUpNote !== desired.followUpNote ||
+      stored.attachmentNotes !== desired.attachmentNotes ||
+      stored.updatedById !== null ||
+      stored.version !== 1;
+    if (drifted) {
+      // Back to a record nobody has edited.
+      await prisma.actionTaken.update({
+        where: { id: stored.id },
+        data: { ...desired, createdAt: recordedAt, updatedAt: recordedAt, updatedById: null, version: 1 },
       });
     }
   }
@@ -438,5 +802,10 @@ export async function runSeed(prisma: PrismaClient): Promise<SeedSummary> {
   const ticketsByStatus: SeedSummary["ticketsByStatus"] = {};
   for (const row of grouped) ticketsByStatus[row.currentStatus] = row._count._all;
 
-  return { usersByRole, ticketsByStatus };
+  return {
+    usersByRole,
+    ticketsByStatus,
+    actions: await prisma.actionTaken.count(),
+    statusChanges: await prisma.ticketStatusChange.count(),
+  };
 }

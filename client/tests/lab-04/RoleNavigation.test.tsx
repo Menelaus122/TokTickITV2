@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TokTickITApp } from "../../src/TokTickITApp.js";
 import * as api from "../../src/api.js";
@@ -86,7 +86,9 @@ describe("UI-27 an Administrator works from the Ticket Queue (FR-23, FR-24, D-08
     render(<TokTickITApp initialEntries={["/queue"]} />);
 
     expect(await screen.findByRole("heading", { name: "Ticket Queue" })).toBeInTheDocument();
-    expect(api.fetchQueue).toHaveBeenCalled();
+    // The heading is the card's title and renders on the first paint; the request
+    // comes from an effect a moment later, so wait for it instead of assuming it.
+    await waitFor(() => expect(api.fetchQueue).toHaveBeenCalled());
     expect(screen.queryByText(FORBIDDEN)).not.toBeInTheDocument();
     // Marked as the current page, as it is for IT Staff.
     expect(within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", { name: "Ticket Queue" })).toHaveAttribute("aria-current", "page");

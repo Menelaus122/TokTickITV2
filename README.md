@@ -131,9 +131,16 @@ local database.
 | IT Staff | `nattapong.it@toktickit.local`, `siriporn.it@toktickit.local`, `thanakorn.it@toktickit.local` | |
 | IT Staff, inactive | `prasert.it@toktickit.local` | Still owns a ticket, which shows that ownership survives deactivation |
 | Administrator | `malee.admin@toktickit.local`, `kittisak.admin@toktickit.local` | Two, so the last-Administrator rule can be tested |
+| Requester with no tickets | `no.tickets@toktickit.local` | Lab 4: signs in to a dashboard where every number is `0`, so the empty state can be seen |
+| IT Staff with no work | `idle.it@toktickit.local` | Lab 4: owns no ticket and has recorded no action, so the "mine" figures are `0` |
 
 The seed also creates 16 sample tickets — two in each of the eight statuses —
-with Public Comments and Internal Notes.
+with Public Comments and Internal Notes. **Lab 4 adds 18 Actions Taken and 37
+status changes** to them: none on the New and Cancelled tickets, one on most Open
+and Closed ones, several on the In Progress ones (one by an IT Staff member who
+is not the Owner), one recorded by an Administrator, a follow-up still pending on
+the Waiting tickets, and two Reopened tickets, one with no action since the
+reopen and one with a fresh one. The two accounts above own and perform none of it.
 
 **The seed converges.** Every run puts each account above back to this password
 and its documented must-change setting, and resets the sample tickets' status,
@@ -156,6 +163,41 @@ the app are never touched.
 > docker compose exec server npm run prisma:seed
 > docker compose restart server
 > ```
+
+> **Upgrading a Lab 3 database to Lab 4.** The migration is additive: two new
+> tables (`ActionTaken`, `TicketStatusChange`), one new `Ticket.version` column
+> that every existing ticket gets as `1`, and an index swap. No existing row is
+> rewritten.
+>
+> 1. **Take a dump first**, because the rollback below does not undo the seed:
+>    `docker exec toktickit-db pg_dump -U toktickit toktickit > backup-pre-lab4.sql`
+> 2. Apply and refresh. **Restart the server container afterwards, always.** On
+>    Windows the bind-mounted `server/` does not tell the container about edits, so
+>    the running API keeps serving old code and an old Prisma client until it is
+>    restarted:
+>
+>    ```bash
+>    docker compose exec server npx prisma migrate deploy
+>    docker compose exec server npx prisma generate
+>    docker compose exec server npm run prisma:seed
+>    docker compose restart server
+>    ```
+>
+> 3. **To roll back** (this loses every Action Taken and status-history row, which
+>    is why the dump comes first), run `server/prisma/rollback/lab4_rollback.sql`
+>    and then remove the migration from Prisma's history, so that
+>    `prisma migrate status` lists it as pending and `migrate deploy` can apply it
+>    again:
+>
+>    ```bash
+>    docker exec -i toktickit-server npx prisma db execute --file prisma/rollback/lab4_rollback.sql --schema prisma/schema.prisma
+>    docker exec toktickit-db psql -U toktickit -d toktickit -c "DELETE FROM \"_prisma_migrations\" WHERE migration_name = '20261006093537_lab4_actions_taken_and_workflow'"
+>    ```
+>
+>    (`prisma migrate resolve --rolled-back` does **not** work here: Prisma only
+>    accepts it for a migration that failed.) The script undoes the migration and
+>    nothing else. A database that was seeded after migrating keeps the seed's two
+>    accounts, so for that case restore the dump instead.
 >
 > The client container's Vite server does not always see file changes made on a
 > Windows host, so after pulling, restart it as well (`docker compose restart
