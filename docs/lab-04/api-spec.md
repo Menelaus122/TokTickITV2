@@ -144,7 +144,7 @@ IT Staff or Administrator. A Requester is `403 FORBIDDEN`.
 
 | Field | Rule |
 | :--- | :--- |
-| `actionAt` | required, ISO 8601; not later than server time + 5 minutes, not before the Ticket's `createdAt` (BR-06) |
+| `actionAt` | required, ISO 8601 date and time **with a zone**, a day that exists (31 February is refused, not moved to 3 March) and a time from `00:00` to `23:59:59` (`24:00` is refused, not read as the next midnight); not later than server time + 5 minutes, not before the Ticket's `createdAt` (BR-06) |
 | `description` | required string, 5–2000 characters after trimming (BR-03) |
 | `result` | required string, 2–1000 characters after trimming (BR-03) |
 | `followUpRequired` | required boolean |

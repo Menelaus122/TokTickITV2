@@ -404,7 +404,6 @@ describe("POST /api/staff/tickets/:id/actions-taken — validation", () => {
       ["a bare date", "2026-10-05"],
       ["a local time with no zone", "2026-10-05T10:00:00"],
       ["a number", Date.now() - HOUR],
-      ["an impossible date", "2026-02-31T10:00:00Z"],
     ];
     for (const [name, actionAt] of bad) {
       const res = await create(id, cookies.owner, validBody({ actionAt }));
@@ -418,6 +417,50 @@ describe("POST /api/staff/tickets/:id/actions-taken — validation", () => {
     expect(soon.status).toBe(201);
     const atCreation = await create(id, cookies.owner, validBody({ actionAt: createdAt.toISOString() }));
     expect(atCreation.status).toBe(201);
+  });
+});
+
+describe("an Action Date/Time that does not exist is refused, not moved to a date that does (BR-06)", () => {
+  // JavaScript turns 31 February into 3 March. A ticket this old leaves every
+  // rolled-over date inside the allowed range, so a 400 here can only be the
+  // calendar check: on a ticket created yesterday the same input is refused by
+  // the "before the ticket existed" rule and proves nothing.
+  const lastYear = new Date().getUTCFullYear() - 1;
+  const impossible = [
+    `${lastYear}-02-31T10:00:00Z`,
+    `${lastYear}-04-31T10:00:00Z`,
+    `${lastYear}-06-31T10:00:00Z`,
+    `${lastYear}-09-31T23:30:00+07:00`,
+    `${lastYear}-03-01T24:00:00Z`,
+  ];
+  const threeYearsAgo = () => new Date(Date.now() - 3 * 365 * 24 * HOUR);
+
+  it("API-09 answers 400 on actionAt for each, on a ticket old enough that no other rule applies, and stores nothing", async () => {
+    const id = await makeTicket({ createdAt: threeYearsAgo() });
+    for (const actionAt of impossible) {
+      const res = await create(id, cookies.owner, validBody({ actionAt }));
+      expect(res.status, actionAt).toBe(400);
+      expect(Object.keys(res.body.error.fields), actionAt).toEqual(["actionAt"]);
+    }
+    expect(await actionsOf(id)).toEqual([]);
+  });
+
+  it("API-09 refuses the same dates in an edit, and leaves the action as it was", async () => {
+    const id = await makeTicket({ createdAt: threeYearsAgo() });
+    const original = await recordedAction(id);
+    for (const actionAt of impossible) {
+      const res = await edit(id, original.id, cookies.owner, { expectedVersion: 1, actionAt });
+      expect(res.status, actionAt).toBe(400);
+      expect(Object.keys(res.body.error.fields), actionAt).toEqual(["actionAt"]);
+    }
+    expect(await actionsOf(id)).toEqual([original]);
+  });
+
+  it("API-09 still accepts a real date on that old ticket, such as 29 February of a leap year, and stores that day", async () => {
+    const id = await makeTicket({ createdAt: new Date("2020-01-01T00:00:00Z") });
+    const res = await create(id, cookies.owner, validBody({ actionAt: "2024-02-29T10:00:00Z" }));
+    expect(res.status).toBe(201);
+    expect(res.body.action.actionAt).toBe("2024-02-29T10:00:00.000Z");
   });
 });
 

@@ -184,11 +184,77 @@ describe("UNIT-03 Action Date/Time against an explicit clock (BR-06)", () => {
   it("refuses anything that is not a complete ISO 8601 date and time with a zone", () => {
     for (const bad of [
       "", "yesterday", "2026-10-05", "2026-10-05 09:30", "2026-10-05T09:30:00", "05/10/2026 09:30",
-      "2026-13-05T09:30:00Z", "2026-02-31T09:30:00Z", "2026-10-05T25:00:00Z", 1759656600000, true, null, {}, [],
+      "2026-13-05T09:30:00Z", "2026-10-05T25:00:00Z", 1759656600000, true, null, {}, [],
     ]) {
       expect(at(bad as string), JSON.stringify(bad)).toEqual(["actionAt"]);
     }
     expect(rejectedFields({ description: valid.description, result: valid.result, followUpRequired: false })).toEqual(["actionAt"]);
+  });
+});
+
+describe("UNIT-03 a date that does not exist is refused, never rolled over to one that does (BR-06)", () => {
+  // JavaScript turns 31 February into 3 March instead of failing. The Ticket here
+  // is old enough that no other rule can refuse the rolled-over date, so a
+  // refusal is the calendar check and nothing else.
+  const early = { now: NOW, ticketCreatedAt: new Date("1800-01-01T00:00:00.000Z") };
+  const atEarly = (iso: string) => {
+    const checked = checkNewAction({ ...valid, actionAt: iso }, early);
+    return checked.ok ? checked.value.actionAt.toISOString() : Object.keys(checked.fields).sort();
+  };
+
+  it("refuses a day the month does not have, with or without an offset", () => {
+    for (const bad of [
+      "2026-02-29T10:00:00Z", "2026-02-30T10:00:00Z", "2026-02-31T10:00:00Z", "2026-04-31T10:00:00Z", "2026-06-31T10:00:00Z",
+      "2026-09-31T10:00:00Z", "2026-11-31T10:00:00Z", "2026-09-31T23:30:00+07:00", "2026-02-31T10:00:00.000Z",
+      "2026-10-00T10:00:00Z", "2026-00-10T10:00:00Z", "2026-13-10T10:00:00Z", "2026-01-32T10:00:00Z",
+    ]) {
+      expect(atEarly(bad), bad).toEqual(["actionAt"]);
+    }
+  });
+
+  it("knows leap years: 29 February exists in 2024 and 2000, and not in 2023 or 1900", () => {
+    expect(atEarly("2024-02-29T10:00:00Z")).toBe("2024-02-29T10:00:00.000Z");
+    expect(atEarly("2000-02-29T10:00:00Z")).toBe("2000-02-29T10:00:00.000Z");
+    expect(atEarly("2023-02-29T10:00:00Z")).toEqual(["actionAt"]);
+    expect(atEarly("1900-02-29T10:00:00Z")).toEqual(["actionAt"]);
+  });
+
+  it("accepts the last real day of every month of a year and refuses the day after it", () => {
+    const lengths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    lengths.forEach((last, index) => {
+      const month = String(index + 1).padStart(2, "0");
+      expect(atEarly(`2025-${month}-${String(last).padStart(2, "0")}T10:00:00Z`), `last day of 2025-${month}`).toBe(
+        `2025-${month}-${String(last).padStart(2, "0")}T10:00:00.000Z`,
+      );
+      expect(atEarly(`2025-${month}-${String(last + 1).padStart(2, "0")}T10:00:00Z`), `day after the end of 2025-${month}`).toEqual(["actionAt"]);
+    });
+  });
+
+  it("refuses a time that would roll into the next day, such as 24:00, and any other out-of-range time", () => {
+    for (const bad of [
+      "2026-03-01T24:00:00Z", "2026-03-01T24:00Z", "2026-03-01T24:30:00Z", "2026-03-01T23:60:00Z", "2026-03-01T10:00:60Z",
+      "2026-03-01T10:00:00+24:00", "2026-03-01T10:00:00+00:60", "2026-03-01T10:00:00-99:00",
+    ]) {
+      expect(atEarly(bad), bad).toEqual(["actionAt"]);
+    }
+  });
+
+  it("accepts the edges of the day and of the offsets that exist", () => {
+    expect(atEarly("2026-03-01T00:00:00Z")).toBe("2026-03-01T00:00:00.000Z");
+    expect(atEarly("2026-03-01T23:59:59Z")).toBe("2026-03-01T23:59:59.000Z");
+    expect(atEarly("2026-03-01T23:59Z")).toBe("2026-03-01T23:59:00.000Z");
+    expect(atEarly("2026-03-01T10:00:00+14:00")).toBe("2026-02-28T20:00:00.000Z");
+    expect(atEarly("2026-03-01T10:00:00-12:00")).toBe("2026-03-01T22:00:00.000Z");
+  });
+
+  it("is the same rule for an edit, which shares the field checks", () => {
+    const stored: ActionFields = {
+      actionAt: new Date("2026-10-05T09:30:00.000Z"), description: valid.description, result: valid.result,
+      followUpRequired: false, followUpNote: null, attachmentNotes: null,
+    };
+    const checked = checkActionEdit(stored, { expectedVersion: 1, actionAt: "2026-02-31T10:00:00Z" }, early);
+    expect(checked.ok).toBe(false);
+    expect(!checked.ok && Object.keys(checked.fields)).toEqual(["actionAt"]);
   });
 });
 

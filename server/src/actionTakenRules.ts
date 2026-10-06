@@ -48,7 +48,23 @@ export interface CheckContext {
 
 // A complete ISO 8601 date and time with an explicit zone. A bare local time has
 // no single meaning once it is stored in UTC, so it is refused rather than guessed.
-const ISO_WITH_ZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+// Each part of the time is held to its real range: `new Date` turns 24:00 into
+// midnight of the next day, and that would store a date the person did not write.
+const ISO_WITH_ZONE =
+  /^(\d{4})-(\d{2})-(\d{2})T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,9})?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/;
+
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+const isLeapYear = (year: number): boolean => (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+
+/**
+ * Whether a year, a month (1 to 12), and a day make a day that exists. `new Date`
+ * does not refuse 31 February: it rolls it over to 3 March, so the calendar has
+ * to be checked before the text is parsed.
+ */
+function isRealDay(year: number, month: number, day: number): boolean {
+  if (month < 1 || month > 12 || day < 1) return false;
+  return day <= (month === 2 && isLeapYear(year) ? 29 : DAYS_IN_MONTH[month - 1]);
+}
 
 const NUL = "\u0000";
 
@@ -76,10 +92,11 @@ function checkText(
 
 function checkActionAt(value: unknown, ctx: CheckContext): { ok: true; at: Date } | { ok: false; message: string } {
   if (value === undefined || value === null || value === "") return { ok: false, message: "Action Date/Time is required." };
-  if (typeof value !== "string" || !ISO_WITH_ZONE.test(value)) {
+  const parts = typeof value === "string" ? ISO_WITH_ZONE.exec(value) : null;
+  if (!parts || !isRealDay(Number(parts[1]), Number(parts[2]), Number(parts[3]))) {
     return { ok: false, message: "Enter a valid date and time, with a time zone." };
   }
-  const at = new Date(value);
+  const at = new Date(value as string);
   if (Number.isNaN(at.getTime())) return { ok: false, message: "Enter a valid date and time, with a time zone." };
   if (at.getTime() > ctx.now.getTime() + FUTURE_TOLERANCE_MS) {
     return { ok: false, message: "Action Date/Time cannot be in the future." };
