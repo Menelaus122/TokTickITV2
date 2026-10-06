@@ -58,7 +58,7 @@ export function checkBody(value: unknown, min = 1, label = "Comment"): { ok: tru
  * their own ticket, and another Requester's ticket is answered exactly like one
  * that does not exist (FR-12, AC-11). IT Staff and Administrators see any.
  */
-async function visibleTicket(prisma: PrismaClient, req: Request, id: number): Promise<boolean> {
+export async function visibleTicket(prisma: PrismaClient, req: Request, id: number): Promise<boolean> {
   const user = req.auth!.user;
   const where = user.role === "REQUESTER" ? { id, requesterId: user.id } : { id };
   return (await prisma.ticket.findFirst({ where, select: { id: true } })) !== null;
