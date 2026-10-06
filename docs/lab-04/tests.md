@@ -165,13 +165,14 @@ first, then the rule or requirement where it adds precision.
 
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| MIG-01 | Migration | AC-23, BR-46 | row counts of User, Ticket, Attachment, PublicComment, and InternalNote before and after the migration | identical | `server/tests/lab-04/migration.regression.test.ts` | Planned |
-| MIG-02 | Migration | AC-23, BR-46 | requester bindings, owners, and ticket numbers; every `Ticket.version` | unchanged; every `version` is 1 | `server/tests/lab-04/migration.regression.test.ts` | Planned |
-| MIG-03 | Migration | AC-23, BR-47 | open a legacy Ticket: its detail, actions, and history | the detail loads; actions and history are `[]`; no error | `server/tests/lab-04/migration.regression.test.ts` | Planned |
-| MIG-04 | Migration | AC-23, BR-48 | a legacy `RESOLVED` and `CLOSED` Ticket, and a legacy `IN_PROGRESS` one | the first two are not re-gated and can be reopened; the third is gated | `server/tests/lab-04/migration.regression.test.ts` | Planned |
-| MIG-05 | Migration | AC-23, BR-49 | snapshot the Lab 3 tables of a scratch database **in the Lab 3 state**, apply the Lab 4 migration, then run the rollback script **without** the Lab 4 seed in between | the Lab 3 tables equal the snapshot row for row; the two new tables and `version` are gone; the single-column `ownerId` index is back | `server/tests/lab-04/migration.regression.test.ts` | Planned |
-| MIG-06 | Migration | AC-24, BR-46 | run the seed twice | identical row counts after each; no duplicate account, action, or history row | `server/tests/lab-04/migration.regression.test.ts` | Planned |
-| MIG-07 | Migration | AC-24, specification §7.5 | the seeded spread | all 8 statuses, owned and unowned, zero / one / several actions, an action by a non-owner, follow-up Yes and No, both reopened cases, and the two zero-data accounts | `server/tests/lab-04/migration.regression.test.ts` | Planned |
+| MIG-01 | Migration | AC-23, BR-46 | row counts of User, Ticket, Attachment, PublicComment, and InternalNote before and after the migration | identical | `server/tests/lab-04/migration.regression.test.ts` | Pass |
+| MIG-02 | Migration | AC-23, BR-46 | requester bindings, owners, and ticket numbers; every `Ticket.version` | unchanged; every `version` is 1 | `server/tests/lab-04/migration.regression.test.ts` | Pass |
+| MIG-03 | Migration | AC-23, BR-47 | open a legacy Ticket: its detail, actions, and history | the detail loads; actions and history are `[]`; no error | `server/tests/lab-04/migration.regression.test.ts` | Partial |
+| MIG-04 | Migration | AC-23, BR-48 | a legacy `RESOLVED` and `CLOSED` Ticket, and a legacy `IN_PROGRESS` one | the first two are not re-gated and can be reopened; the third is gated | `server/tests/lab-04/migration.regression.test.ts` | Partial |
+| MIG-05 | Migration | AC-23, BR-49 | snapshot the Lab 3 tables of a scratch database **in the Lab 3 state**, apply the Lab 4 migration, then run the rollback script **without** the Lab 4 seed in between | the Lab 3 tables equal the snapshot row for row; the two new tables and `version` are gone; the single-column `ownerId` index is back | `server/tests/lab-04/migration.regression.test.ts` | Pass |
+| MIG-06 | Migration | AC-24, BR-46 | run the seed twice | identical row counts after each; no duplicate account, action, or history row | `server/tests/lab-04/migration.regression.test.ts` | Pass |
+| MIG-07 | Migration | AC-24, specification §7.5 | the seeded spread | all 8 statuses, owned and unowned, zero / one / several actions, an action by a non-owner, follow-up Yes and No, both reopened cases, and the two zero-data accounts | `server/tests/lab-04/migration.regression.test.ts` | Pass |
+| MIG-08 | Migration | AC-23, BR-28, D-01, D-04, D-05 | the migrated schema: the two new tables with their columns, lengths, and nullability, `Ticket.version`, the unique `(ticketId, performedById, requestKey)` key, every index §7.3 names, the dropped single-column owner index, and each foreign key; then the constraints in use: a duplicate key is refused, two keyless rows are not, a user who is only a performer, only an editor, or only a status-changer cannot be deleted until that row is gone, and deleting a Ticket removes its actions and history | all as §7.1 – §7.3 specify; each author foreign key is `RESTRICT` and each Ticket foreign key `CASCADE` | `server/tests/lab-04/migration.regression.test.ts` | Pass |
 
 ### 2.7 Hardening and performance smoke
 
@@ -301,7 +302,7 @@ alone.
 | AC-20 | SEC-05, DASH-05, DASH-16, DASH-19, UI-24, E2E-06 |
 | AC-21 | UNIT-11, DASH-07, DASH-08, DASH-17, DASH-18, UI-18, UI-22, UI-29, UI-38, E2E-05, E2E-06 |
 | AC-22 | UI-21, UI-25 |
-| AC-23 | MIG-01 – MIG-05, API-01, UI-01 |
+| AC-23 | MIG-01 – MIG-05, MIG-08, API-01, UI-01 |
 | AC-24 | MIG-06, MIG-07 |
 | AC-25 | REG-01, REG-02, REG-03, RESP-05 |
 | AC-26 | UNIT-04, UNIT-12, API-17, HARD-01, HARD-02 |
@@ -316,19 +317,19 @@ alone.
 
 ### 3.1 Planned test distribution by issue
 
-151 tests are planned: 12 unit, 17 Actions Taken API, 9 authorization, 20
-workflow, 19 dashboard, 7 migration, 3 hardening, 3 performance smoke, 38 UI
+152 tests are planned: 12 unit, 17 Actions Taken API, 9 authorization, 20
+workflow, 19 dashboard, 8 migration, 3 hardening, 3 performance smoke, 38 UI
 component, 6 UI style, 6 responsive, 8 E2E, and 3 regression suites.
 
 | Issue | Tests |
 | :--- | :--- |
 | 2 — Administrator access to IT Staff ticket operations (#68) | SEC-01 – SEC-04, SEC-06, SEC-08, SEC-09, UI-27, UI-28, each for the endpoints and screens that exist at Issue 2 (see below) |
-| 3 — Actions Taken data model, migration, and seed (#69) | MIG-01 – MIG-07 |
-| 4 — Actions Taken API (#70) | UNIT-01 – UNIT-06, API-01 – API-17 |
+| 3 — Actions Taken data model, migration, and seed (#69) | MIG-01 – MIG-08 (MIG-03 and MIG-04 for the data only, see below) |
+| 4 — Actions Taken API (#70) | UNIT-01 – UNIT-06, API-01 – API-17; extends SEC-01, SEC-07, SEC-08 (`performedBy`), and SEC-09 for the Actions Taken routes |
 | 5 — Actions Taken UI on Ticket Detail (#71) | UI-01 – UI-09, STYLE-03 |
-| 6 — Ticket workflow and resolution gate (#72) | UNIT-07 – UNIT-10, WF-01 – WF-17, WF-19, WF-20, UI-10 – UI-16, STYLE-06 |
-| 7 — Requester Dashboard (#73) | UNIT-11, DASH-01 – DASH-09, UI-18 – UI-21, UI-29, UI-37 (Requester), STYLE-02 |
-| 8 — IT Staff and Administrator Dashboard (#74) | DASH-10 – DASH-19, UI-22 – UI-26, UI-37 (IT Staff and Administrator), UI-38 |
+| 6 — Ticket workflow and resolution gate (#72) | UNIT-07 – UNIT-10, WF-01 – WF-17, WF-19, WF-20, UI-10 – UI-16, STYLE-06; extends SEC-01 for the status-history route and SEC-08 (`changedBy`) |
+| 7 — Requester Dashboard (#73) | UNIT-11, DASH-01 – DASH-09, UI-18 – UI-21, UI-29, UI-37 (Requester), STYLE-02; completes SEC-05 (the Requester dashboard half) and extends SEC-01 and SEC-07 |
+| 8 — IT Staff and Administrator Dashboard (#74) | DASH-10 – DASH-19, UI-22 – UI-26, UI-37 (IT Staff and Administrator), UI-38; completes SEC-05 (the staff dashboard half) and extends SEC-01 and SEC-07 |
 | 9 — Final hardening and full regression (#75) | UNIT-12, WF-18, UI-17, HARD-01 – HARD-03, PERF-01 – PERF-03, UI-30 – UI-36, STYLE-01, STYLE-04, STYLE-05 |
 | 10 — Lab 4 E2E suite and visual evidence (#76) | RESP-01 – RESP-06, E2E-01 – E2E-08, REG-01 – REG-03 |
 | 11 — Staging integration, documentation, and delivery (#77) | no new tests: the final run from `main` |
@@ -354,6 +355,20 @@ that adds the thing they test, by appending a row to the route tables in
 | UI-28 | the owner, IT Priority, and status controls, and the Internal Notes region | 5: the Actions Taken controls |
 
 SEC-02, SEC-03, SEC-04, and SEC-06 are complete at Issue 2.
+
+The same happened at Issue 3: MIG-03 and MIG-04 were assigned to it whole, but each
+has a half that needs something built later. What the migration itself guarantees
+is tested now, against the data; what a screen or the gate does with it is tested
+when that exists:
+
+| Test | Complete at Issue 3 (the data) | Completed in |
+| :--- | :--- | :--- |
+| MIG-03 | a legacy Ticket has no row in `ActionTaken` or `TicketStatusChange` and keeps its version 1 | 4 (the actions list answers `[]` for it), 6 (the status history answers `[]` and the detail screen loads) |
+| MIG-04 | a legacy `RESOLVED`, `CLOSED`, and `IN_PROGRESS` Ticket is exactly as it was, with its owner | 6: a legacy `RESOLVED` or `CLOSED` Ticket can be reopened, and a legacy `IN_PROGRESS` one is gated like any other |
+
+MIG-08 was added in Issue 3 for what the plan lacked: a test of the migrated
+schema itself. It was not in the plan approved in PR #78, which had 151 tests, and
+it brings the plan to 152.
 
 ---
 

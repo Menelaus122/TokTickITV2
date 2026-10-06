@@ -97,11 +97,17 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  requestedTickets Ticket[]        @relation("TicketRequester")
-  ownedTickets     Ticket[]        @relation("TicketOwner")
+  requestedTickets Ticket[]             @relation("TicketRequester")
+  ownedTickets     Ticket[]             @relation("TicketOwner")
   sessions         Session[]
   publicComments   PublicComment[]
   internalNotes    InternalNote[]
+  // Lab 4 — what this user recorded, what they last edited, and the status
+  // changes they made. All three are restrict relations, so a user who has
+  // acted is deactivated, never deleted (Lab 3 BR-50).
+  actionsPerformed ActionTaken[]        @relation("ActionPerformedBy")
+  actionsEdited    ActionTaken[]        @relation("ActionUpdatedBy")
+  statusChanges    TicketStatusChange[] @relation("StatusChangedBy")
 
   // The assignable-owner list and the Administrator's role filter (§7.3).
   @@index([role, isActive])
@@ -146,13 +152,17 @@ model Ticket {
   description String @db.VarChar(4000) // Lab 2 BR-27
 
   // Lab 3 BR-27 — the Requester's value, immutable for every role.
-  requestedPriority Priority
+  requestedPriority   Priority
   // Lab 3 BR-28 — copied from requestedPriority at creation, then IT Staff's.
   // Stored separately so re-prioritising never hides what was asked for (D-06).
-  itPriority        Priority
-  currentStatus     TicketStatus @default(NEW)
+  itPriority          Priority
+  currentStatus       TicketStatus @default(NEW)
   // Lab 3 BR-29 — the Requester's "Problem Appears Resolved" signal.
   requesterResolvedAt DateTime?
+  // Lab 4 BR-25 — the stale-update token. It starts at 1 and rises by one
+  // whenever the owner, IT Priority, status, or the signal above really changes.
+  // An integer rather than updatedAt, which a comment also moves (D-02).
+  version             Int          @default(1)
 
   createdAt DateTime @default(now()) // Lab 2 BR-05 — this is the Ticket Date
   updatedAt DateTime @updatedAt // Lab 2 BR-08 — drives "Last Updated"
@@ -167,11 +177,18 @@ model Ticket {
   attachments    Attachment[]
   publicComments PublicComment[]
   internalNotes  InternalNote[]
+  // Lab 4 — what was done on this ticket, and every change of its status.
+  actionsTaken   ActionTaken[]
+  statusChanges  TicketStatusChange[]
 
   // Serves every My Tickets query: the owner filter plus the default sort.
   @@index([requesterId, createdAt])
-  // The queue's ownership filter.
-  @@index([ownerId])
+  // The Requester dashboard's grouped counts by status (Lab 4 BR-32, D-05).
+  @@index([requesterId, currentStatus])
+  // The queue's ownership filter, and "assigned to me" and "my tickets" on the
+  // dashboard. It supersedes Lab 3's single-column [ownerId] index, whose
+  // leading column it covers (Lab 4 §7.3).
+  @@index([ownerId, currentStatus])
   // The queue's default order and its status filter (BR-55).
   @@index([currentStatus, itPriority, createdAt])
 }
@@ -234,4 +251,68 @@ model InternalNote {
   author User   @relation(fields: [authorId], references: [id])
 
   @@index([ticketId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Actions Taken — Lab 4
+// A record of work done on a ticket (specification BR-01 to BR-14, D-01, D-06).
+// It has no assignee and no status of its own: it says what was done, by whom,
+// what came of it, and whether anything still has to happen.
+// ---------------------------------------------------------------------------
+model ActionTaken {
+  id               Int      @id @default(autoincrement())
+  // BR-01 — belongs to exactly one ticket, and goes with it if it is removed.
+  ticketId         Int
+  // BR-06 — typed by the user, stored in UTC; bounds are checked by the API.
+  actionAt         DateTime
+  description      String   @db.VarChar(2000) // BR-03
+  result           String   @db.VarChar(1000) // BR-03
+  // BR-05 — the signed-in user who created it, never editable.
+  performedById    Int
+  followUpRequired Boolean
+  // BR-04 — required when followUpRequired, and null otherwise.
+  followUpNote     String?  @db.VarChar(1000)
+  // BR-03 — text about which file to look for; nothing is uploaded.
+  attachmentNotes  String?  @db.VarChar(500)
+  // BR-27 — the stale-edit token for this record.
+  version          Int      @default(1)
+  // BR-28 — the client's id for one submission, so a retry cannot record twice.
+  requestKey       String?  @db.VarChar(64)
+  // BR-07 — who last edited it; null until the first edit.
+  updatedById      Int?
+  createdAt        DateTime @default(now()) // BR-07 — backend-generated, and what the gate reads (BR-17)
+  updatedAt        DateTime @updatedAt
+
+  ticket      Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  // Restrict: users are deactivated, never deleted, so an author cannot vanish.
+  performedBy User   @relation("ActionPerformedBy", fields: [performedById], references: [id], onDelete: Restrict)
+  updatedBy   User?  @relation("ActionUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  // D-04 — the database is the last line of defence against a double submit.
+  // PostgreSQL treats NULLs as distinct, so rows with no key never conflict.
+  @@unique([ticketId, performedById, requestKey])
+  // One list read per ticket in BR-08 order (§7.3).
+  @@index([ticketId, actionAt, id])
+  // "My Recent Actions" on the IT Staff dashboard (BR-36).
+  @@index([performedById, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Status history — Lab 4
+// Append-only: written in the same transaction as every change of
+// Ticket.currentStatus, and never updated or deleted (BR-21, BR-22, D-03).
+// ---------------------------------------------------------------------------
+model TicketStatusChange {
+  id          Int          @id @default(autoincrement())
+  ticketId    Int
+  fromStatus  TicketStatus
+  toStatus    TicketStatus
+  changedById Int
+  createdAt   DateTime     @default(now())
+
+  ticket    Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  changedBy User   @relation("StatusChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
+
+  // The timeline in order, and the gate's "most recent entry into REOPENED".
+  @@index([ticketId, createdAt, id])
 }

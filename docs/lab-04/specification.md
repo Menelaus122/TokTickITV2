@@ -422,8 +422,12 @@ SQL**, and apply it only after.
 
 **Rollback.** `server/prisma/rollback/lab4_rollback.sql` drops the two new tables
 and the `version` column, drops the two new indexes, and recreates the
-single-column `ownerId` index, after which `prisma migrate resolve --rolled-back`
-marks the migration. Every statement removes something Lab 4 added, so no Lab 1–3
+single-column `ownerId` index. Prisma's history is then made to agree by deleting
+the migration's row from `_prisma_migrations`, after which `prisma migrate status`
+lists it as pending and `migrate deploy` applies it again. (An earlier draft said
+`prisma migrate resolve --rolled-back`; Prisma refuses that for a migration that
+succeeded, with P3012, and it was found by running it in Issue 3.) Every statement
+removes something Lab 4 added, so no Lab 1–3
 row is lost. MIG-05 pins the comparison: it snapshots the Lab 3 tables of a
 scratch database **in the Lab 3 state**, applies the migration, runs the rollback
 **without** the Lab 4 seed in between, and checks that the Lab 3 tables equal the
