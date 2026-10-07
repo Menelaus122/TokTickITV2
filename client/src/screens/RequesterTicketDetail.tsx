@@ -28,6 +28,7 @@ import {
 import { ConversationThread } from "../components/ConversationThread.js";
 import { AppearsResolvedPanel } from "../components/AppearsResolvedPanel.js";
 import { ActionsTakenRegion } from "../components/ActionsTakenRegion.js";
+import { StatusHistoryRegion } from "../components/StatusHistoryRegion.js";
 
 // Requester Ticket Detail (ui-spec.md 11).
 //
@@ -251,6 +252,9 @@ export function RequesterTicketDetail({
         ticketCreatedAt={ticket.createdAt}
         mode="requester"
       />
+
+      {/* Lab 4 — every change of status, read-only, after what IT Staff did (ui-spec §6, FR-13). */}
+      <StatusHistoryRegion ticketId={ticket.id} ticketCreatedAt={ticket.createdAt} />
 
       <AttachmentSection
         attachments={ticket.attachments}

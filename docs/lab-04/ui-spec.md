@@ -409,6 +409,7 @@ region is Lab 3's.
 | Reason | choosing Resolved, Cancelled, or Reopened reveals the required reason textarea of Lab 3, 5–2000 characters, before **Apply** is enabled; helper text says it is posted as a Public Comment |
 | Apply | busy and disabled while in flight; sends the Ticket's `version` as `expectedVersion` |
 | Terminal ticket | for `CANCELLED` neither list has an entry: the control shows "This ticket is cancelled and cannot change." |
+| Held back, nothing permitted | when the matrix allows moves but none is permitted yet, the select is not drawn: the control says "No move is available yet." above the "Not available now" list |
 
 After a success (FR-14) the Ticket summary, the status badge, the select's options,
 the "Not available now" list, and the Status History of §6 all refresh from the
@@ -416,7 +417,15 @@ response, with no reload, and the status message "Status changed to In Progress.
 is announced. A `STALE_UPDATE` shows the §1.5 conflict callout and **Show latest**,
 which reloads the Ticket and keeps any reason the user typed. A gate refusal that
 reaches the server anyway — a race — shows its own §1.5 message, never a generic
-failure.
+failure; the screen then reads the Ticket again, so the options and the list show
+what is true, and what the person had chosen and typed is kept (BR-54).
+
+The gate reads the Actions Taken, so the control also reads the Ticket again after
+an action is **recorded or edited** on the same screen: Resolved joins "Move to" when
+the gate opens, and moves to "Not available now" when an edit leaves the latest
+recorded action needing follow-up. The move and the reason already chosen are kept
+when that move is still offered. If the read fails, the screen stays as it is and the
+API still enforces the gate.
 
 An Administrator sees exactly this control, because the API permits it (BR-42).
 

@@ -533,13 +533,30 @@ export async function fetchAssignableUsers(): Promise<AssignableUser[]> {
 
 // --- Lab 3, Issue 9 — IT Staff Ticket Detail (api-spec §4.3, §4.4, §5.2–§5.5) --
 
+/** Why a move the matrix allows is not available yet (api-spec §3.1, BR-17, BR-18). */
+export interface BlockedTransition {
+  to: TicketStatus;
+  code: "OWNER_REQUIRED" | "ACTION_REQUIRED" | "FOLLOW_UP_PENDING";
+  /** Words safe to show; the API answers a refused move with the same sentence. */
+  message: string;
+}
+
 export interface StaffTicketDetail extends QueueTicket {
   description: string;
   relatedSystemName: string;
   requester: { id: number; fullName: string; email: string; role: Role; isActive: boolean };
   attachments: Attachment[];
-  /** From the BR-33 matrix on the server; the only statuses the screen offers (FR-34). */
+  /** Lab 4 (BR-25, BR-26): sent back as `expectedVersion` with every change, so a stale save is refused. */
+  version: number;
+  /** Lab 4 (BR-55): the owner's role beside isActive, so "Inactive" and "No longer IT Staff" can differ. */
+  owner: (QueueOwner & { role: Role }) | null;
+  /**
+   * The moves the ticket can make right now: the matrix's targets less any held back by the
+   * owner rule or the resolution gate (api-spec §3.1). The only statuses the screen offers (FR-09).
+   */
   permittedTransitions: TicketStatus[];
+  /** The matrix's other targets, each with the reason it is not available yet. */
+  blockedTransitions: BlockedTransition[];
 }
 
 /** Statuses whose move posts a 5–2000 character reason as a Public Comment (BR-36, BR-37). */
@@ -567,16 +584,27 @@ async function patchStaffTicket<T>(ticketId: number, action: string, body: unkno
  * the screen was showing, so a change someone else made first is refused with
  * 409 TICKET_ALREADY_OWNED instead of being overwritten (BR-25).
  */
-export async function setTicketOwner(ticketId: number, ownerId: number | null, expectedOwnerId: number | null): Promise<StaffTicketDetail> {
+export async function setTicketOwner(
+  ticketId: number,
+  ownerId: number | null,
+  expectedOwnerId: number | null,
+  expectedVersion?: number,
+): Promise<StaffTicketDetail> {
   const result = await patchStaffTicket<{ ticket: StaffTicketDetail }>(
-    ticketId, "owner", { ownerId, expectedOwnerId }, "The owner could not be changed.",
+    ticketId,
+    "owner",
+    { ownerId, expectedOwnerId, ...(expectedVersion === undefined ? {} : { expectedVersion }) },
+    "The owner could not be changed.",
   );
   return result.ticket;
 }
 
-export async function setItPriority(ticketId: number, itPriority: RequestedPriority): Promise<StaffTicketDetail> {
+export async function setItPriority(ticketId: number, itPriority: RequestedPriority, expectedVersion?: number): Promise<StaffTicketDetail> {
   const result = await patchStaffTicket<{ ticket: StaffTicketDetail }>(
-    ticketId, "it-priority", { itPriority }, "The IT Priority could not be changed.",
+    ticketId,
+    "it-priority",
+    { itPriority, ...(expectedVersion === undefined ? {} : { expectedVersion }) },
+    "The IT Priority could not be changed.",
   );
   return result.ticket;
 }
@@ -587,10 +615,41 @@ export interface StatusChangeResult {
   comment: ThreadEntry | null;
 }
 
-export async function changeTicketStatus(ticketId: number, currentStatus: TicketStatus, reason?: string): Promise<StatusChangeResult> {
+/**
+ * Moves a ticket. `expectedVersion` is the version the screen was showing: when the ticket has
+ * since changed, the API answers 409 STALE_UPDATE with the ticket as it is now in `ApiError.current`
+ * (BR-26). A refused gate is 409 ACTION_REQUIRED or FOLLOW_UP_PENDING (BR-18).
+ */
+export async function changeTicketStatus(
+  ticketId: number,
+  currentStatus: TicketStatus,
+  reason?: string,
+  expectedVersion?: number,
+): Promise<StatusChangeResult> {
   return patchStaffTicket<StatusChangeResult>(
-    ticketId, "status", reason === undefined ? { currentStatus } : { currentStatus, reason }, "The status could not be changed.",
+    ticketId,
+    "status",
+    { currentStatus, ...(reason === undefined ? {} : { reason }), ...(expectedVersion === undefined ? {} : { expectedVersion }) },
+    "The status could not be changed.",
   );
+}
+
+// --- Lab 4, Issue 6 — Status History (api-spec §3.3) ----------------------
+
+/** One change of status: who, from what, to what, and when. Append-only (BR-22). */
+export interface StatusChange {
+  id: number;
+  fromStatus: TicketStatus;
+  toStatus: TicketStatus;
+  changedBy: { id: number; fullName: string; role: Role };
+  createdAt: string;
+}
+
+/** The changes in the order they were made, oldest first. A ticket that has never changed has none (BR-22). */
+export async function fetchStatusHistory(ticketId: number): Promise<StatusChange[]> {
+  const response = await apiFetch(`${API_URL}/api/tickets/${ticketId}/status-history`);
+  if (!response.ok) throw await failure(response, "Cannot load the status history.");
+  return ((await response.json()) as { history: StatusChange[] }).history;
 }
 
 export async function fetchNotes(ticketId: number): Promise<ThreadEntry[]> {

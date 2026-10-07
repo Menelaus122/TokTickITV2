@@ -49,6 +49,9 @@ beforeEach(() => {
   // Lab 4, Issue 5: the screen now loads the Actions Taken region too. These tests
   // are about other things, so it has none.
   vi.spyOn(api, "fetchActionsTaken").mockResolvedValue([]);
+  // Lab 4, Issue 6: the screen now loads the Status History too. These tests are about
+  // other things, so it has no changes.
+  vi.spyOn(api, "fetchStatusHistory").mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -176,7 +179,7 @@ describe("UI-10 Problem Appears Resolved", () => {
     expect(within(panel).getByRole("heading", { name: "Does this look resolved to you?" })).toBeInTheDocument();
     expect(within(panel).getByLabelText(/^Comment/)).toBeRequired();
     expect(within(panel).getByRole("button", { name: "Mark as appears resolved" })).toBeInTheDocument();
-    expect(within(panel).getByText("Only IT Staff can resolve or close a ticket.")).toBeInTheDocument();
+    expect(within(panel).getByText("Only IT Staff can resolve a ticket. This tells them you think it is fixed.")).toBeInTheDocument();
     // Nowhere on the screen can a Requester pick a status (BR-05).
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^(Resolve|Close)/ })).not.toBeInTheDocument();
