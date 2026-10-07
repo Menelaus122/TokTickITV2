@@ -404,6 +404,8 @@ export class ApiError extends Error {
     public readonly code: string,
     message: string,
     public readonly fields: Record<string, string> = {},
+    /** On a 409 STALE_UPDATE, the record as it is now: what the edit lost the race to (api-spec §1.2). */
+    public readonly current?: unknown,
   ) {
     super(message);
   }
@@ -411,8 +413,8 @@ export class ApiError extends Error {
 
 async function failure(response: Response, fallback: string): Promise<ApiError> {
   try {
-    const body = (await response.json()) as { error?: { code?: string; message?: string; fields?: Record<string, string> } };
-    return new ApiError(response.status, body.error?.code ?? "UNKNOWN", body.error?.message ?? fallback, body.error?.fields ?? {});
+    const body = (await response.json()) as { error?: { code?: string; message?: string; fields?: Record<string, string>; current?: unknown } };
+    return new ApiError(response.status, body.error?.code ?? "UNKNOWN", body.error?.message ?? fallback, body.error?.fields ?? {}, body.error?.current);
   } catch {
     return new ApiError(response.status, "UNKNOWN", fallback);
   }
@@ -606,6 +608,92 @@ export async function postNote(ticketId: number, body: string): Promise<ThreadEn
   });
   if (response.status !== 201) throw await failure(response, "The note could not be posted.");
   return (await response.json()) as ThreadEntry;
+}
+
+// --- Lab 4, Issue 5 — Actions Taken (api-spec §1.3, §2) ----------------------
+
+/** One Action Taken, as every endpoint returns it (api-spec §1.3). */
+export interface ActionTaken {
+  id: number;
+  ticketId: number;
+  actionAt: string;
+  description: string;
+  result: string;
+  performedBy: { id: number; fullName: string; role: Role };
+  followUpRequired: boolean;
+  followUpNote: string | null;
+  attachmentNotes: string | null;
+  /** What an edit sends back as `expectedVersion` (BR-27). */
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  updatedBy: { id: number; fullName: string; role: Role } | null;
+}
+
+/** The limits the server enforces (BR-03, BR-04). The server re-checks every one. */
+export const ACTION_LIMITS = {
+  descriptionMin: 5,
+  descriptionMax: 2000,
+  resultMin: 2,
+  resultMax: 1000,
+  followUpNoteMin: 5,
+  followUpNoteMax: 1000,
+  attachmentNotesMax: 500,
+} as const;
+
+/** Every Action Taken of a ticket, in the server's reading order (BR-08). */
+export async function fetchActionsTaken(ticketId: number): Promise<ActionTaken[]> {
+  const response = await apiFetch(`${API_URL}/api/tickets/${ticketId}/actions-taken`);
+  if (!response.ok) throw await failure(response, "Cannot load the actions taken.");
+  return ((await response.json()) as { actions: ActionTaken[] }).actions;
+}
+
+/**
+ * What a person fills in. Performed by, the ticket, and the times are never sent:
+ * the server takes them from the session and the path (BR-05).
+ */
+export interface ActionTakenInput {
+  actionAt: string;
+  description: string;
+  result: string;
+  followUpRequired: boolean;
+  followUpNote?: string;
+  attachmentNotes?: string;
+}
+
+/**
+ * Records an action. `requestKey` names this submission, so a retry that reaches
+ * the server twice is recorded once (BR-28): the answer is 201 the first time and
+ * 200 with the same action after that, and both are success.
+ */
+export async function createActionTaken(ticketId: number, input: ActionTakenInput, requestKey: string): Promise<ActionTaken> {
+  const response = await apiFetch(`${API_URL}/api/staff/tickets/${ticketId}/actions-taken`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...input, requestKey }),
+  });
+  if (response.status !== 201 && response.status !== 200) throw await failure(response, "The action could not be recorded.");
+  return ((await response.json()) as { action: ActionTaken }).action;
+}
+
+/**
+ * Edits an action. `expectedVersion` is the version the screen was showing, so an
+ * edit made against an older one is refused with 409 STALE_UPDATE, carrying the
+ * current record in `ApiError.current`, instead of overwriting someone's work (BR-27).
+ */
+export async function editActionTaken(
+  ticketId: number,
+  actionId: number,
+  expectedVersion: number,
+  input: ActionTakenInput,
+): Promise<ActionTaken> {
+  const response = await apiFetch(`${API_URL}/api/staff/tickets/${ticketId}/actions-taken/${actionId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...input, expectedVersion }),
+  });
+  if (!response.ok) throw await failure(response, "The action could not be saved.");
+  return ((await response.json()) as { action: ActionTaken }).action;
 }
 
 // --- Lab 3, Issue 10 — Administrator User Management (api-spec §6) ----------

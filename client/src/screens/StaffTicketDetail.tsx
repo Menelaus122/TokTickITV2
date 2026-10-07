@@ -7,6 +7,7 @@ import {
   REASON_MIN,
   REASON_REQUIRED,
   RequestedPriority,
+  Role,
   StaffTicketDetail as Detail,
   ThreadEntry,
   changeTicketStatus,
@@ -39,12 +40,13 @@ import {
   type TicketStatus,
 } from "../components/index.js";
 import { ConversationThread } from "../components/ConversationThread.js";
+import { ActionsTakenRegion } from "../components/ActionsTakenRegion.js";
 
 // Lab 3, Issue 9 — IT Staff Ticket Detail (ui-spec §7; FR-31 to FR-37).
 //
-// Four regions in a fixed order: what the Requester submitted (read-only),
-// the operational fields IT Staff may change, the Lab 2 attachments, and the
-// two threads. The server is the authority on every rule: the "Move to" list
+// Regions in a fixed order: what the Requester submitted (read-only), the
+// operational fields IT Staff may change, Actions Taken (Lab 4, ui-spec §4), the
+// Lab 2 attachments, and the two threads. The server is the authority on every rule: the "Move to" list
 // is exactly the response's permittedTransitions, and anything the screen
 // prevents locally the API refuses again.
 
@@ -59,6 +61,8 @@ type LoadState = "loading" | "ready" | "not-found" | "forbidden" | "error";
 export interface StaffTicketDetailProps {
   ticketId: number;
   currentUserId: number;
+  /** Who is signed in, shown as Performed by while recording an action (Lab 4, BR-05). */
+  currentUser?: { fullName: string; role: Role };
   onBack?: () => void;
   /** Injected in tests; defaults to downloading through the staff route. */
   onDownload?: (attachment: Attachment) => void;
@@ -69,7 +73,7 @@ function describeOwner(ticket: Detail, staff: AssignableUser[], ownerId: number 
   return staff.find((user) => user.id === ownerId)?.fullName ?? ticket.owner?.fullName ?? "the chosen owner";
 }
 
-export function StaffTicketDetail({ ticketId, currentUserId, onBack, onDownload }: StaffTicketDetailProps) {
+export function StaffTicketDetail({ ticketId, currentUserId, currentUser, onBack, onDownload }: StaffTicketDetailProps) {
   const [ticket, setTicket] = useState<Detail | null>(null);
   const [state, setState] = useState<LoadState>("loading");
   const [staff, setStaff] = useState<AssignableUser[]>([]);
@@ -468,7 +472,16 @@ export function StaffTicketDetail({ ticketId, currentUserId, onBack, onDownload 
         </section>
       </div>
 
-      {/* 3 — Lab 2 attachments: listed and downloadable, never added or removed here (BR-18). */}
+      {/* 3 — Actions Taken: what was done, recorded and edited here (Lab 4, ui-spec §4). */}
+      <ActionsTakenRegion
+        ticketId={current.id}
+        ticketStatus={current.currentStatus}
+        ticketCreatedAt={current.createdAt}
+        mode="staff"
+        currentUser={currentUser}
+      />
+
+      {/* 4 — Lab 2 attachments: listed and downloadable, never added or removed here (BR-18). */}
       <AttachmentSection
         attachments={current.attachments}
         rejected={downloadErrors}
@@ -476,7 +489,7 @@ export function StaffTicketDetail({ ticketId, currentUserId, onBack, onDownload 
         onDismissRejection={(filename) => setDownloadErrors((existing) => existing.filter((e) => e.filename !== filename))}
       />
 
-      {/* 4 — The two threads, never adjacent composers (ui-spec §7.1, AC-39). */}
+      {/* 5 — The two threads, never adjacent composers (ui-spec §7.1, AC-39). */}
       <ConversationThread
         variant="public"
         status={commentsState}

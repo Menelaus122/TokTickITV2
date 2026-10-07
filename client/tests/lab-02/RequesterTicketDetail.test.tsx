@@ -56,6 +56,9 @@ beforeEach(() => {
   // Lab 3, Issue 7 added a Public Comments thread to this screen; these Lab 2
   // tests are about the ticket and its attachments, so the thread is empty.
   vi.spyOn(api, "fetchComments").mockResolvedValue([]);
+  // Lab 4, Issue 5: the screen now loads the Actions Taken region too. These tests
+  // are about other things, so it has none.
+  vi.spyOn(api, "fetchActionsTaken").mockResolvedValue([]);
 });
 
 afterEach(() => {

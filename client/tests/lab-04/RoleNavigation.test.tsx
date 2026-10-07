@@ -14,7 +14,7 @@ import type { AuthUser, Role, StaffTicketDetail as Detail } from "../../src/api.
 //
 // UI-27's "lands on their Dashboard" and the Dashboard navigation item arrive
 // with Issues 7 and 8 (UI-37); until then a role bounced from a page lands on
-// its own Lab 3 home. UI-28's Actions Taken controls arrive with Issue 5.
+// its own Lab 3 home. UI-28's Actions Taken controls arrived with Issue 5.
 
 const USERS: Record<Role, AuthUser> = {
   REQUESTER: { id: 1, fullName: "Anucha Wongsawat", email: "anucha.wong@kmutt.ac.th", role: "REQUESTER", isActive: true, mustChangePassword: false },
@@ -60,6 +60,7 @@ beforeEach(() => {
   vi.spyOn(api, "fetchStaffTicket").mockResolvedValue(detail());
   vi.spyOn(api, "fetchComments").mockResolvedValue([]);
   vi.spyOn(api, "fetchNotes").mockResolvedValue([]);
+  vi.spyOn(api, "fetchActionsTaken").mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -215,5 +216,79 @@ describe("UI-28 an Administrator on the ticket detail acts as themself (BR-45)",
     expect(note).toHaveBeenCalledWith(12, "Checked the switch.");
     expect(comment).not.toHaveBeenCalled();
     expect(await internal.findByText("Checked the switch.")).toBeInTheDocument();
+  });
+
+  // Issue 5 completes UI-28 with the Actions Taken controls (tests.md §3.1).
+  describe("Actions Taken", () => {
+    const byStaff: api.ActionTaken = {
+      id: 31,
+      ticketId: 12,
+      actionAt: "2026-09-29T03:10:00.000Z",
+      description: "Replaced the toner cartridge and ran a test page.",
+      result: "Test page printed cleanly.",
+      performedBy: { id: 7, fullName: "Nattapong Saelim", role: "IT_STAFF" },
+      followUpRequired: false,
+      followUpNote: null,
+      attachmentNotes: null,
+      version: 1,
+      createdAt: "2026-09-29T03:12:41.000Z",
+      updatedAt: "2026-09-29T03:12:41.000Z",
+      updatedBy: null,
+    };
+
+    it("records an action as the signed-in Administrator: Performed by is them, and nothing names anyone else", async () => {
+      const user = userEvent.setup();
+      vi.spyOn(api, "fetchActionsTaken").mockResolvedValue([]);
+      const record = vi.spyOn(api, "createActionTaken").mockResolvedValue({
+        ...byStaff,
+        id: 40,
+        performedBy: { id: ADMIN.id, fullName: ADMIN.fullName, role: "ADMINISTRATOR" },
+      });
+      await openAsAdmin();
+
+      const actions = within(await screen.findByRole("region", { name: /^Actions Taken/ }));
+      await user.click(await actions.findByRole("button", { name: "+ Add action" }));
+      const form = within(screen.getByRole("form", { name: "Record an action" }));
+      expect(form.getByLabelText(/^Performed by/)).toHaveValue(ADMIN.fullName);
+      expect(form.getByText("Administrator")).toBeInTheDocument();
+      await user.type(form.getByLabelText(/^Action Description/), "Checked the switch on the third floor.");
+      await user.type(form.getByLabelText(/^Result/), "The port was off; it is on now.");
+      await user.click(form.getByRole("button", { name: "Save action" }));
+
+      expect(await screen.findByText("Action recorded.")).toBeInTheDocument();
+      expect(record).toHaveBeenCalledTimes(1);
+      const [ticketId, input] = record.mock.calls[0];
+      expect(ticketId).toBe(12);
+      // The body carries what was typed, never who did it: the session says that.
+      expect(Object.keys(input).sort()).toEqual(["actionAt", "description", "followUpRequired", "result"]);
+      expect(within(actions.getByRole("list")).getByText(ADMIN.fullName)).toBeInTheDocument();
+    });
+
+    it("edits an action that IT Staff recorded, which stays theirs, and is named as the editor", async () => {
+      const user = userEvent.setup();
+      vi.spyOn(api, "fetchActionsTaken").mockResolvedValue([byStaff]);
+      const change = vi.spyOn(api, "editActionTaken").mockResolvedValue({
+        ...byStaff,
+        result: "Test page printed cleanly; toner at 100%.",
+        version: 2,
+        updatedAt: "2026-09-29T05:00:00.000Z",
+        updatedBy: { id: ADMIN.id, fullName: ADMIN.fullName, role: "ADMINISTRATOR" },
+      });
+      await openAsAdmin();
+
+      const actions = within(await screen.findByRole("region", { name: /^Actions Taken/ }));
+      await user.click(await actions.findByRole("button", { name: /^Edit/ }));
+      const form = within(screen.getByRole("form", { name: "Edit action" }));
+      // The performer is still the IT Staff member, not the Administrator.
+      expect(form.getByLabelText(/^Performed by/)).toHaveValue("Nattapong Saelim");
+      const result = form.getByLabelText(/^Result/);
+      await user.clear(result);
+      await user.type(result, "Test page printed cleanly; toner at 100%.");
+      await user.click(form.getByRole("button", { name: "Save changes" }));
+
+      expect(await actions.findByText(/Edited by Malee Sutthiwong/)).toBeInTheDocument();
+      expect(change).toHaveBeenCalledWith(12, 31, 1, expect.objectContaining({ result: "Test page printed cleanly; toner at 100%." }));
+      expect(actions.getByText("Nattapong Saelim")).toBeInTheDocument();
+    });
   });
 });

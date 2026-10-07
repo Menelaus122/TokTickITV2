@@ -27,6 +27,7 @@ import {
 } from "../components/index.js";
 import { ConversationThread } from "../components/ConversationThread.js";
 import { AppearsResolvedPanel } from "../components/AppearsResolvedPanel.js";
+import { ActionsTakenRegion } from "../components/ActionsTakenRegion.js";
 
 // Requester Ticket Detail (ui-spec.md 11).
 //
@@ -242,6 +243,14 @@ export function RequesterTicketDetail({
           <dd className="tt-detail__description">{ticket.description}</dd>
         </dl>
       </Card>
+
+      {/* Lab 4 — what IT Staff did, read-only, before the files (ui-spec §6, FR-04). */}
+      <ActionsTakenRegion
+        ticketId={ticket.id}
+        ticketStatus={ticket.currentStatus}
+        ticketCreatedAt={ticket.createdAt}
+        mode="requester"
+      />
 
       <AttachmentSection
         attachments={ticket.attachments}
