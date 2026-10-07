@@ -40,7 +40,9 @@ function detail(overrides: Partial<Detail> = {}): Detail {
     createdAt: "2026-09-28T02:10:00.000Z",
     updatedAt: "2026-09-29T09:14:22.310Z",
     attachments: [],
+    version: 1,
     permittedTransitions: ["OPEN", "CANCELLED"],
+    blockedTransitions: [],
     ...overrides,
   };
 }
@@ -61,6 +63,7 @@ beforeEach(() => {
   vi.spyOn(api, "fetchComments").mockResolvedValue([]);
   vi.spyOn(api, "fetchNotes").mockResolvedValue([]);
   vi.spyOn(api, "fetchActionsTaken").mockResolvedValue([]);
+  vi.spyOn(api, "fetchStatusHistory").mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -153,7 +156,7 @@ describe("UI-28 an Administrator on the ticket detail acts as themself (BR-45)",
   it("claims the ticket as the signed-in Administrator, never as someone else", async () => {
     const user = userEvent.setup();
     const claim = vi.spyOn(api, "setTicketOwner").mockResolvedValue(
-      detail({ owner: { id: ADMIN.id, fullName: ADMIN.fullName, isActive: true }, currentStatus: "OPEN" }),
+      detail({ owner: { id: ADMIN.id, fullName: ADMIN.fullName, role: "ADMINISTRATOR", isActive: true }, currentStatus: "OPEN" }),
     );
     const operational = await openAsAdmin();
 
@@ -161,7 +164,7 @@ describe("UI-28 an Administrator on the ticket detail acts as themself (BR-45)",
     await user.click(screen.getByRole("button", { name: "Confirm claim" }));
 
     // expectedOwnerId null: a claim, so a colleague's earlier claim still wins.
-    expect(claim).toHaveBeenCalledWith(12, ADMIN.id, null);
+    expect(claim).toHaveBeenCalledWith(12, ADMIN.id, null, 1);
     expect(await screen.findByText("You claimed TT-2026-00042, and it moved to Open.")).toBeInTheDocument();
   });
 
@@ -174,7 +177,7 @@ describe("UI-28 an Administrator on the ticket detail acts as themself (BR-45)",
     await user.selectOptions(operational.getByLabelText("IT Priority"), "URGENT");
     await user.click(operational.getByRole("button", { name: "Update IT Priority" }));
 
-    expect(save).toHaveBeenCalledWith(12, "URGENT");
+    expect(save).toHaveBeenCalledWith(12, "URGENT", 1);
     expect(await screen.findByText("IT Priority is now URGENT.")).toBeInTheDocument();
     expect(operational.getByLabelText("Requested Priority")).toHaveValue("MEDIUM");
   });
@@ -182,7 +185,7 @@ describe("UI-28 an Administrator on the ticket detail acts as themself (BR-45)",
   it("offers the status control with exactly the moves the server permits", async () => {
     const operational = await openAsAdmin({
       currentStatus: "OPEN",
-      owner: { id: ADMIN.id, fullName: ADMIN.fullName, isActive: true },
+      owner: { id: ADMIN.id, fullName: ADMIN.fullName, role: "ADMINISTRATOR", isActive: true },
       permittedTransitions: ["IN_PROGRESS", "CANCELLED"],
     });
 

@@ -282,7 +282,7 @@ always the new one.
 | Condition | Response |
 | :--- | :--- |
 | `expectedVersion` present and no longer the Ticket's version | `409 STALE_UPDATE`, `error.current` is the §3.1 `ticket` (AC-14) |
-| `expectedVersion` present but not an integer | `400 VALIDATION_FAILED` on `expectedVersion` |
+| `expectedVersion` present but not an integer from 1 to 2 147 483 647 (a string, a decimal, `0`, a negative number, a boolean, or `null`) | `400 VALIDATION_FAILED` on `expectedVersion`, before the Ticket is read |
 | `expectedOwnerId` no longer matches (owner endpoint) | `409 TICKET_ALREADY_OWNED`, as Lab 3 D-26; checked **before** `expectedVersion` |
 | Status: target not reachable, or equal to the current | `409 INVALID_TRANSITION` |
 | Status: `RESOLVED` or `CLOSED` on an unowned Ticket | `409 OWNER_REQUIRED` |
@@ -296,15 +296,31 @@ row (BR-29). A deactivation that commits first makes the assignment
 `409 OWNER_NOT_ASSIGNABLE`; one that arrives after leaves the new owner in place
 (Lab 3 BR-26). Lab 3 read the user before the transaction, which left a gap.
 
+The owner endpoint answers in this order, and the first that applies wins: body
+validation (`400`) → no such Ticket (`404`) → the proposed owner does not exist
+(`400`) or is not assignable (`409 OWNER_NOT_ASSIGNABLE`) → a cancelled Ticket
+(`409 INVALID_TRANSITION`) → `expectedOwnerId` no longer matches
+(`409 TICKET_ALREADY_OWNED`) → `expectedVersion` no longer matches
+(`409 STALE_UPDATE`) → unassigning a `RESOLVED` or `CLOSED` Ticket
+(`409 OWNER_REQUIRED`). A request that sends both a stale `expectedOwnerId` and a
+stale `expectedVersion` is therefore told who owns the Ticket, not that it is stale.
+
 **A Requester's "appears resolved" moves `version`** (BR-25), so an owner, priority,
 or status save made from a screen loaded before it is a `409 STALE_UPDATE`. That is
 intended: the staff screen should show the advisory before anyone acts on an older
-view.
+view. Marking the Ticket again, with a new comment, is a change and moves `version`
+a second time; withdrawing a signal that is not set is not a change, answers as it
+did in Lab 3, and leaves `version` where it was.
 
 The status handler checks in the order BR-24 sets: validation → exists → stale →
 matrix and same-status → owner → gate. So a request that is both stale and invalid
 is told it is stale, and one that is both unowned and ungated is told to claim
 first.
+
+"Invalid" here means a move the matrix does not allow, or a repeat of the current
+status. A **malformed body** (an unknown `currentStatus`, a bad `expectedVersion`,
+or a missing or out-of-range `reason`) is a `400` before the Ticket is read, so it is
+told it is malformed whether or not it is also stale.
 
 `it-priority` now locks the Ticket's row like the other two (BR-29), where Lab 3
 wrote it unlocked. Resending the IT Priority a Ticket already has is a `200` that

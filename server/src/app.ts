@@ -9,6 +9,7 @@ import { nextTicketNumber } from "./ticketNumber.js";
 import { parseTicketListQuery, buildPageMeta } from "./listQuery.js";
 import { conversationRouter } from "./conversation.js";
 import { actionsTakenReadRouter, actionsTakenStaffRouter } from "./actionsTaken.js";
+import { statusHistoryRouter } from "./statusHistory.js";
 import { staffRouter } from "./staff.js";
 import { adminRouter } from "./admin.js";
 import { routeId } from "./routeId.js";
@@ -680,6 +681,8 @@ app.patch("/api/attachments/:id/remove", async (req: Request, res: Response) => 
 app.use("/api/tickets", conversationRouter);
 // Lab 4, Issue 4 — the Actions Taken list of a Ticket.
 app.use("/api/tickets", actionsTakenReadRouter);
+// Lab 4, Issue 6 — the Status History of a Ticket, read-only.
+app.use("/api/tickets", statusHistoryRouter);
 // Lab 3, Issue 8 — the IT Staff queue, behind the /api/staff role guard above.
 app.use("/api/staff", staffRouter);
 // Lab 4, Issue 4 — recording and editing Actions Taken, behind the same role guard.

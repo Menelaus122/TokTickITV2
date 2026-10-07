@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import {
   ApiError,
   AssignableUser,
@@ -41,21 +41,34 @@ import {
 } from "../components/index.js";
 import { ConversationThread } from "../components/ConversationThread.js";
 import { ActionsTakenRegion } from "../components/ActionsTakenRegion.js";
+import { StatusHistoryRegion } from "../components/StatusHistoryRegion.js";
 
 // Lab 3, Issue 9 — IT Staff Ticket Detail (ui-spec §7; FR-31 to FR-37).
 //
 // Regions in a fixed order: what the Requester submitted (read-only), the
 // operational fields IT Staff may change, Actions Taken (Lab 4, ui-spec §4), the
-// Lab 2 attachments, and the two threads. The server is the authority on every rule: the "Move to" list
-// is exactly the response's permittedTransitions, and anything the screen
-// prevents locally the API refuses again.
+// Lab 2 attachments, the two threads, and the Status History (Lab 4, ui-spec §6.1).
+//
+// The server is the authority on every rule. The "Move to" list is exactly the
+// response's permittedTransitions, and "Not available now" is exactly its
+// blockedTransitions with the API's own words (Lab 4, FR-09); anything the screen
+// prevents locally the API refuses again. Every change sends the version the
+// screen was showing, so one made against an older ticket is refused as stale
+// (BR-26) and the screen offers to show what is true now (ui-spec §1.5).
 
 const PRIORITIES: RequestedPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 const OWNER_REQUIRED: TicketStatus[] = ["RESOLVED", "CLOSED"];
 
 /** The operational control whose request is in flight; the others wait (FR-37). */
 type Busy = "claim" | "owner" | "priority" | "status" | null;
-type Feedback = { tone: "success" | "error"; message: string } | null;
+/** What the person is told after a request: a success, a failure, a gate refusal, or a stale save (ui-spec §1.5). */
+type Feedback =
+  | { tone: "success" | "error" | "gate"; message: string }
+  | { tone: "stale"; latest: Detail }
+  | null;
+
+/** The two refusals of a move to RESOLVED that come from the gate (BR-18). */
+const GATE_CODES = ["ACTION_REQUIRED", "FOLLOW_UP_PENDING"];
 type LoadState = "loading" | "ready" | "not-found" | "forbidden" | "error";
 
 export interface StaffTicketDetailProps {
@@ -87,19 +100,26 @@ export function StaffTicketDetail({ ticketId, currentUserId, currentUser, onBack
   const [reason, setReason] = useState("");
   const [reasonError, setReasonError] = useState<string>();
   const [downloadErrors, setDownloadErrors] = useState<{ filename: string; message: string }[]>([]);
+  /** Changes when the ticket has changed status, so the timeline is read again without a reload (FR-14). */
+  const [historyToken, setHistoryToken] = useState(0);
+  const ownerRef = useRef<HTMLDivElement>(null);
 
   const [comments, setComments] = useState<ThreadEntry[]>([]);
   const [commentsState, setCommentsState] = useState<"loading" | "ready" | "error">("loading");
   const [notes, setNotes] = useState<ThreadEntry[]>([]);
   const [notesState, setNotesState] = useState<"loading" | "ready" | "error">("loading");
 
-  /** Shows a ticket from the server and resets every control to match it. */
-  const show = useCallback((next: Detail) => {
+  /**
+   * Shows a ticket from the server and resets every control to match it. After a conflict the
+   * person's reason is kept, and so is the move they chose when the ticket still offers it
+   * (BR-54): what they typed is theirs, and the ticket changing under them is not their fault.
+   */
+  const show = useCallback((next: Detail, keepForm = false) => {
     setTicket(next);
     setOwnerChoice(next.owner ? String(next.owner.id) : "");
     setPriorityChoice(next.itPriority);
-    setMoveTo("");
-    setReason("");
+    setMoveTo((chosen) => (keepForm && next.permittedTransitions.includes(chosen as TicketStatus) ? chosen : ""));
+    if (!keepForm) setReason("");
     setReasonError(undefined);
     setConfirmingClaim(false);
   }, []);
@@ -155,9 +175,10 @@ export function StaffTicketDetail({ ticketId, currentUserId, currentUser, onBack
   }, [loadComments, loadNotes]);
 
   /**
-   * Runs one operation: busy while in flight, then success or a safe failure.
-   * A conflict means the ticket changed under us, so it is reloaded and the
-   * screen shows what is true now beside the explanation.
+   * Runs one operation: busy while in flight, then success or a safe failure. A stale save
+   * (409 STALE_UPDATE) keeps the form as it is and offers to show the ticket as it is now, so
+   * nothing the person typed is lost (BR-26, BR-54). Any other conflict means the ticket changed
+   * under us, so it is reloaded and the screen shows what is true now beside the explanation.
    */
   async function run(action: Exclude<Busy, null>, request: () => Promise<Detail>, success: (next: Detail) => string) {
     setBusy(action);
@@ -166,17 +187,24 @@ export function StaffTicketDetail({ ticketId, currentUserId, currentUser, onBack
       const next = await request();
       show(next);
       setFeedback({ tone: "success", message: success(next) });
+      // A claim can move a New ticket to Open, and a move is always a step in the history.
+      setHistoryToken((token) => token + 1);
     } catch (error) {
+      if (error instanceof ApiError && error.status === 409 && error.code === "STALE_UPDATE" && error.current) {
+        setFeedback({ tone: "stale", latest: error.current as Detail });
+        return;
+      }
       if (error instanceof ApiError && error.status === 400 && error.fields.reason) {
         setReasonError(error.fields.reason);
       }
+      const gate = error instanceof ApiError && error.status === 409 && GATE_CODES.includes(error.code);
       setFeedback({
-        tone: "error",
+        tone: gate ? "gate" : "error",
         message: error instanceof ApiError && error.status !== 500 ? error.message : "That did not work. Please try again.",
       });
       if (error instanceof ApiError && error.status === 409) {
         try {
-          show(await fetchStaffTicket(ticketId));
+          show(await fetchStaffTicket(ticketId), gate);
         } catch {
           // The explanation above still stands; the next action reloads.
         }
@@ -184,6 +212,41 @@ export function StaffTicketDetail({ ticketId, currentUserId, currentUser, onBack
     } finally {
       setBusy(null);
     }
+  }
+
+  /**
+   * Reads the ticket again after an action was recorded or edited, because the resolution gate reads the
+   * actions (BR-17): Resolved may now be available, or may no longer be. What the person had chosen and
+   * typed is kept. If it cannot be read, the screen stays as it is, and the API still enforces the gate.
+   */
+  async function refreshTicket() {
+    try {
+      show(await fetchStaffTicket(ticketId), true);
+    } catch {
+      // The next action or a reload shows what is true; nothing here is lost.
+    }
+  }
+
+  /** Show latest: reads the ticket again and shows it, keeping what the person typed (ui-spec §1.5). */
+  async function showLatest() {
+    try {
+      show(await fetchStaffTicket(ticketId), true);
+      setFeedback(null);
+    } catch {
+      setFeedback({ tone: "error", message: "The latest version could not be loaded. Please try again." });
+    }
+  }
+
+  /** Go to Actions Taken: the region's heading takes focus, wherever on the page it is (ui-spec §9). */
+  function goToActions() {
+    const heading = document.querySelector<HTMLElement>('[data-region="actions-taken"] h2');
+    heading?.scrollIntoView?.({ block: "start" });
+    heading?.focus();
+  }
+
+  /** Claim this ticket: focus goes to the owner control, where the claim or the assignment is made. */
+  function goToOwner() {
+    ownerRef.current?.querySelector<HTMLElement>("button, select")?.focus();
   }
 
   if (state === "loading") return <LoadingState rows={8} label="Loading the ticket…" />;
@@ -227,7 +290,7 @@ export function StaffTicketDetail({ ticketId, currentUserId, currentUser, onBack
   function claim() {
     void run(
       "claim",
-      () => setTicketOwner(current.id, currentUserId, null),
+      () => setTicketOwner(current.id, currentUserId, null, current.version),
       (next) => (isNew ? `You claimed ${next.ticketNumber}, and it moved to Open.` : `You claimed ${next.ticketNumber}.`),
     );
   }
@@ -235,13 +298,13 @@ export function StaffTicketDetail({ ticketId, currentUserId, currentUser, onBack
   function changeOwner() {
     void run(
       "owner",
-      () => setTicketOwner(current.id, chosenOwnerId, ownerId),
+      () => setTicketOwner(current.id, chosenOwnerId, ownerId, current.version),
       (next) => (chosenOwnerId === null ? `${next.ticketNumber} is now unassigned.` : `${next.ticketNumber} is now owned by ${describeOwner(next, staff, chosenOwnerId)}.`),
     );
   }
 
   function changePriority() {
-    void run("priority", () => setItPriority(current.id, priorityChoice), (next) => `IT Priority is now ${next.itPriority}.`);
+    void run("priority", () => setItPriority(current.id, priorityChoice, current.version), (next) => `IT Priority is now ${next.itPriority}.`);
   }
 
   function applyStatus(event: FormEvent) {
@@ -255,12 +318,12 @@ export function StaffTicketDetail({ ticketId, currentUserId, currentUser, onBack
     void run(
       "status",
       async () => {
-        const result = await changeTicketStatus(current.id, target, reasonNeeded ? trimmedReason : undefined);
+        const result = await changeTicketStatus(current.id, target, reasonNeeded ? trimmedReason : undefined, current.version);
         // The reason joins the public thread straight away (BR-36).
         if (result.comment) setComments((existing) => [...existing, result.comment!]);
         return result.ticket;
       },
-      (next) => `${next.ticketNumber} moved to ${STATUS_LABEL[next.currentStatus]}${reasonNeeded ? ", and the reason was posted as a Public Comment" : ""}.`,
+      (next) => `Status changed to ${STATUS_LABEL[next.currentStatus]}.`,
     );
   }
 
@@ -322,15 +385,33 @@ export function StaffTicketDetail({ ticketId, currentUserId, currentUser, onBack
             <span className="tt-badge">Editable</span>
           </div>
 
-          {feedback &&
-            (feedback.tone === "success" ? (
-              <SuccessCallout>{feedback.message}</SuccessCallout>
-            ) : (
-              <div className="tt-callout tt-callout--error" role="alert" data-state="error">
-                <span aria-hidden="true">!</span>
-                <div>{feedback.message}</div>
-              </div>
-            ))}
+          {feedback?.tone === "success" && <SuccessCallout>{feedback.message}</SuccessCallout>}
+          {feedback?.tone === "error" && (
+            <div className="tt-callout tt-callout--error" role="alert" data-state="error">
+              <span aria-hidden="true">!</span>
+              <div>{feedback.message}</div>
+            </div>
+          )}
+          {feedback?.tone === "gate" && (
+            <WarningCallout role="alert">
+              <p>{feedback.message}</p>
+              <Button variant="secondary" onClick={goToActions}>
+                Go to Actions Taken
+              </Button>
+            </WarningCallout>
+          )}
+          {feedback?.tone === "stale" && (
+            <WarningCallout role="alert">
+              <p>
+                This ticket changed while you were working on it — for example a colleague moved it, or the Requester marked the problem as
+                appearing resolved. It is now <strong>{STATUS_LABEL[feedback.latest.currentStatus]}</strong>
+                {feedback.latest.owner ? `, owned by ${feedback.latest.owner.fullName}` : ", with no owner"}. Review it and try again.
+              </p>
+              <Button variant="secondary" onClick={() => void showLatest()}>
+                Show latest
+              </Button>
+            </WarningCallout>
+          )}
 
           {current.requesterResolvedAt && (
             <WarningCallout>
@@ -341,7 +422,7 @@ export function StaffTicketDetail({ ticketId, currentUserId, currentUser, onBack
           )}
 
           {/* Ticket Owner — claim when unassigned, otherwise reassign (BR-24, BR-25). */}
-          <div className="tt-staff-detail__group" data-control="owner">
+          <div className="tt-staff-detail__group" data-control="owner" ref={ownerRef}>
             <h3 className="tt-h3">Ticket Owner</h3>
             <p>
               <OwnerPresentation owner={current.owner} currentUserId={currentUserId} />
@@ -421,9 +502,13 @@ export function StaffTicketDetail({ ticketId, currentUserId, currentUser, onBack
               Current: <StatusBadge value={current.currentStatus} /> <PriorityBadge value={current.itPriority} />
             </p>
             {current.permittedTransitions.length === 0 ? (
-              <p className="tt-muted" data-state="terminal">
-                {STATUS_LABEL[current.currentStatus]} is final. The ticket cannot move anywhere else.
-              </p>
+              current.blockedTransitions.length === 0 ? (
+                <p className="tt-muted" data-state="terminal">
+                  This ticket is {STATUS_LABEL[current.currentStatus].toLowerCase()} and cannot change.
+                </p>
+              ) : (
+                <p className="tt-field__help">No move is available yet.</p>
+              )
             ) : (
               <>
                 <SelectInput
@@ -468,6 +553,33 @@ export function StaffTicketDetail({ ticketId, currentUserId, currentUser, onBack
                 </Button>
               </>
             )}
+
+            {/* The moves the matrix allows that the ticket cannot make yet, with the API's own reason (FR-09). */}
+            {current.blockedTransitions.length > 0 && (
+              <div className="tt-staff-detail__blocked" data-state="blocked">
+                <h4 className="tt-h3" id="not-available-heading">
+                  Not available now
+                </h4>
+                <ul aria-labelledby="not-available-heading">
+                  {current.blockedTransitions.map((blocked) => (
+                    <li key={blocked.to}>
+                      <strong>{STATUS_LABEL[blocked.to]}</strong>
+                      {" — "}
+                      {blocked.message}{" "}
+                      {blocked.code === "OWNER_REQUIRED" ? (
+                        <Button variant="tertiary" onClick={goToOwner}>
+                          Claim this ticket
+                        </Button>
+                      ) : (
+                        <Button variant="tertiary" onClick={goToActions}>
+                          Go to Actions Taken
+                        </Button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </form>
         </section>
       </div>
@@ -479,6 +591,7 @@ export function StaffTicketDetail({ ticketId, currentUserId, currentUser, onBack
         ticketCreatedAt={current.createdAt}
         mode="staff"
         currentUser={currentUser}
+        onChanged={() => void refreshTicket()}
       />
 
       {/* 4 — Lab 2 attachments: listed and downloadable, never added or removed here (BR-18). */}
@@ -510,6 +623,9 @@ export function StaffTicketDetail({ ticketId, currentUserId, currentUser, onBack
           setNotes((existing) => [...existing, note]);
         }}
       />
+
+      {/* 6 — Status History: the last region, read-only (Lab 4, ui-spec §6.1). */}
+      <StatusHistoryRegion ticketId={ticketId} ticketCreatedAt={current.createdAt} refreshToken={historyToken} />
     </>
   );
 }

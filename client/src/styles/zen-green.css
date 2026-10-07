@@ -854,3 +854,50 @@ html, body { overflow-x: hidden; }
   .tt-action__fields { grid-template-columns: 180px minmax(0, 1fr); }
   .tt-action__fields dd { margin-bottom: 0; }
 }
+
+/* --- Lab 4: Status History (ui-spec §1.4, §6) -------------------------------
+   An ordered list with a vertical rule on the left in --tt-border and one marker
+   per step. The newest step is not marked by colour: it is simply last. */
+
+.tt-history { margin-bottom: var(--tt-space-4); }
+.tt-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 var(--tt-space-4);
+  border-left: 2px solid var(--tt-border);
+}
+.tt-timeline__step {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tt-space-2) var(--tt-space-3);
+  padding: var(--tt-space-2) 0 var(--tt-space-3);
+  overflow-wrap: anywhere;
+}
+.tt-timeline__step::before {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--tt-space-4) - 6px);
+  top: var(--tt-space-4);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--tt-green-primary);
+}
+.tt-timeline__what { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--tt-space-1); font-weight: 600; }
+.tt-timeline__who { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--tt-space-2); font-size: var(--tt-font-label); color: var(--tt-text-muted); }
+.tt-timeline__step time { margin-left: auto; font-size: var(--tt-font-help); color: var(--tt-text-muted); }
+
+@media (max-width: 767px) {
+  .tt-timeline__step time { margin-left: 0; flex-basis: 100%; }
+}
+
+/* --- Lab 4: Status control (ui-spec §5) --------------------------------------
+   "Not available now": the moves the matrix allows that the ticket cannot make
+   yet, each with the API's own reason. */
+
+.tt-staff-detail__blocked { margin-top: var(--tt-space-3); padding-top: var(--tt-space-3); border-top: 1px solid var(--tt-border); }
+.tt-staff-detail__blocked ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--tt-space-2); }
+.tt-staff-detail__blocked li { overflow-wrap: anywhere; }
+.tt-staff-detail__group .tt-staff-detail__blocked .tt-btn { margin-bottom: 0; }

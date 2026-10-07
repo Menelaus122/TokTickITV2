@@ -10,7 +10,8 @@ import { TextArea } from "./Inputs.js";
 // and the helper text says who does resolve. Unset, it is a bordered panel with
 // a required comment; set, a success callout with the date and an Undo.
 
-export const ONLY_STAFF_RESOLVE = "Only IT Staff can resolve or close a ticket.";
+// Lab 4 (ui-spec §5.1) words it as "resolve a ticket" and says what the mark is: a signal, not a status.
+export const ONLY_STAFF_RESOLVE = "Only IT Staff can resolve a ticket. This tells them you think it is fixed.";
 
 export interface AppearsResolvedPanelProps {
   resolvedAt: string | null;

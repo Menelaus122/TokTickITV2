@@ -59,6 +59,9 @@ beforeEach(() => {
   // Lab 4, Issue 5: the screen now loads the Actions Taken region too. These tests
   // are about other things, so it has none.
   vi.spyOn(api, "fetchActionsTaken").mockResolvedValue([]);
+  // Lab 4, Issue 6: the screen now loads the Status History too. These tests are about
+  // other things, so it has no changes.
+  vi.spyOn(api, "fetchStatusHistory").mockResolvedValue([]);
 });
 
 afterEach(() => {

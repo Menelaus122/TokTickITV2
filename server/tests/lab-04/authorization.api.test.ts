@@ -15,10 +15,10 @@ import { endTestSessions, signInAs } from "../helpers/signIn.js";
 // The seam is the HTTP boundary: a real login cookie, the real Express app, the
 // real database. Nothing here reaches into the guard to test it.
 //
-// SEC-05, the dashboard parts of SEC-01 and SEC-07, and the status-history and
-// status-change parts of SEC-08 cannot be written until those endpoints exist.
-// They arrive with Issues 6, 7, and 8, which add their routes to the tables
-// below. See tests.md §3.1.
+// SEC-05 and the dashboard parts of SEC-01 and SEC-07 cannot be written until the
+// dashboard endpoints exist. They arrive with Issues 7 and 8, which add their
+// routes to the tables below. The status-history route (SEC-01) and the
+// `changedBy` of SEC-08 arrived with Issue 6. See tests.md §3.1.
 
 const prisma = getPrisma();
 const ALLOWED_ORIGIN = "http://localhost:5173";
@@ -41,7 +41,10 @@ const STAFF_ROUTES: Row[] = [
   ["PATCH", "/api/staff/tickets/1/actions-taken/1"],
 ];
 // Routes that any signed-in role reaches, with ownership deciding what a Requester sees.
-const SHARED_ROUTES: Row[] = [["GET", "/api/tickets/1/actions-taken"]];
+const SHARED_ROUTES: Row[] = [
+  ["GET", "/api/tickets/1/actions-taken"],
+  ["GET", "/api/tickets/1/status-history"],
+];
 // A path nobody has written and nobody will: the prefix guard answers for it.
 const UNWRITTEN_STAFF_ROUTE: Row = ["GET", "/api/staff/this-route-does-not-exist"];
 const ADMIN_ROUTES: Row[] = [
@@ -276,6 +279,22 @@ describe("SEC-08 an Administrator acts as themself (BR-45)", () => {
     const notes = await request(app).get(`/api/tickets/${id}/notes`).set("Cookie", cookies.admin);
     expect(comments.body.comments[0].author).toMatchObject({ id: ids.admin, role: "ADMINISTRATOR" });
     expect(notes.body.notes[0].author).toMatchObject({ id: ids.admin, role: "ADMINISTRATOR" });
+  });
+
+  it("is the changedBy of a status change they make, and of the NEW to OPEN a claim causes (Issue 6, BR-21, BR-45)", async () => {
+    const moved = await makeTicket();
+    const claim = await request(app).patch(`/api/staff/tickets/${moved}/owner`).set("Cookie", cookies.admin).send({ ownerId: ids.admin, expectedOwnerId: null });
+    expect(claim.status).toBe(200);
+    const progress = await request(app).patch(`/api/staff/tickets/${moved}/status`).set("Cookie", cookies.admin).send({ currentStatus: "IN_PROGRESS" });
+    expect(progress.status).toBe(200);
+
+    const rows = (await request(app).get(`/api/tickets/${moved}/status-history`).set("Cookie", cookies.admin)).body.history as Array<{
+      fromStatus: string;
+      toStatus: string;
+      changedBy: { id: number; role: string };
+    }>;
+    expect(rows.map((r) => `${r.fromStatus}>${r.toStatus}`)).toEqual(["NEW>OPEN", "OPEN>IN_PROGRESS"]);
+    for (const entry of rows) expect(entry.changedBy).toMatchObject({ id: ids.admin, role: "ADMINISTRATOR" });
   });
 
   it("becomes the Ticket Owner of a ticket they claim, and only that", async () => {

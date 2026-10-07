@@ -30,6 +30,11 @@ export interface ActionsTakenRegionProps {
   mode: "staff" | "requester";
   /** The signed-in user, shown as Performed by while recording (BR-05). */
   currentUser?: { fullName: string; role: Role };
+  /**
+   * Called once an action has been recorded or edited. The resolution gate reads the actions
+   * (BR-17), so the screen's status control has to ask the server what the ticket can do now.
+   */
+  onChanged?: () => void;
 }
 
 type LoadState = "loading" | "ready" | "error" | "forbidden";
@@ -143,7 +148,7 @@ function toEditInput(values: ActionFormValues, entry: ActionTaken): ActionTakenI
   return input;
 }
 
-export function ActionsTakenRegion({ ticketId, ticketStatus, ticketCreatedAt, mode, currentUser }: ActionsTakenRegionProps) {
+export function ActionsTakenRegion({ ticketId, ticketStatus, ticketCreatedAt, mode, currentUser, onChanged }: ActionsTakenRegionProps) {
   const headingId = useId();
   const helpId = useId();
   const sectionRef = useRef<HTMLElement>(null);
@@ -188,6 +193,7 @@ export function ActionsTakenRegion({ ticketId, ticketStatus, ticketCreatedAt, mo
     setCreating(null);
     setMessage("Action recorded.");
     setFocus({ id: entry.id, on: "title" });
+    onChanged?.();
   }
 
   async function saveEdit(entry: ActionTaken, values: ActionFormValues) {
@@ -199,6 +205,7 @@ export function ActionsTakenRegion({ ticketId, ticketStatus, ticketCreatedAt, mo
     setEditing(null);
     setMessage(moved ? "Changes saved. Moved to its new position by date." : "Changes saved.");
     setFocus({ id: entry.id, on: moved ? "title" : "edit" });
+    onChanged?.();
   }
 
   /** The person chose to drop their edits for the record as it is now. */
@@ -230,7 +237,8 @@ export function ActionsTakenRegion({ ticketId, ticketStatus, ticketCreatedAt, mo
   return (
     <section className="tt-card tt-actions-taken" aria-labelledby={headingId} data-region="actions-taken" ref={sectionRef}>
       <div className="tt-actions-taken__head">
-        <h2 className="tt-h2" id={headingId}>
+        {/* Focusable by script, so "Go to Actions Taken" in the status control can land here (ui-spec §9). */}
+        <h2 className="tt-h2" id={headingId} tabIndex={-1}>
           Actions Taken{state === "ready" ? ` (${actions.length})` : ""}
         </h2>
         {staff && state === "ready" && actions.length > 0 && addButton}

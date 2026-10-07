@@ -42,13 +42,17 @@ function detail(overrides: Partial<Detail> = {}): Detail {
     createdAt: "2026-09-28T02:10:00.000Z",
     updatedAt: "2026-09-29T09:14:22.310Z",
     attachments: [],
+    // Lab 4 (api-spec §3.1): the detail now carries a version and the moves held back, and the
+    // owner a role. A mock-shape change, as tests.md §6 says; the assertions below are Lab 3's.
+    version: 1,
     permittedTransitions: MATRIX[currentStatus],
+    blockedTransitions: [],
     ...overrides,
   };
 }
 
-const mine = { id: ME, fullName: "Nattapong Saelim", isActive: true };
-const theirs = { id: COLLEAGUE, fullName: "Siriporn Kaewmanee", isActive: true };
+const mine = { id: ME, fullName: "Nattapong Saelim", role: "IT_STAFF" as const, isActive: true };
+const theirs = { id: COLLEAGUE, fullName: "Siriporn Kaewmanee", role: "IT_STAFF" as const, isActive: true };
 
 function entry(id: number, body: string, role: api.Role = "IT_STAFF"): ThreadEntry {
   return { id, body, createdAt: "2026-09-29T09:00:00.000Z", author: { id: ME, fullName: "Nattapong Saelim", role } };
@@ -68,6 +72,9 @@ beforeEach(() => {
   // Lab 4, Issue 5: the screen now loads the Actions Taken region too. These tests
   // are about other things, so it has none.
   vi.spyOn(api, "fetchActionsTaken").mockResolvedValue([]);
+  // Lab 4, Issue 6: the screen now loads the Status History too. These tests are about
+  // other things, so it has no changes.
+  vi.spyOn(api, "fetchStatusHistory").mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -85,8 +92,9 @@ const operational = () => within(screen.getByRole("region", { name: "Operational
 const submitted = () => within(screen.getByRole("region", { name: "What the Requester submitted" }));
 
 describe("regions (FR-31)", () => {
-  // Lab 4, Issue 5 added Actions Taken between Operational and Attachments (ui-spec §4).
-  it("groups the ticket into the five regions, in order", async () => {
+  // Lab 4 added Actions Taken between Operational and Attachments (Issue 5, ui-spec §4) and the
+  // Status History as the last region (Issue 6, ui-spec §6.1).
+  it("groups the ticket into the six regions, in order", async () => {
     await ready();
     const regions = screen.getAllByRole("region").map((r) => r.getAttribute("aria-label") ?? r.querySelector("h2")?.textContent);
     expect(regions).toEqual([
@@ -96,6 +104,7 @@ describe("regions (FR-31)", () => {
       expect.stringMatching(/^Attachments/),
       "Public Comments",
       `Internal Notes — ${INTERNAL_CAPTION}`,
+      "Status History",
     ]);
   });
 
@@ -134,7 +143,7 @@ describe("UI-15 Claim (AC-22)", () => {
 
     await user.click(confirm.getByRole("button", { name: "Confirm claim" }));
     // expectedOwnerId null: this is a claim, so a colleague's earlier claim wins (BR-25).
-    expect(claim).toHaveBeenCalledWith(12, ME, null);
+    expect(claim).toHaveBeenCalledWith(12, ME, null, 1);
     expect(await screen.findByText("You claimed TT-2026-00042, and it moved to Open.")).toBeInTheDocument();
     expect(operational().getByText("You")).toBeInTheDocument();
     expect(operational().queryByRole("button", { name: "Claim" })).not.toBeInTheDocument();
@@ -178,7 +187,7 @@ describe("reassignment (FR-32)", () => {
     await user.selectOptions(picker, String(COLLEAGUE));
     await user.click(operational().getByRole("button", { name: "Reassign" }));
 
-    expect(setOwner).toHaveBeenCalledWith(12, COLLEAGUE, ME);
+    expect(setOwner).toHaveBeenCalledWith(12, COLLEAGUE, ME, 1);
     expect(await screen.findByText("TT-2026-00042 is now owned by Siriporn Kaewmanee.")).toBeInTheDocument();
   });
 
@@ -188,11 +197,11 @@ describe("reassignment (FR-32)", () => {
     await ready(detail({ owner: mine, currentStatus: "OPEN" }));
     await user.selectOptions(operational().getByLabelText("Reassign to"), "");
     await user.click(operational().getByRole("button", { name: "Unassign" }));
-    expect(setOwner).toHaveBeenCalledWith(12, null, ME);
+    expect(setOwner).toHaveBeenCalledWith(12, null, ME, 1);
   });
 
   it("keeps an inactive current owner visible in the picker (BR-26)", async () => {
-    await ready(detail({ owner: { id: 44, fullName: "Prasert Chaiyo", isActive: false }, currentStatus: "OPEN" }));
+    await ready(detail({ owner: { id: 44, fullName: "Prasert Chaiyo", role: "IT_STAFF", isActive: false }, currentStatus: "OPEN" }));
     expect(operational().getByText("Inactive")).toBeInTheDocument();
     expect(operational().getByLabelText("Reassign to")).toHaveDisplayValue("Prasert Chaiyo (inactive)");
   });
@@ -219,7 +228,7 @@ describe("UI-16 priorities (AC-24)", () => {
     await user.selectOptions(operational().getByLabelText("IT Priority"), "URGENT");
     await user.click(button);
 
-    expect(save).toHaveBeenCalledWith(12, "URGENT");
+    expect(save).toHaveBeenCalledWith(12, "URGENT", 1);
     expect(await screen.findByText("IT Priority is now URGENT.")).toBeInTheDocument();
     expect(operational().getByLabelText("Requested Priority")).toHaveValue("MEDIUM");
   });
@@ -230,7 +239,7 @@ describe("UI-17 status offers only permittedTransitions (AC-25)", () => {
     await ready(detail({ currentStatus: status, owner: mine }));
     if (MATRIX[status].length === 0) {
       expect(operational().queryByLabelText("Move to")).not.toBeInTheDocument();
-      expect(operational().getByText(/is final/)).toBeInTheDocument();
+      expect(operational().getByText(/is cancelled and cannot change/)).toBeInTheDocument();
       return;
     }
     const options = within(operational().getByLabelText("Move to")).getAllByRole("option").map((o) => o.getAttribute("value"));
@@ -254,8 +263,8 @@ describe("UI-17 status offers only permittedTransitions (AC-25)", () => {
     expect(operational().queryByLabelText(/Reason/)).not.toBeInTheDocument();
     await user.click(operational().getByRole("button", { name: "Apply" }));
 
-    expect(change).toHaveBeenCalledWith(12, "IN_PROGRESS", undefined);
-    expect(await screen.findByText("TT-2026-00042 moved to In Progress.")).toBeInTheDocument();
+    expect(change).toHaveBeenCalledWith(12, "IN_PROGRESS", undefined, 1);
+    expect(await screen.findByText("Status changed to In Progress.")).toBeInTheDocument();
   });
 
   it("keeps Resolve and Close unavailable until the ticket has an owner (BR-35)", async () => {
@@ -276,7 +285,7 @@ describe("UI-17 status offers only permittedTransitions (AC-25)", () => {
     await user.click(operational().getByRole("button", { name: "Apply" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("A CANCELLED ticket cannot move to IN_PROGRESS.");
-    expect(await operational().findByText(/is final/)).toBeInTheDocument();
+    expect(await operational().findByText(/is cancelled and cannot change/)).toBeInTheDocument();
   });
 });
 
@@ -305,7 +314,7 @@ describe("UI-18 a reason before Apply for Resolved, Cancelled, and Reopened (AC-
     expect(apply).toBeEnabled();
     await user.click(apply);
 
-    expect(change).toHaveBeenCalledWith(12, to, "abcd  Toner replaced and test page printed.");
+    expect(change).toHaveBeenCalledWith(12, to, "abcd  Toner replaced and test page printed.", 1);
     // The reason joins the public thread straight away.
     const thread = within(screen.getByRole("region", { name: "Public Comments" }));
     expect(await thread.findByText("Toner replaced and test page printed.")).toBeInTheDocument();
