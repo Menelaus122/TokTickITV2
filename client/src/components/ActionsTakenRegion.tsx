@@ -50,6 +50,26 @@ function toLocalInput(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+/**
+ * What a new form starts with: now, to the minute, as long as the ticket already
+ * existed then. The input holds minutes only, so "now" is truncated, and on a ticket
+ * created seconds ago that truncated minute is before the ticket (BR-06): the form
+ * would refuse its own default. There the default is the next whole minute after the
+ * ticket's creation, at most 59 seconds ahead, well inside the five minutes the
+ * server allows.
+ */
+function defaultActionTime(now: Date, ticketCreatedAt: Date): Date {
+  const thisMinute = new Date(now);
+  thisMinute.setSeconds(0, 0);
+  if (thisMinute.getTime() >= ticketCreatedAt.getTime()) return thisMinute;
+  const nextMinute = new Date(ticketCreatedAt);
+  if (nextMinute.getSeconds() !== 0 || nextMinute.getMilliseconds() !== 0) {
+    nextMinute.setSeconds(0, 0);
+    nextMinute.setMinutes(nextMinute.getMinutes() + 1);
+  }
+  return nextMinute;
+}
+
 /** BR-08 — the order for reading: oldest Action Date/Time first, ties by id. */
 function readingOrder(a: ActionTaken, b: ActionTaken): number {
   return new Date(a.actionAt).getTime() - new Date(b.actionAt).getTime() || a.id - b.id;
@@ -225,7 +245,14 @@ export function ActionsTakenRegion({ ticketId, ticketStatus, ticketCreatedAt, mo
       {staff && creating && (
         <ActionTakenForm
           mode="create"
-          initial={{ actionAt: toLocalInput(new Date()), description: "", result: "", followUpRequired: false, followUpNote: "", attachmentNotes: "" }}
+          initial={{
+            actionAt: toLocalInput(defaultActionTime(new Date(), new Date(ticketCreatedAt))),
+            description: "",
+            result: "",
+            followUpRequired: false,
+            followUpNote: "",
+            attachmentNotes: "",
+          }}
           performer={currentUser ?? { fullName: "You" }}
           ticketCreatedAt={ticketCreatedAt}
           onSave={saveNew}
@@ -236,7 +263,8 @@ export function ActionsTakenRegion({ ticketId, ticketStatus, ticketCreatedAt, mo
 
       {state === "ready" &&
         (actions.length === 0 ? (
-          staff ? (
+          // "No actions recorded yet" beside the form that is recording one would contradict it.
+          staff && creating ? null : staff ? (
             <EmptyState
               title="No actions recorded yet."
               body="Record what you do on this ticket so the Requester can see it."
