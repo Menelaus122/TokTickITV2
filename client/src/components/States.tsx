@@ -118,9 +118,10 @@ export function SuccessCallout({ children }: { children: ReactNode }) {
 
 // Amber is reserved for genuine warnings and is never ordinary decoration
 // (ui-spec.md 1).
-export function WarningCallout({ children }: { children: ReactNode }) {
+export function WarningCallout({ children, role = "status" }: { children: ReactNode; role?: "status" | "alert" }) {
+  // A conflict is announced at once, so it asks for "alert" (Lab 4 ui-spec §1.5).
   return (
-    <div className="tt-callout tt-callout--warning" role="status" data-state="warning">
+    <div className="tt-callout tt-callout--warning" role={role} data-state="warning">
       <span aria-hidden="true">!</span>
       <div>{children}</div>
     </div>

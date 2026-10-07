@@ -65,6 +65,9 @@ beforeEach(() => {
   ]);
   vi.spyOn(api, "fetchComments").mockResolvedValue([entry(1, "We are looking at it.")]);
   vi.spyOn(api, "fetchNotes").mockResolvedValue([entry(2, "Toner order placed.")]);
+  // Lab 4, Issue 5: the screen now loads the Actions Taken region too. These tests
+  // are about other things, so it has none.
+  vi.spyOn(api, "fetchActionsTaken").mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -82,12 +85,14 @@ const operational = () => within(screen.getByRole("region", { name: "Operational
 const submitted = () => within(screen.getByRole("region", { name: "What the Requester submitted" }));
 
 describe("regions (FR-31)", () => {
-  it("groups the ticket into the four regions, in order", async () => {
+  // Lab 4, Issue 5 added Actions Taken between Operational and Attachments (ui-spec §4).
+  it("groups the ticket into the five regions, in order", async () => {
     await ready();
     const regions = screen.getAllByRole("region").map((r) => r.getAttribute("aria-label") ?? r.querySelector("h2")?.textContent);
     expect(regions).toEqual([
       "What the Requester submitted",
       "Operational",
+      expect.stringMatching(/^Actions Taken/),
       expect.stringMatching(/^Attachments/),
       "Public Comments",
       `Internal Notes — ${INTERNAL_CAPTION}`,

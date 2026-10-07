@@ -189,15 +189,15 @@ first, then the rule or requirement where it adds precision.
 
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| UI-01 | UI | AC-10, AC-23, FR-01, FR-08 | the Actions Taken list, and a Ticket with none | entries in BR-08 reading order showing all seven fields, empty ones omitted; the **Latest recorded** tag on exactly one entry, the most recently recorded, including when it is not the last card; the explicit empty state | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-02 | UI | AC-04, FR-02 | create mode | every field present, Performed by read-only, red asterisks, Follow-up Note shown and required only for Yes | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-03 | UI | AC-04, AC-27, BR-54 | validation and a failed save | messages beneath their own fields, focus on the first invalid field, every typed value kept | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-04 | UI | AC-07, AC-27, BR-28 | repeated clicks on Save, then a network failure and a retry | one request per submission, Save busy and disabled; the retry reuses the same `requestKey` | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-05 | UI | AC-05, AC-06, FR-03 | edit mode | the form opens in place with the stored values; Performed by read-only; the save sends `expectedVersion`; the card returns to view mode with "Edited by"; an edit that changes Action Date/Time moves the card, announces "Moved to its new position by date.", and keeps focus on it | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-06 | UI | AC-06, AC-27, FR-07 | a `409 STALE_UPDATE` on an edit | the conflict callout inside the card, the user's edits kept, **Show latest** asks before replacing them | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-07 | UI | AC-08, FR-04 | the Requester's view | every action read-only; no **Add action**, no **Edit**, no hint of either | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-08 | UI | AC-09, BR-10 | a `RESOLVED`, `CLOSED`, or `CANCELLED` Ticket | **Add action** and **Edit** disabled with the explanation; the entries stay readable; a `409 TICKET_NOT_ACTIVE` shows its own message | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-09 | UI | AC-28 | the region's loading, API-failure, and forbidden states | skeleton cards; a callout with **Try again** that leaves the other regions alone; the forbidden callout | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
+| UI-01 | UI | AC-10, AC-23, FR-01, FR-08 | the Actions Taken list, and a Ticket with none | entries in BR-08 reading order showing all seven fields, empty ones omitted; the **Latest recorded** tag on exactly one entry, the most recently recorded, including when it is not the last card; the explicit empty state | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-02 | UI | AC-04, FR-02 | create mode | every field present, Performed by read-only, red asterisks, Follow-up Note shown and required only for Yes | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-03 | UI | AC-04, AC-27, BR-54 | validation and a failed save | messages beneath their own fields, focus on the first invalid field, every typed value kept | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-04 | UI | AC-07, AC-27, BR-28 | repeated clicks on Save, then a network failure and a retry | one request per submission, Save busy and disabled; the retry reuses the same `requestKey` | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-05 | UI | AC-05, AC-06, FR-03 | edit mode | the form opens in place with the stored values; Performed by read-only; the save sends `expectedVersion`; the card returns to view mode with "Edited by"; an edit that changes Action Date/Time moves the card, announces "Moved to its new position by date.", and keeps focus on it | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-06 | UI | AC-06, AC-27, FR-07 | a `409 STALE_UPDATE` on an edit | the conflict callout inside the card, the user's edits kept, **Show latest** asks before replacing them | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-07 | UI | AC-08, FR-04 | the Requester's view | every action read-only; no **Add action**, no **Edit**, no hint of either | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-08 | UI | AC-09, BR-10 | a `RESOLVED`, `CLOSED`, or `CANCELLED` Ticket | **Add action** and **Edit** disabled with the explanation; the entries stay readable; a `409 TICKET_NOT_ACTIVE` shows its own message | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-09 | UI | AC-28 | the region's loading, API-failure, and forbidden states | skeleton cards; a callout with **Try again** that leaves the other regions alone; the forbidden callout | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
 | UI-10 | UI | AC-16, FR-09 | the status select and the "Not available now" list | the select offers only `permittedTransitions`; each `blockedTransitions` entry is listed with its message | `client/tests/lab-04/TicketWorkflow.test.tsx` | Planned |
 | UI-11 | UI | AC-16, BR-19 | reasons for Resolved, Cancelled, and Reopened | the reason textarea is required before **Apply** is enabled | `client/tests/lab-04/TicketWorkflow.test.tsx` | Planned |
 | UI-12 | UI | AC-03, AC-16 | a gate refusal that reaches the server | the `ACTION_REQUIRED` and `FOLLOW_UP_PENDING` messages as their own callout, with **Go to Actions Taken** focusing the region | `client/tests/lab-04/TicketWorkflow.test.tsx` | Planned |
@@ -216,7 +216,7 @@ first, then the rule or requirement where it adds precision.
 | UI-25 | UI | AC-22, FR-20 | loading, zero data, forbidden, failure, and Refresh | as UI-21; zero data keeps the cards and shows the staff empty messages | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
 | UI-26 | UI | AC-19, D-11 | the quick actions | **Open Ticket Queue**, **Unassigned Tickets**, and **My Queue** only; no Create Ticket, no Profile, no "from yesterday" | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
 | UI-27 | UI | AC-17, FR-23, FR-24 | the Administrator's navigation and routes | **Ticket Queue** is offered and opens; a Requester typing `/queue` or `/users` lands on their Dashboard with the forbidden callout | `client/tests/lab-04/RoleNavigation.test.tsx` | Partial |
-| UI-28 | UI | AC-17, BR-45 | an Administrator on the Ticket Detail | the owner, IT Priority, status, and Actions Taken controls are present and send requests under the session | `client/tests/lab-04/RoleNavigation.test.tsx` | Partial |
+| UI-28 | UI | AC-17, BR-45 | an Administrator on the Ticket Detail | the owner, IT Priority, status, and Actions Taken controls are present and send requests under the session | `client/tests/lab-04/RoleNavigation.test.tsx` | Pass |
 | UI-29 | UI | AC-21, FR-21 | My Tickets opened with `?group=open&status=…` | the request carries both; the filter chip shows; Clear Filters removes it; an unknown parameter is ignored | `client/tests/lab-04/DrillDown.test.tsx` | Planned |
 | UI-30 | UI | AC-27, BR-53 | every write form: create ticket, comment, note, owner, IT Priority, status, user management, Action Taken | one request per submission under repeated clicks | `client/tests/lab-04/FinalRegression.test.tsx` | Planned |
 | UI-31 | UI | AC-27, BR-54 | a recoverable failure on the same forms | the typed values are still in the form | `client/tests/lab-04/FinalRegression.test.tsx` | Planned |
@@ -234,7 +234,7 @@ first, then the rule or requirement where it adds precision.
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | STYLE-01 | UI style | AC-29, FR-26 | every Lab 4 screen's styles | only Lab 2 and Lab 3 tokens; no hard-coded hex | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Planned |
 | STYLE-02 | UI style | AC-29, `ui-spec.md` §1.1 | the metric card | label, value, and "View all" in the specified sizes and tokens; the focus outline present | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Planned |
-| STYLE-03 | UI style | AC-30, AC-04 | the follow-up pill and the Follow-up Note's asterisk | the pill carries text; the red asterisk appears with the note's `required` for Yes only | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Planned |
+| STYLE-03 | UI style | AC-30, AC-04 | the follow-up pill and the Follow-up Note's asterisk | the pill carries text; the red asterisk appears with the note's `required` for Yes only | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Pass |
 | STYLE-04 | UI style | AC-29 | read-only against disabled | `readonly` fields use `--tt-readonly-bg`, distinct from a disabled **Add action** | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Planned |
 | STYLE-05 | UI style | AC-27 | validation placement and busy buttons | messages sit beneath their own field; a busy button is disabled, labelled, and permits one request | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Planned |
 | STYLE-06 | UI style | AC-29, `ui-spec.md` §1.2, §1.4 | the Action Taken card and the timeline | the card's definition-list structure and the timeline's `<ol>` with its tokens | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Planned |
@@ -326,10 +326,10 @@ component, 6 UI style, 6 responsive, 8 E2E, and 3 regression suites.
 | 2 — Administrator access to IT Staff ticket operations (#68) | SEC-01 – SEC-04, SEC-06, SEC-08, SEC-09, UI-27, UI-28, each for the endpoints and screens that exist at Issue 2 (see below) |
 | 3 — Actions Taken data model, migration, and seed (#69) | MIG-01 – MIG-08 (MIG-03 and MIG-04 for the data only, see below) |
 | 4 — Actions Taken API (#70) | UNIT-01 – UNIT-06, API-01 – API-17; extends SEC-01, SEC-07, SEC-08 (`performedBy`), and SEC-09 for the Actions Taken routes |
-| 5 — Actions Taken UI on Ticket Detail (#71) | UI-01 – UI-09, STYLE-03 |
+| 5 — Actions Taken UI on Ticket Detail (#71) | UI-01 – UI-09, STYLE-03; completes UI-28 with the Actions Taken controls |
 | 6 — Ticket workflow and resolution gate (#72) | UNIT-07 – UNIT-10, WF-01 – WF-17, WF-19, WF-20, UI-10 – UI-16, STYLE-06; extends SEC-01 for the status-history route and SEC-08 (`changedBy`) |
-| 7 — Requester Dashboard (#73) | UNIT-11, DASH-01 – DASH-09, UI-18 – UI-21, UI-29, UI-37 (Requester), STYLE-02; completes SEC-05 (the Requester dashboard half) and extends SEC-01 and SEC-07 |
-| 8 — IT Staff and Administrator Dashboard (#74) | DASH-10 – DASH-19, UI-22 – UI-26, UI-37 (IT Staff and Administrator), UI-38; completes SEC-05 (the staff dashboard half) and extends SEC-01 and SEC-07 |
+| 7 — Requester Dashboard (#73) | UNIT-11, DASH-01 – DASH-09, UI-18 – UI-21, UI-29, UI-37 (Requester), STYLE-02; completes SEC-05 (the Requester dashboard half) and extends SEC-01, SEC-07, and UI-27 |
+| 8 — IT Staff and Administrator Dashboard (#74) | DASH-10 – DASH-19, UI-22 – UI-26, UI-37 (IT Staff and Administrator), UI-38; completes SEC-05 (the staff dashboard half) and extends SEC-01, SEC-07, and UI-27 |
 | 9 — Final hardening and full regression (#75) | UNIT-12, WF-18, UI-17, HARD-01 – HARD-03, PERF-01 – PERF-03, UI-30 – UI-36, STYLE-01, STYLE-04, STYLE-05 |
 | 10 — Lab 4 E2E suite and visual evidence (#76) | RESP-01 – RESP-06, E2E-01 – E2E-08, REG-01 – REG-03 |
 | 11 — Staging integration, documentation, and delivery (#77) | no new tests: the final run from `main` |
@@ -352,7 +352,7 @@ that adds the thing they test, by appending a row to the route tables in
 | SEC-08 | an Administrator is the author of their comments and notes, and the Owner of what they claim | ~~4~~ (done: `performedBy`), 6 (`changedBy`) |
 | SEC-09 | a foreign `Origin` is refused on an Administrator's writes to the existing staff routes | ~~4~~ (done: the Actions Taken writes) |
 | UI-27 | the Administrator's navigation and routes; the sign-in deep link; the refusals; "sent home" means the role's Lab 3 home | 7, 8: the Dashboard becomes the home (UI-37) |
-| UI-28 | the owner, IT Priority, and status controls, and the Internal Notes region | 5: the Actions Taken controls |
+| UI-28 | the owner, IT Priority, and status controls, and the Internal Notes region | ~~5~~ (done: the Actions Taken controls) |
 
 SEC-02, SEC-03, SEC-04, and SEC-06 are complete at Issue 2.
 
@@ -478,8 +478,9 @@ forces it, and the **Status** column records it when it is done.
 | `client/tests/lab-03/RequesterRegression.test.tsx` — "a signed-in Requester lands on My Tickets" | the landing page is My Tickets | the landing page is the Dashboard | D-09 | 7 | Planned |
 | `e2e/lab-03/authentication.spec.ts` — E2E-01 and the landing-page table | the Requester's navigation is exactly My Tickets and Create Ticket; IT Staff land on `/queue` and an Administrator on `/users` | the Administrator's list gains Ticket Queue (**Issue 2, Done**: `Ticket Queue, User Management`, landing still `/users`); then each role's navigation starts with Dashboard and each lands on `/dashboard` (Issues 7, 8) | D-08, D-09 | 2, 7, 8 | Issue 2 part Done; Dashboard part Planned |
 | `client/tests/lab-02/Navigation.test.tsx` | iterates the Requester's navigation items | expected to pass unchanged because it iterates `NAV_ITEMS`; re-verified, not edited, unless it does not | D-09 | 7 | Planned |
-| `client/tests/lab-02/RequesterTicketDetail.test.tsx` | mocks each client call with `vi.spyOn(api, …)`: the ticket detail, comments, and attachments | the mocks gain the two calls the Requester Ticket Detail now makes, `fetchActionsTaken` (Issue 5) and `fetchStatusHistory` (Issue 6); no assertion changes | the screen loads two more resources; an unmocked call would reach the network | 5, 6 | Planned |
-| `client/tests/lab-03/RequesterComments.test.tsx` | the same per-call mocks, with `fetchComments` | the same two mocks are added | as above | 5, 6 | Planned |
+| `client/tests/lab-02/RequesterTicketDetail.test.tsx` | mocks each client call with `vi.spyOn(api, …)`: the ticket detail, comments, and attachments | the mocks gain the two calls the Requester Ticket Detail now makes, `fetchActionsTaken` (Issue 5) and `fetchStatusHistory` (Issue 6); no assertion changes | the screen loads two more resources; an unmocked call would reach the network | 5, 6 | Issue 5 part Done (`fetchActionsTaken`); `fetchStatusHistory` Planned |
+| `client/tests/lab-03/RequesterComments.test.tsx` | the same per-call mocks, with `fetchComments` | the same two mocks are added | as above | 5, 6 | Issue 5 part Done (`fetchActionsTaken`); `fetchStatusHistory` Planned |
+| `client/tests/lab-03/StaffTicketDetail.test.tsx` — "groups the ticket into the four regions, in order", and the mocks in `beforeEach` | **not foreseen when this table was written; found by running the suite.** The screen has four regions, and each test mocks only the calls Lab 3's screen made | the region list has five, with Actions Taken between Operational and Attachments; the mocks gain `fetchActionsTaken` (an empty list) | FR-01 and ui-spec §4: the Ticket Detail now has an Actions Taken region and loads its list. Left unmocked, the region reports its own load failure, a second `alert`, and three tests that look for a single one failed | 5 | Done |
 
 No Lab 1 test changes. A change not in this table is a defect to be fixed in the
 code, not in the test. If implementation finds a Lab 3 test that must change and

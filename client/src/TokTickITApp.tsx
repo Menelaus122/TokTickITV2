@@ -238,6 +238,7 @@ function StaffDetailRoute() {
         key={`staff-detail-${ticketId}`}
         ticketId={ticketId}
         currentUserId={user.id}
+        currentUser={{ fullName: user.fullName, role: user.role }}
         onBack={() => navigate(ROUTES.queue)}
       />
     </Page>

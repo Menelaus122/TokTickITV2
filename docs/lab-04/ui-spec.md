@@ -118,7 +118,7 @@ can offer it:
 | `STALE_UPDATE` on a Ticket | "This ticket changed while you were working on it — for example a colleague moved it, or the Requester marked the problem as appearing resolved. It is now **In Progress**, owned by Siriporn K. Review it and try again." |
 | `STALE_UPDATE` on an action | "Someone else edited this action while you were working on it. Your changes are still in the form." |
 | `TICKET_ALREADY_OWNED` | "Someone else claimed this ticket first." (unchanged) |
-| `TICKET_NOT_ACTIVE` | "This ticket is Resolved, so no more actions can be recorded. Reopen it first." |
+| `TICKET_NOT_ACTIVE` | "This ticket is Resolved, so no more actions can be recorded. Reopen it first." Shown beside the button as the helper text of §4.4, where the status is known. When the API answers it while a form is open, the ticket has changed under the person and the screen does not yet know its new status, so the callout shows the API's own sentence ("This ticket is resolved, closed, or cancelled, so its actions can no longer be recorded or changed.") followed by "Everything you typed is still in the form." |
 | `ACTION_REQUIRED` | "Record at least one action before resolving this ticket." |
 | `FOLLOW_UP_PENDING` | "The most recently recorded action still needs follow-up. Record the follow-up as a new action first." |
 
@@ -377,7 +377,7 @@ and **Cancel** replace the Save action buttons. Only one card is editable at a t
 | :--- | :--- |
 | Loading | skeleton cards inside the region only; the rest of the screen is already usable |
 | Empty | "No actions recorded yet." with a one-line explanation "Record what you do on this ticket so the Requester can see it." and the **+ Add action** button (FR-08). Legacy Tickets land here |
-| Ticket not active | `RESOLVED`, `CLOSED`, or `CANCELLED`: **+ Add action** and every **Edit** are disabled with the helper text "This ticket is Resolved, so no more actions can be recorded. Reopen it first." The existing entries stay readable (BR-10) |
+| Ticket not active | `RESOLVED`, `CLOSED`, or `CANCELLED`: **+ Add action** and every **Edit** are disabled with the helper text "This ticket is Resolved, so no more actions can be recorded. Reopen it first." The status is spelled as the badge spells it ("Closed", "Cancelled"), and for **Cancelled** the sentence ends after "recorded", because a cancelled ticket cannot be reopened (Lab 3 BR-33) and the advice would be false. Each disabled control is tied to the sentence with `aria-describedby`. The existing entries stay readable (BR-10) |
 | API failure | Error callout inside the region with **Try again**; the other regions are unaffected |
 | Forbidden | not reachable by a role that can open the screen; if the API still answers `403`, the Error callout "You do not have access to record actions." |
 

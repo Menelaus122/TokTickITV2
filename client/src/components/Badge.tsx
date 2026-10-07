@@ -150,3 +150,14 @@ export function OwnerPresentation({ owner, currentUserId }: { owner: OwnerValue 
     </span>
   );
 }
+
+// --- Follow-up (Lab 4, ui-spec §1.3) -----------------------------------------
+
+// Lab 2's pill geometry with a text label, so the colour is never the signal.
+export function FollowUpPill({ required }: { required: boolean }) {
+  return required ? (
+    <BadgeBase kind="follow-up" tone="amber" text="Follow-up needed" />
+  ) : (
+    <BadgeBase kind="follow-up" tone="neutral" text="No follow-up" />
+  );
+}
