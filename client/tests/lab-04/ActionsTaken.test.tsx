@@ -38,14 +38,15 @@ function action(overrides: Partial<ActionTaken> = {}): ActionTaken {
 interface RegionProps {
   ticketStatus?: TicketStatus;
   mode?: "staff" | "requester";
+  ticketCreatedAt?: string;
 }
 
-function renderRegion({ ticketStatus = "IN_PROGRESS", mode = "staff" }: RegionProps = {}) {
+function renderRegion({ ticketStatus = "IN_PROGRESS", mode = "staff", ticketCreatedAt = "2026-09-28T02:10:00.000Z" }: RegionProps = {}) {
   return render(
     <ActionsTakenRegion
       ticketId={12}
       ticketStatus={ticketStatus}
-      ticketCreatedAt="2026-09-28T02:10:00.000Z"
+      ticketCreatedAt={ticketCreatedAt}
       mode={mode}
       currentUser={ME}
     />,
@@ -1296,5 +1297,101 @@ describe("the Actions Taken API client sends what api-spec §2 says", () => {
       respond(status, { error: { code: "X", message: "No." } });
       await expect(api.createActionTaken(12, input, "key-1234-abcd"), String(status)).rejects.toBeInstanceOf(ApiError);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// What the form starts with (review of PR #83)
+// ---------------------------------------------------------------------------
+
+describe("the form's own default Action Date/Time is one the ticket accepts (FR-02, BR-06)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** A moment on 7 October 2026 in the viewer's own time zone, whatever that is. */
+  const at = (hour: number, minute: number, second = 0, ms = 0) => new Date(2026, 9, 7, hour, minute, second, ms);
+
+  async function openAt(now: Date, createdAt: Date) {
+    // Only the clock is faked: typing and promises keep running as they do.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(now);
+    const user = userEvent.setup();
+    vi.spyOn(api, "createActionTaken").mockResolvedValue(created());
+    fetchSpy.mockResolvedValue([]);
+    renderRegion({ ticketCreatedAt: createdAt.toISOString() });
+    await waitFor(() => expect(screen.queryByText("Loading actions taken…")).not.toBeInTheDocument());
+    const form = await openCreate(user);
+    return { user, form, defaultValue: (control(form, "Action Date/Time") as HTMLInputElement).value };
+  }
+
+  it("on a ticket created seconds ago, starts at the next whole minute rather than a minute the ticket did not exist in, and saves it", async () => {
+    // The ticket was created at 13:54:39 and the form is opened at 13:54:50. "Now, to the minute" is 13:54:00,
+    // which is before the ticket existed, so the form would have refused its own default.
+    const { user, form, defaultValue } = await openAt(at(13, 54, 50), at(13, 54, 39));
+    expect(defaultValue).toBe("2026-10-07T13:55");
+
+    await fillRequired(user, form);
+    await user.click(form.getByRole("button", { name: "Save action" }));
+
+    expect(screen.queryByText("Action Date/Time cannot be before the ticket was created.")).not.toBeInTheDocument();
+    const create = vi.mocked(api.createActionTaken);
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    const sent = new Date((create.mock.calls[0][1] as ActionTakenInput).actionAt).getTime();
+    expect(sent).toBe(at(13, 55).getTime());
+    // Not before the ticket, and well inside the five minutes the server allows ahead of now.
+    expect(sent).toBeGreaterThanOrEqual(at(13, 54, 39).getTime());
+    expect(sent - at(13, 54, 50).getTime()).toBeLessThan(60 * 1000);
+  });
+
+  it("is still now, to the minute, on any ticket old enough for that to be allowed", async () => {
+    const { defaultValue } = await openAt(at(13, 54, 50), at(9, 0, 39));
+    expect(defaultValue).toBe("2026-10-07T13:54");
+  });
+
+  it("is still now, to the minute, once the minute the ticket was created in is over", async () => {
+    // Created at 13:54:39, opened at 13:56:10: 13:56 is after the ticket, so there is nothing to correct.
+    const { defaultValue } = await openAt(at(13, 56, 10), at(13, 54, 39));
+    expect(defaultValue).toBe("2026-10-07T13:56");
+  });
+
+  it("does not move a default that is exactly the minute the ticket was created", async () => {
+    const { defaultValue } = await openAt(at(13, 54, 50), at(13, 54, 0, 0));
+    expect(defaultValue).toBe("2026-10-07T13:54");
+  });
+
+  it("rounds a creation time with only milliseconds past the minute up, as it does seconds", async () => {
+    const { defaultValue } = await openAt(at(13, 54, 0, 800), at(13, 54, 0, 500));
+    expect(defaultValue).toBe("2026-10-07T13:55");
+  });
+});
+
+describe("the empty state while a form is open (review of PR #83)", () => {
+  it("steps aside for the create form and comes back when it is cancelled", async () => {
+    const user = userEvent.setup();
+    await ready([]);
+    expect(within(region()).getByText("No actions recorded yet.")).toBeInTheDocument();
+
+    const form = await openCreate(user);
+    // "No actions recorded yet" beside a form that is recording one reads as a contradiction, and its
+    // disabled button is a second Add action beside a form that already is one.
+    expect(within(region()).queryByText("No actions recorded yet.")).not.toBeInTheDocument();
+    expect(within(region()).queryByText("Record what you do on this ticket so the Requester can see it.")).not.toBeInTheDocument();
+    expect(within(region()).queryByRole("button", { name: "+ Add action" })).not.toBeInTheDocument();
+
+    await user.click(form.getByRole("button", { name: "Cancel" }));
+    expect(within(region()).getByText("No actions recorded yet.")).toBeInTheDocument();
+    expect(within(region()).getByRole("button", { name: "+ Add action" })).toBeEnabled();
+  });
+
+  it("is replaced by the new entry once the first action is recorded", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "createActionTaken").mockResolvedValue(created());
+    await ready([]);
+    const form = await openCreate(user);
+    await fillRequired(user, form);
+    await user.click(form.getByRole("button", { name: "Save action" }));
+    await waitFor(() => expect(cardIds()).toEqual([99]));
+    expect(within(region()).queryByText("No actions recorded yet.")).not.toBeInTheDocument();
   });
 });
