@@ -465,14 +465,20 @@ Administrator) accept one new optional parameter:
 It combines with every other filter by AND, `status` included: `group=open` with
 `status=CLOSED` is an empty list, not an error. An unknown value, or the parameter
 given twice, is `400 INVALID_QUERY`, as Lab 3 BR-58 treats every parameter. The
-response shape is unchanged. Every dashboard `href` in §4 is a client route whose
-query string these endpoints accept, so `totalItems` of the list a card opens
-equals the card's `value` (AC-21); DASH-14 checks every card against it.
+response shape is unchanged. Every dashboard `href` in §4 is a client route, and the
+list a card opens shows exactly the card's `value` (AC-21). For the staff queue the
+route's query string is the endpoint's own. For the Requester's list there is one
+translation, which the web client makes and `GET /api/tickets` does not: the route says
+`status=WAITING_FOR_REQUESTER`, and the client asks the API for `currentStatus=
+WAITING_FOR_REQUESTER`, the name Lab 2 gave that filter and this endpoint keeps (a `status`
+sent to it is not a filter and is ignored, like any parameter it does not know). DASH-07
+follows each Requester `href` that way; DASH-14 does the same for the staff cards.
 
 ### 5.2 Existing filters used by the links
 
 `status`, `itPriority`, and `owner` (`unassigned` | `me` | an id) are Lab 3's
-(`docs/lab-03/api-spec.md` §5.1). Nothing else changes. `GET /api/admin/users` is
+(`docs/lab-03/api-spec.md` §5.1); the Requester's list takes its status as `currentStatus`
+(§5.1). Nothing else changes. `GET /api/admin/users` is
 untouched, and the Administrator's account counts link to nothing, because that list
 includes inactive users and no filter could make it match an *active* count (BR-40,
 D-12). The client reads the filters above from its own URL (FR-21); that is a client

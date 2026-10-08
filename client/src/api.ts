@@ -164,6 +164,8 @@ export interface TicketListParams {
   relatedSystemId?: number | "";
   requestedPriority?: RequestedPriority | "";
   currentStatus?: TicketStatus | "";
+  /** Lab 4 (D-12): `open` is the five statuses nobody has resolved, closed, or cancelled (BR-31). */
+  group?: "open" | "";
   sortBy?: "createdAt" | "updatedAt";
   sortDir?: "asc" | "desc";
   page?: number;
@@ -650,6 +652,42 @@ export async function fetchStatusHistory(ticketId: number): Promise<StatusChange
   const response = await apiFetch(`${API_URL}/api/tickets/${ticketId}/status-history`);
   if (!response.ok) throw await failure(response, "Cannot load the status history.");
   return ((await response.json()) as { history: StatusChange[] }).history;
+}
+
+// --- Lab 4, Issue 7 — the Requester dashboard (api-spec §4.1) ----------------------------------
+
+/** One card: its number, and the client route whose list shows exactly that many Tickets (BR-40). */
+export interface DashboardMetric {
+  value: number;
+  href: string;
+}
+
+/** The concise row of api-spec §1.4: enough to identify a Ticket and open it. */
+export interface DashboardTicket {
+  id: number;
+  ticketNumber: string;
+  summary: string;
+  currentStatus: TicketStatus;
+  updatedAt: string;
+}
+
+export interface RequesterDashboard {
+  generatedAt: string;
+  metrics: {
+    openTickets: DashboardMetric;
+    waitingForYou: DashboardMetric;
+    resolved: DashboardMetric;
+    closed: DashboardMetric;
+  };
+  needsAttention: DashboardTicket[];
+  recentTickets: DashboardTicket[];
+}
+
+/** The signed-in Requester's dashboard. A refused role is an `ApiError` with status 403. */
+export async function fetchRequesterDashboard(): Promise<RequesterDashboard> {
+  const response = await apiFetch(`${API_URL}/api/dashboard/requester`);
+  if (!response.ok) throw await failure(response, "The dashboard could not be loaded.");
+  return (await response.json()) as RequesterDashboard;
 }
 
 export async function fetchNotes(ticketId: number): Promise<ThreadEntry[]> {

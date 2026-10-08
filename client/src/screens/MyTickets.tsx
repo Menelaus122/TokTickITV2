@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Category,
   PERMITTED_PAGE_SIZES,
@@ -25,11 +26,18 @@ import {
   TICKET_STATUSES,
   type TicketStatus,
 } from "../components/index.js";
+import { parseTicketListUrl, toTicketListUrl, type TicketListState } from "../ticketListUrl.js";
 
 // My Tickets (ui-spec.md 10).
 //
 // Every list read is scoped to the signed-in Requester by the server; this
 // screen simply asks for "my tickets" and never sees anyone else's.
+//
+// Lab 4, Issue 7 (ui-spec §7, FR-21): the filters live in the address. The screen reads them
+// from the query string and writes every change back, so a dashboard card, a reload, and a
+// bookmark all show the same list. The wrapper at the foot of this file is the one that
+// connects the screen to the address; the screen itself still works with no router, as Lab 2's
+// tests mount it.
 
 const SORT_OPTIONS = [
   { value: "createdAt:desc", label: "Newest first" },
@@ -48,19 +56,11 @@ interface Filters {
   relatedSystemId: string;
   requestedPriority: string;
   currentStatus: string;
+  /** Lab 4 (D-12): the open group, which a single status cannot say. */
+  group?: "" | "open";
   sort: string;
   pageSize: number;
 }
-
-const DEFAULT_FILTERS: Filters = {
-  search: "",
-  categoryId: "",
-  relatedSystemId: "",
-  requestedPriority: "",
-  currentStatus: "",
-  sort: "createdAt:desc",
-  pageSize: 10,
-};
 
 /** True when anything narrows the list — the empty/no-results distinction. */
 export function hasActiveFilters(filters: Filters): boolean {
@@ -69,7 +69,8 @@ export function hasActiveFilters(filters: Filters): boolean {
     filters.categoryId !== "" ||
     filters.relatedSystemId !== "" ||
     filters.requestedPriority !== "" ||
-    filters.currentStatus !== ""
+    filters.currentStatus !== "" ||
+    filters.group === "open"
   );
 }
 
@@ -81,40 +82,65 @@ function formatDate(iso: string): string {
   });
 }
 
-export function MyTickets({
-  onOpenTicket,
-  onCreateTicket,
-}: {
+export interface MyTicketsProps {
   onOpenTicket?: (ticket: TicketListItem) => void;
   onCreateTicket?: () => void;
-}) {
+  /**
+   * The address' query string, when the address is where the filters live (ui-spec §7). The
+   * screen reads its filters from it, and `onQueryChange` is how it writes them back. Without
+   * it the screen keeps the same string itself, as Lab 2's did.
+   */
+  query?: string;
+  onQueryChange?: (query: string) => void;
+}
 
-  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [page, setPage] = useState(1);
+export function MyTickets({ onOpenTicket, onCreateTicket, query, onQueryChange }: MyTicketsProps) {
+  // The filters are one string, the query, whether the address holds it or the screen does.
+  const [ownQuery, setOwnQuery] = useState("");
+  const queryString = query ?? ownQuery;
+  const state = useMemo(() => parseTicketListUrl(queryString), [queryString]);
+  const writeQuery = query !== undefined ? (onQueryChange ?? (() => undefined)) : setOwnQuery;
+  function commit(next: TicketListState) {
+    writeQuery(toTicketListUrl(next));
+  }
+  // The write for a typed search happens a moment later, so it has to be made from what the
+  // address says then, not from what it said when the person started typing: a filter chosen
+  // in between must not be undone by it.
+  const latest = useRef({ state, writeQuery });
+  latest.current = { state, writeQuery };
+
+  // The text in the search box is what the person has typed; the term in the address is what
+  // has been asked for, a moment after they stopped. The ref says which term this screen last
+  // wrote, so an address that changes for any other reason (Back, a link, Clear Filters) is
+  // the only change that replaces what is in the box, and a write that lands while the person
+  // is still typing never takes their next letters away.
+  const [searchText, setSearchText] = useState(state.search);
+  const written = useRef(state.search);
+  useEffect(() => {
+    if (state.search === written.current) return;
+    written.current = state.search;
+    setSearchText(state.search);
+  }, [state.search]);
+
+  // Typing should not fire a request per keystroke. Any change to what is being asked for
+  // returns to the first page, otherwise a narrowed result set can leave the user stranded on
+  // a page that no longer exists; the page resets in the same update as the question, so no
+  // request for the new question on the old page is ever sent.
+  useEffect(() => {
+    const term = searchText.trim();
+    if (term === state.search) return;
+    const timer = setTimeout(() => {
+      written.current = term;
+      latest.current.writeQuery(toTicketListUrl({ ...latest.current.state, search: term, page: 1 }));
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [searchText, state.search]);
 
   const [result, setResult] = useState<TicketListResponse | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [systems, setSystems] = useState<RelatedSystem[]>([]);
-
-  // Typing should not fire a request per keystroke. Any change to what is
-  // being asked for returns to the first page, otherwise a narrowed result set
-  // can leave the user stranded on a page that no longer exists; the page
-  // resets in the same update as the question, so no request for the new
-  // question on the old page is ever sent.
-  const appliedSearch = useRef("");
-  useEffect(() => {
-    const term = filters.search.trim();
-    const timer = setTimeout(() => {
-      if (term === appliedSearch.current) return;
-      appliedSearch.current = term;
-      setDebouncedSearch(term);
-      setPage(1);
-    }, SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [filters.search]);
 
   useEffect(() => {
     // Filter options come from the database like every other reference list.
@@ -131,34 +157,32 @@ export function MyTickets({
       });
   }, []);
 
-  const [sortBy, sortDir] = filters.sort.split(":") as [
-    TicketListParams["sortBy"],
-    TicketListParams["sortDir"],
-  ];
+  // What the controls show: the address' state, with the box showing what has been typed.
+  const filters: Filters = {
+    search: searchText,
+    categoryId: state.categoryId,
+    relatedSystemId: state.relatedSystemId,
+    requestedPriority: state.requestedPriority,
+    currentStatus: state.status,
+    group: state.group,
+    sort: `${state.sortBy}:${state.sortDir}`,
+    pageSize: state.pageSize,
+  };
 
   const params = useMemo<TicketListParams>(
     () => ({
-      search: debouncedSearch || undefined,
-      categoryId: filters.categoryId ? Number(filters.categoryId) : undefined,
-      relatedSystemId: filters.relatedSystemId ? Number(filters.relatedSystemId) : undefined,
-      requestedPriority: (filters.requestedPriority || undefined) as RequestedPriority | undefined,
-      currentStatus: (filters.currentStatus || undefined) as TicketStatus | undefined,
-      sortBy,
-      sortDir,
-      page,
-      pageSize: filters.pageSize,
+      search: state.search || undefined,
+      categoryId: state.categoryId ? Number(state.categoryId) : undefined,
+      relatedSystemId: state.relatedSystemId ? Number(state.relatedSystemId) : undefined,
+      requestedPriority: (state.requestedPriority || undefined) as RequestedPriority | undefined,
+      currentStatus: (state.status || undefined) as TicketStatus | undefined,
+      group: state.group || undefined,
+      sortBy: state.sortBy,
+      sortDir: state.sortDir,
+      page: state.page,
+      pageSize: state.pageSize,
     }),
-    [
-      debouncedSearch,
-      filters.categoryId,
-      filters.relatedSystemId,
-      filters.requestedPriority,
-      filters.currentStatus,
-      filters.pageSize,
-      sortBy,
-      sortDir,
-      page,
-    ],
+    [state],
   );
 
   // Only the latest request may set what is shown: an earlier one that
@@ -186,14 +210,39 @@ export function MyTickets({
   }, [load]);
 
   function update<K extends keyof Filters>(key: K, value: Filters[K]) {
-    setFilters((current) => ({ ...current, [key]: value }));
-    // Search returns to page 1 when its debounced term changes, above.
-    if (key !== "search") setPage(1);
+    // Search is written a moment after the typing stops, above.
+    if (key === "search") {
+      setSearchText(value as string);
+      return;
+    }
+    const next: TicketListState = { ...state, page: 1 };
+    if (key === "categoryId") next.categoryId = value as string;
+    if (key === "relatedSystemId") next.relatedSystemId = value as string;
+    if (key === "requestedPriority") next.requestedPriority = value as string;
+    if (key === "currentStatus") next.status = value as string;
+    if (key === "pageSize") next.pageSize = Number(value);
+    if (key === "sort") {
+      const [sortBy, sortDir] = (value as string).split(":");
+      next.sortBy = sortBy as TicketListState["sortBy"];
+      next.sortDir = sortDir as TicketListState["sortDir"];
+    }
+    commit(next);
+  }
+
+  function goToPage(page: number) {
+    commit({ ...state, page });
+  }
+
+  function removeGroup() {
+    commit({ ...state, group: "", page: 1 });
   }
 
   function clearFilters() {
-    setFilters(DEFAULT_FILTERS);
-    setPage(1);
+    // Everything, the sort and the page size included, as it always did; the box empties
+    // because the address no longer has a search term.
+    written.current = "";
+    setSearchText("");
+    writeQuery("");
   }
 
   const filtering = hasActiveFilters(filters);
@@ -280,6 +329,17 @@ export function MyTickets({
             </option>
           ))}
         </select>
+
+        {/* The open group is not one of the controls above, so it is shown as its own chip,
+            which removes itself (ui-spec §7). */}
+        {filters.group === "open" && (
+          <span className="tt-chip">
+            <span>Open tickets</span>
+            <button type="button" className="tt-chip__remove" aria-label="Remove the Open tickets filter" onClick={removeGroup}>
+              <span aria-hidden="true">✕</span>
+            </button>
+          </span>
+        )}
 
         {/* Only offered when something is actually narrowing the list. */}
         {filtering && (
@@ -389,7 +449,7 @@ export function MyTickets({
               <Button
                 variant="secondary"
                 disabled={!meta.hasPrev}
-                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                onClick={() => goToPage(Math.max(1, state.page - 1))}
               >
                 Previous
               </Button>
@@ -401,7 +461,7 @@ export function MyTickets({
               <Button
                 variant="secondary"
                 disabled={!meta.hasNext}
-                onClick={() => setPage((current) => current + 1)}
+                onClick={() => goToPage(state.page + 1)}
               >
                 Next
               </Button>
@@ -431,3 +491,20 @@ export function MyTickets({
 }
 
 export default MyTickets;
+
+/**
+ * My Tickets as the route mounts it: the filters are the address' query string, and a change
+ * replaces the address instead of adding to the history, so Back still leaves the page rather
+ * than stepping through each filter the person tried.
+ */
+export function MyTicketsWithUrl(props: Pick<MyTicketsProps, "onOpenTicket" | "onCreateTicket">) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  return (
+    <MyTickets
+      {...props}
+      query={location.search}
+      onQueryChange={(query) => navigate({ pathname: location.pathname, search: query ? `?${query}` : "" }, { replace: true })}
+    />
+  );
+}

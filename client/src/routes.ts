@@ -2,6 +2,8 @@
 // shell having to import from the app root (which imports the shell).
 
 export const ROUTES = {
+  // Lab 4: the first item of every role's navigation (Issue 7 for the Requester).
+  dashboard: "/dashboard",
   list: "/tickets",
   create: "/tickets/new",
   detail: (id: number | string) => `/tickets/${id}`,

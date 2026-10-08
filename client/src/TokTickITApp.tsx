@@ -15,7 +15,8 @@ import { RequesterProvider } from "./context/RequesterContext.js";
 import { Login } from "./screens/Login.js";
 import { ChangePassword } from "./screens/ChangePassword.js";
 import { CreateTicket } from "./screens/CreateTicket.js";
-import { MyTickets } from "./screens/MyTickets.js";
+import { RequesterDashboard } from "./screens/RequesterDashboard.js";
+import { MyTicketsWithUrl } from "./screens/MyTickets.js";
 import { RequesterTicketDetail } from "./screens/RequesterTicketDetail.js";
 import { StaffTicketQueue } from "./screens/StaffTicketQueue.js";
 import { StaffTicketDetail } from "./screens/StaffTicketDetail.js";
@@ -30,6 +31,7 @@ export { ROUTES };
 //
 //   /login              Login, outside the shell
 //   /change-password    mandatory (no shell) or voluntary (in the shell)
+//   /dashboard          Requester (Lab 4, Issue 7)
 //   /tickets, /tickets/new, /tickets/:id    Requester
 //   /queue, /queue/:id  IT Staff and Administrator
 //   /users              Administrator
@@ -43,6 +45,8 @@ export { ROUTES };
 // when it belongs to the role that signed in. The queue is shared by IT Staff
 // and Administrators (Lab 4 D-08); every other page has one owner.
 function rolesForPath(path: string): Role[] {
+  // Lab 4, Issue 7: the Dashboard is the Requester's until Issue 8 gives the others theirs.
+  if (path.startsWith(ROUTES.dashboard)) return ["REQUESTER"];
   if (path.startsWith(ROUTES.list)) return ["REQUESTER"];
   if (path.startsWith(ROUTES.queue)) return ["IT_STAFF", "ADMINISTRATOR"];
   if (path.startsWith(ROUTES.users)) return ["ADMINISTRATOR"];
@@ -170,11 +174,21 @@ function CatchAll() {
   return <Navigate to={user ? LANDING[user.role] : ROUTES.login} replace />;
 }
 
+function DashboardRoute() {
+  const { user } = useAuth();
+  if (!user) return null;
+  return (
+    <Page>
+      <RequesterDashboard fullName={user.fullName} />
+    </Page>
+  );
+}
+
 function MyTicketsRoute() {
   const navigate = useNavigate();
   return (
     <Page>
-      <MyTickets onOpenTicket={(ticket) => navigate(ROUTES.detail(ticket.id))} onCreateTicket={() => navigate(ROUTES.create)} />
+      <MyTicketsWithUrl onOpenTicket={(ticket) => navigate(ROUTES.detail(ticket.id))} onCreateTicket={() => navigate(ROUTES.create)} />
     </Page>
   );
 }
@@ -251,6 +265,7 @@ function AppRoutes() {
       <Route path={ROUTES.login} element={<LoginRoute />} />
       <Route path={ROUTES.password} element={<PasswordRoute />} />
 
+      <Route path={ROUTES.dashboard} element={<RequesterRoute><DashboardRoute /></RequesterRoute>} />
       <Route path={ROUTES.list} element={<RequesterRoute><MyTicketsRoute /></RequesterRoute>} />
       <Route path={ROUTES.create} element={<RequesterRoute><CreateTicketRoute /></RequesterRoute>} />
       <Route path="/tickets/:id" element={<RequesterRoute><TicketDetailRoute /></RequesterRoute>} />

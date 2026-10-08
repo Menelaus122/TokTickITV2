@@ -901,3 +901,156 @@ html, body { overflow-x: hidden; }
 .tt-staff-detail__blocked ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--tt-space-2); }
 .tt-staff-detail__blocked li { overflow-wrap: anywhere; }
 .tt-staff-detail__group .tt-staff-detail__blocked .tt-btn { margin-bottom: 0; }
+
+/* --- Lab 4: Metric card and Requester Dashboard (ui-spec §1.1, §3.1, §3.6) -----
+   A card that is also a link, built from Lab 2's card so it adds no colour. The three
+   sizes are the ones the specification gives: the label 12 px, the value 32 px, and
+   the link text 14 px, which is the label size. Lab 2 already draws 12 px (the badge) and
+   32 px (the empty-state icon) as literals, so these are not new sizes; the card names
+   them, so every font size in the stylesheet is still a variable. */
+
+.tt-metric {
+  --tt-font-caption: 12px;
+  --tt-font-metric: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tt-space-2);
+  padding: var(--tt-space-4) var(--tt-space-6);
+  background: var(--tt-surface);
+  border: 1px solid var(--tt-border);
+  border-radius: var(--tt-radius);
+  box-shadow: var(--tt-shadow-card);
+  color: var(--tt-text);
+  text-decoration: none;
+}
+.tt-metric__label { font-size: var(--tt-font-caption); font-weight: 600; text-transform: uppercase; color: var(--tt-text-muted); overflow-wrap: anywhere; }
+.tt-metric__value { font-size: var(--tt-font-metric); line-height: 1.1; font-weight: 600; color: var(--tt-green-primary); }
+.tt-metric__link { font-size: var(--tt-font-label); color: var(--tt-green-primary); }
+
+.tt-metric--link:hover { border-color: var(--tt-green-primary); background: var(--tt-green-pale); }
+.tt-metric--link:hover .tt-metric__link { text-decoration: underline; }
+.tt-metric--link:active { background: var(--tt-green-pale); }
+.tt-metric--link:focus-visible {
+  outline: 2px solid var(--tt-green-secondary);
+  outline-offset: 2px;
+}
+
+.tt-dash__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tt-space-4);
+  margin-bottom: var(--tt-space-6);
+}
+.tt-dash__head .tt-h1 { margin: 0; }
+
+.tt-dash__cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--tt-space-4);
+  margin-bottom: var(--tt-space-6);
+}
+
+.tt-dash__list-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--tt-space-4);
+  margin-bottom: var(--tt-space-3);
+}
+.tt-dash__list-head .tt-h2 { margin: 0; }
+.tt-dash__view-all { font-size: var(--tt-font-label); font-weight: 600; color: var(--tt-green-primary); text-decoration: none; white-space: nowrap; }
+.tt-dash__view-all:hover { text-decoration: underline; }
+.tt-dash__view-all:focus-visible {
+  outline: 2px solid var(--tt-green-secondary);
+  outline-offset: 2px;
+}
+
+.tt-dash__list > .tt-muted { margin: 0; }
+.tt-dash__rows { list-style: none; margin: 0; padding: 0; }
+.tt-dash-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--tt-space-3);
+  padding: var(--tt-space-3) var(--tt-space-2);
+  border-top: 1px solid var(--tt-border);
+  color: var(--tt-text);
+  text-decoration: none;
+}
+.tt-dash__rows li:first-child .tt-dash-row { border-top: 0; }
+.tt-dash-row:hover { background: var(--tt-green-pale); }
+.tt-dash-row:focus-visible {
+  outline: 2px solid var(--tt-green-secondary);
+  outline-offset: 2px;
+}
+.tt-dash-row__number { font-family: var(--bs-font-monospace, monospace); font-weight: 600; color: var(--tt-green-primary); white-space: nowrap; }
+.tt-dash-row__summary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt-dash-row time { font-size: var(--tt-font-help); color: var(--tt-text-muted); white-space: nowrap; }
+
+.tt-dash__empty { display: flex; align-items: center; flex-wrap: wrap; gap: var(--tt-space-4); }
+.tt-dash__empty p { margin: 0; }
+
+.tt-dash__buttons { display: flex; flex-wrap: wrap; gap: var(--tt-space-3); }
+a.tt-btn { text-decoration: none; }
+
+.tt-skeleton--card { height: 112px; margin: 0; }
+.tt-skeleton--list { height: 148px; margin-bottom: var(--tt-space-6); }
+
+@media (max-width: 991px) {
+  .tt-dash__cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 767px) {
+  .tt-dash__head { flex-direction: column; align-items: flex-start; }
+  .tt-dash__cards { grid-template-columns: 1fr; }
+  .tt-dash-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .tt-dash-row__summary { grid-column: 1 / -1; order: 3; }
+  .tt-dash-row time { grid-column: 1 / -1; order: 4; }
+  .tt-dash__buttons { flex-direction: column; }
+  .tt-dash__buttons .tt-btn { width: 100%; }
+}
+
+/* --- Lab 4: Filter chip (ui-spec §7) -------------------------------------------
+   The group filter on My Tickets, shown beside the other filters so the list's scope
+   is visible, with a cross that removes it. Lab 2's green badge colours, no new ones. */
+
+.tt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tt-space-1);
+  padding: 2px var(--tt-space-2) 2px var(--tt-space-3);
+  border: 1px solid var(--tt-green-secondary);
+  border-radius: 999px;
+  background: var(--tt-green-pale);
+  color: var(--tt-green-primary);
+  font-size: var(--tt-font-label);
+  font-weight: 600;
+}
+.tt-chip__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.tt-chip__remove:hover { background: var(--tt-surface); }
+.tt-chip__remove:focus-visible {
+  outline: 2px solid var(--tt-green-secondary);
+  outline-offset: 2px;
+}
+
+@media (max-width: 767px) {
+  /* Lab 2 gives the search box `flex: 1 1 240px`, a width in a row. In the column the toolbar
+     becomes on a phone it is a height, and the box was 240 px tall. */
+  .tt-toolbar input[type="search"] { flex: 0 0 auto; }
+  .tt-chip { align-self: flex-start; }
+  .tt-chip__remove { min-width: 44px; min-height: 44px; }
+}

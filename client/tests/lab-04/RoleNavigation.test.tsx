@@ -12,9 +12,10 @@ import type { AuthUser, Role, StaffTicketDetail as Detail } from "../../src/api.
 // as a person in each role would meet them. The API client is the system
 // boundary, so it is the only thing mocked.
 //
-// UI-27's "lands on their Dashboard" and the Dashboard navigation item arrive
-// with Issues 7 and 8 (UI-37); until then a role bounced from a page lands on
-// its own Lab 3 home. UI-28's Actions Taken controls arrived with Issue 5.
+// UI-27's "lands on their Dashboard" and the Dashboard navigation item (UI-37) arrived for
+// the Requester with Issue 7; IT Staff and Administrators get theirs with Issue 8, so until
+// then a staff role bounced from a page lands on its own Lab 3 home. UI-28's Actions Taken
+// controls arrived with Issue 5.
 
 const USERS: Record<Role, AuthUser> = {
   REQUESTER: { id: 1, fullName: "Anucha Wongsawat", email: "anucha.wong@kmutt.ac.th", role: "REQUESTER", isActive: true, mustChangePassword: false },
@@ -47,7 +48,21 @@ function detail(overrides: Partial<Detail> = {}): Detail {
   };
 }
 
+const BOARD: api.RequesterDashboard = {
+  generatedAt: "2026-10-05T09:00:00.000Z",
+  metrics: {
+    openTickets: { value: 3, href: "/tickets?group=open" },
+    waitingForYou: { value: 1, href: "/tickets?status=WAITING_FOR_REQUESTER" },
+    resolved: { value: 5, href: "/tickets?status=RESOLVED" },
+    closed: { value: 12, href: "/tickets?status=CLOSED" },
+  },
+  needsAttention: [],
+  recentTickets: [],
+};
+
 beforeEach(() => {
+  // Lab 4, Issue 7: a Requester lands on the Dashboard, so every Requester sign-in asks for it.
+  vi.spyOn(api, "fetchRequesterDashboard").mockResolvedValue(BOARD);
   vi.spyOn(api, "fetchMyTickets").mockResolvedValue({
     data: [], meta: { page: 1, pageSize: 10, totalItems: 0, totalPages: 0, hasPrev: false, hasNext: false },
   });
@@ -124,9 +139,9 @@ describe("UI-27 an Administrator works from the Ticket Queue (FR-23, FR-24, D-08
   // screen would have made]. The last column is never the home screen's own
   // request: IT Staff are sent to the queue, so their row names a different one.
   it.each([
-    ["REQUESTER", "/queue", "My Tickets", "fetchQueue"],
-    ["REQUESTER", "/queue/12", "My Tickets", "fetchStaffTicket"],
-    ["REQUESTER", "/users", "My Tickets", "fetchUsers"],
+    ["REQUESTER", "/queue", "Dashboard", "fetchQueue"],
+    ["REQUESTER", "/queue/12", "Dashboard", "fetchStaffTicket"],
+    ["REQUESTER", "/users", "Dashboard", "fetchUsers"],
     ["IT_STAFF", "/users", "Ticket Queue", "fetchUsers"],
     ["IT_STAFF", "/tickets", "Ticket Queue", "fetchMyTickets"],
     ["ADMINISTRATOR", "/tickets/new", "User Management", "fetchCategories"],
@@ -293,5 +308,120 @@ describe("UI-28 an Administrator on the ticket detail acts as themself (BR-45)",
       expect(change).toHaveBeenCalledWith(12, 31, 1, expect.objectContaining({ result: "Test page printed cleanly; toner at 100%." }));
       expect(actions.getByText("Nattapong Saelim")).toBeInTheDocument();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Lab 4, Issue 7 — UI-37 (the Requester's part) and the Requester's half of UI-27
+// ---------------------------------------------------------------------------------------------
+
+describe("UI-37 the Requester's navigation starts with Dashboard, and Dashboard is where they land (AC-34, FR-22, D-09)", () => {
+  const nav = () => within(screen.getByRole("navigation", { name: "Main" }));
+
+  it("offers Dashboard, My Tickets, and Create Ticket, in that order", async () => {
+    signedInAs("REQUESTER");
+    render(<TokTickITApp initialEntries={["/tickets"]} />);
+
+    await screen.findByRole("navigation", { name: "Main" });
+    expect(nav().getAllByRole("link").map((link) => link.textContent)).toEqual(["Dashboard", "My Tickets", "Create Ticket"]);
+  });
+
+  it("marks Dashboard as the current page on /dashboard, and nothing else", async () => {
+    signedInAs("REQUESTER");
+    render(<TokTickITApp initialEntries={["/dashboard"]} />);
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Welcome, Anucha" })).toBeInTheDocument();
+    expect(nav().getByRole("link", { name: "Dashboard" })).toHaveAttribute("aria-current", "page");
+    expect(nav().getByRole("link", { name: "My Tickets" })).not.toHaveAttribute("aria-current");
+    expect(nav().getByRole("link", { name: "Create Ticket" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("does not mark Dashboard as current on My Tickets, where My Tickets is", async () => {
+    signedInAs("REQUESTER");
+    render(<TokTickITApp initialEntries={["/tickets"]} />);
+
+    await screen.findByRole("heading", { name: "My Tickets" });
+    expect(nav().getByRole("link", { name: "My Tickets" })).toHaveAttribute("aria-current", "page");
+    expect(nav().getByRole("link", { name: "Dashboard" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("lands on the Dashboard after signing in, and never asks for My Tickets", async () => {
+    vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(null);
+    vi.spyOn(api, "login").mockResolvedValue(USERS.REQUESTER);
+    render(<TokTickITApp initialEntries={["/login"]} />);
+
+    await userEvent.type(await screen.findByLabelText(/^Email/), USERS.REQUESTER.email);
+    await userEvent.type(screen.getByLabelText(/^Password/), "Toktickit#2026");
+    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Welcome, Anucha" })).toBeInTheDocument();
+    expect(nav().getByRole("link", { name: "Dashboard" })).toHaveAttribute("aria-current", "page");
+    expect(api.fetchMyTickets).not.toHaveBeenCalled();
+  });
+
+  it("lands on the Dashboard when they open the application at its root, or at a page that does not exist", async () => {
+    for (const path of ["/", "/nonsense"]) {
+      signedInAs("REQUESTER");
+      const { unmount } = render(<TokTickITApp initialEntries={[path]} />);
+      expect(await screen.findByRole("heading", { level: 1, name: "Welcome, Anucha" }), path).toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it("links the wordmark to the Dashboard from any page", async () => {
+    signedInAs("REQUESTER");
+    render(<TokTickITApp initialEntries={["/tickets/new"]} />);
+
+    expect(await screen.findByRole("link", { name: "TokTickIT" })).toHaveAttribute("href", "/dashboard");
+  });
+
+  it("still takes a Requester back to the page they asked for, when it is theirs, instead of the Dashboard", async () => {
+    vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(null);
+    vi.spyOn(api, "login").mockResolvedValue(USERS.REQUESTER);
+    render(<TokTickITApp initialEntries={["/tickets/new"]} />);
+
+    await userEvent.type(await screen.findByLabelText(/^Email/), USERS.REQUESTER.email);
+    await userEvent.type(screen.getByLabelText(/^Password/), "Toktickit#2026");
+    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(await screen.findByLabelText(/^Ticket Summary/)).toBeInTheDocument();
+    expect(api.fetchRequesterDashboard).not.toHaveBeenCalled();
+  });
+
+  it("is a Requester's page only: IT Staff and an Administrator typing /dashboard are sent to their own home with the notice, and nothing breaks", async () => {
+    for (const [role, home] of [["IT_STAFF", "Ticket Queue"], ["ADMINISTRATOR", "User Management"]] as const) {
+      signedInAs(role);
+      const { unmount } = render(<TokTickITApp initialEntries={["/dashboard"]} />);
+      expect(await screen.findByText(FORBIDDEN), role).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: home }), role).toHaveAttribute("aria-current", "page");
+      expect(api.fetchRequesterDashboard, role).not.toHaveBeenCalled();
+      unmount();
+    }
+  });
+
+  it("takes IT Staff who were sent away from /dashboard to their own home on sign-in, without the 'no access' notice", async () => {
+    vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(null);
+    vi.spyOn(api, "login").mockResolvedValue(USERS.IT_STAFF);
+    render(<TokTickITApp initialEntries={["/dashboard"]} />);
+
+    await userEvent.type(await screen.findByLabelText(/^Email/), USERS.IT_STAFF.email);
+    await userEvent.type(screen.getByLabelText(/^Password/), "Toktickit#2026");
+    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(await screen.findByRole("heading", { name: "Ticket Queue" })).toBeInTheDocument();
+    expect(screen.queryByText(FORBIDDEN)).not.toBeInTheDocument();
+  });
+
+  it("keeps the other roles' navigation as Lab 3 and Issue 2 left it, until Issue 8 gives them a Dashboard", async () => {
+    signedInAs("IT_STAFF");
+    const { unmount } = render(<TokTickITApp initialEntries={["/queue"]} />);
+    await screen.findByRole("heading", { name: "Ticket Queue" });
+    expect(nav().getAllByRole("link").map((link) => link.textContent)).toEqual(["Ticket Queue"]);
+    unmount();
+
+    signedInAs("ADMINISTRATOR");
+    render(<TokTickITApp initialEntries={["/users"]} />);
+    await screen.findByRole("link", { name: "User Management" });
+    expect(nav().getAllByRole("link").map((link) => link.textContent)).toEqual(["Ticket Queue", "User Management"]);
   });
 });
