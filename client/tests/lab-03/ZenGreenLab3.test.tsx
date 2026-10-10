@@ -132,7 +132,7 @@ describe("STYLE-02 badges carry text, not colour alone (AC-39)", () => {
         <UserStatusBadge active />
         <UserStatusBadge active={false} />
         <OwnerPresentation owner={null} />
-        <OwnerPresentation owner={{ id: 4, fullName: "Prasert Chaiyo", isActive: false }} />
+        <OwnerPresentation owner={{ id: 4, fullName: "Prasert Chaiyo", role: "IT_STAFF", isActive: false }} />
       </div>,
     );
     // The words themselves, written out here rather than read from the label

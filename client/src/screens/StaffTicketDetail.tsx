@@ -25,9 +25,12 @@ import {
   AttachmentSection,
   Button,
   EmptyState,
+  ErrorCallout,
   ErrorState,
+  ForbiddenState,
   LoadingState,
   OwnerPresentation,
+  ownerProblem,
   PriorityBadge,
   ReadOnlyField,
   RoleBadge,
@@ -103,6 +106,8 @@ export function StaffTicketDetail({ ticketId, currentUserId, currentUser, onBack
   /** Changes when the ticket has changed status, so the timeline is read again without a reload (FR-14). */
   const [historyToken, setHistoryToken] = useState(0);
   const ownerRef = useRef<HTMLDivElement>(null);
+  /** Set the instant an operation starts, so a second submission in the same breath finds it taken (BR-53). */
+  const inFlight = useRef(false);
 
   const [comments, setComments] = useState<ThreadEntry[]>([]);
   const [commentsState, setCommentsState] = useState<"loading" | "ready" | "error">("loading");
@@ -178,9 +183,15 @@ export function StaffTicketDetail({ ticketId, currentUserId, currentUser, onBack
    * Runs one operation: busy while in flight, then success or a safe failure. A stale save
    * (409 STALE_UPDATE) keeps the form as it is and offers to show the ticket as it is now, so
    * nothing the person typed is lost (BR-26, BR-54). Any other conflict means the ticket changed
-   * under us, so it is reloaded and the screen shows what is true now beside the explanation.
+   * under us, so it is reloaded and the screen shows what is true now beside the explanation, with
+   * the reason they typed, and the move they chose if the ticket still offers it (BR-54).
+   *
+   * One operation runs at a time (BR-53). A button disables itself while one is in flight, but a form
+   * can be submitted without its button, so the guard is here, taken before the first await.
    */
   async function run(action: Exclude<Busy, null>, request: () => Promise<Detail>, success: (next: Detail) => string) {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(action);
     setFeedback(null);
     try {
@@ -204,12 +215,13 @@ export function StaffTicketDetail({ ticketId, currentUserId, currentUser, onBack
       });
       if (error instanceof ApiError && error.status === 409) {
         try {
-          show(await fetchStaffTicket(ticketId), gate);
+          show(await fetchStaffTicket(ticketId), true);
         } catch {
           // The explanation above still stands; the next action reloads.
         }
       }
     } finally {
+      inFlight.current = false;
       setBusy(null);
     }
   }
@@ -260,7 +272,7 @@ export function StaffTicketDetail({ ticketId, currentUserId, currentUser, onBack
     );
   }
   if (state === "forbidden") {
-    return <ErrorState message="You do not have permission to open this ticket. Only IT Staff can." />;
+    return <ForbiddenState what="this ticket" hint="Only IT Staff and Administrators can open it." />;
   }
   if (state === "error" || !ticket) {
     return <ErrorState message="Cannot load this ticket. Make sure the TokTickIT API is running, then try again." onRetry={load} />;
@@ -278,12 +290,13 @@ export function StaffTicketDetail({ ticketId, currentUserId, currentUser, onBack
   const working = busy !== null;
 
   // The owner picker: active IT Staff and Administrators, plus the current
-  // owner even when inactive, so the select can show who holds the ticket.
+  // owner even when they are not assignable, so the select can show who holds the
+  // ticket, and say whether the account is deactivated or no longer IT Staff (BR-55).
   const ownerOptions = [
     { value: "", label: unassigned ? "Choose an owner" : "Unassign (no owner)" },
     ...staff.map((user) => ({ value: String(user.id), label: `${user.fullName}${user.role === "ADMINISTRATOR" ? " (Administrator)" : ""}` })),
     ...(current.owner && !staff.some((user) => user.id === current.owner!.id)
-      ? [{ value: String(current.owner.id), label: `${current.owner.fullName} (inactive)` }]
+      ? [{ value: String(current.owner.id), label: `${current.owner.fullName} (${ownerProblem(current.owner) === "not-staff" ? "no longer IT Staff" : "inactive"})` }]
       : []),
   ];
 
@@ -386,12 +399,7 @@ export function StaffTicketDetail({ ticketId, currentUserId, currentUser, onBack
           </div>
 
           {feedback?.tone === "success" && <SuccessCallout>{feedback.message}</SuccessCallout>}
-          {feedback?.tone === "error" && (
-            <div className="tt-callout tt-callout--error" role="alert" data-state="error">
-              <span aria-hidden="true">!</span>
-              <div>{feedback.message}</div>
-            </div>
-          )}
+          {feedback?.tone === "error" && <ErrorCallout>{feedback.message}</ErrorCallout>}
           {feedback?.tone === "gate" && (
             <WarningCallout role="alert">
               <p>{feedback.message}</p>

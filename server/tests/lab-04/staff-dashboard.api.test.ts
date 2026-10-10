@@ -50,7 +50,7 @@ interface Row {
   currentStatus: string;
   updatedAt: string;
   itPriority: string;
-  owner: { id: number; fullName: string; isActive: boolean } | null;
+  owner: { id: number; fullName: string; role: string; isActive: boolean } | null;
 }
 interface ActionRow {
   id: number;
@@ -473,7 +473,7 @@ describe("DASH-14 the three lists are bounded, ordered as the specification says
     const res = await board(me.cookie);
     for (const row of [...res.body.myTickets, ...res.body.urgentTickets] as Row[]) {
       expect(Object.keys(row).sort()).toEqual(["currentStatus", "id", "itPriority", "owner", "summary", "ticketNumber", "updatedAt"]);
-      if (row.owner) expect(Object.keys(row.owner).sort()).toEqual(["fullName", "id", "isActive"]);
+      if (row.owner) expect(Object.keys(row.owner).sort()).toEqual(["fullName", "id", "isActive", "role"]);
     }
     expect(res.body.urgentTickets.some((t: Row) => t.owner === null)).toBe(true);
     expect(res.body.urgentTickets.some((t: Row) => t.owner !== null)).toBe(true);
@@ -492,7 +492,7 @@ describe("DASH-14 the three lists are bounded, ordered as the specification says
     const id = await makeTicket({ ownerId: gone.id, itPriority: "URGENT", createdAt: new Date("2000-06-01T00:00:00.000Z") });
     const res = await board(me.cookie);
     const row = (res.body.urgentTickets as Row[]).find((t) => t.id === id)!;
-    expect(row.owner).toEqual({ id: gone.id, fullName: "Staff dashboard suite gone", isActive: false });
+    expect(row.owner).toEqual({ id: gone.id, fullName: "Staff dashboard suite gone", role: "IT_STAFF", isActive: false });
   });
 });
 

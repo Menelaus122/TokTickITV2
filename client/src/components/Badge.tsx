@@ -128,12 +128,25 @@ export function UserStatusBadge({ active }: { active: boolean }) {
 export interface OwnerValue {
   id: number;
   fullName: string;
+  /** Lab 4 (BR-55): beside isActive, what tells "Inactive" from "No longer IT Staff". */
+  role: RoleValue;
   isActive: boolean;
 }
 
+/**
+ * What is wrong with an owner, if anything (Lab 4 BR-55, ui-spec §1.6): `inactive` when the account is
+ * deactivated, which is the stronger fact and so wins, and `not-staff` when it is active but its role
+ * was changed to Requester after the ticket was assigned. An owner who is still assignable has neither.
+ */
+export function ownerProblem(owner: Pick<OwnerValue, "role" | "isActive">): "inactive" | "not-staff" | null {
+  if (!owner.isActive) return "inactive";
+  return owner.role === "REQUESTER" ? "not-staff" : null;
+}
+
 // Never an empty cell: an unassigned ticket says so in words (FR-28). A
-// deactivated owner keeps their name, marked Inactive (BR-26), and the signed-in
-// IT Staff member's own tickets carry a "You" pill.
+// deactivated owner keeps their name, marked Inactive (BR-26), an active one who
+// is no longer IT Staff is marked so (BR-55), and the signed-in IT Staff
+// member's own tickets carry a "You" pill.
 export function OwnerPresentation({ owner, currentUserId }: { owner: OwnerValue | null; currentUserId?: number }) {
   if (!owner) {
     return (
@@ -145,7 +158,8 @@ export function OwnerPresentation({ owner, currentUserId }: { owner: OwnerValue 
   return (
     <span className="tt-owner" data-owner={owner.id}>
       {owner.fullName}
-      {!owner.isActive && <BadgeBase kind="owner-inactive" tone="neutral" text="Inactive" />}
+      {ownerProblem(owner) === "inactive" && <BadgeBase kind="owner-inactive" tone="neutral" text="Inactive" />}
+      {ownerProblem(owner) === "not-staff" && <BadgeBase kind="owner-not-staff" tone="neutral" text="No longer IT Staff" />}
       {owner.id === currentUserId && <BadgeBase kind="owner-you" tone="green" text="You" />}
     </span>
   );

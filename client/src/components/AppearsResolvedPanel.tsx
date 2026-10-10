@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { APPEARS_RESOLVED_MIN, ApiError, COMMENT_MAX } from "../api.js";
 import { Button } from "./Button.js";
 import { TextArea } from "./Inputs.js";
+import { SuccessCallout } from "./States.js";
 
 // Lab 3, Issue 7 — "Problem Appears Resolved" (ui-spec §5.1; BR-05, BR-29,
 // BR-30).
@@ -65,23 +66,20 @@ export function AppearsResolvedPanel({ resolvedAt, onMark, onUndo }: AppearsReso
   return (
     <section className="tt-card tt-resolved" aria-label="Problem Appears Resolved" data-testid="appears-resolved">
       {resolvedAt ? (
-        <div className="tt-callout tt-callout--success" role="status" data-state="appears-resolved">
-          <span aria-hidden="true">✓</span>
+        <SuccessCallout>
+          You marked this as appearing resolved on{" "}
+          {new Date(resolvedAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}.
           <div>
-            You marked this as appearing resolved on{" "}
-            {new Date(resolvedAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}.
-            <div>
-              <Button variant="tertiary" onClick={() => void undo()} busy={busy} busyLabel="Undoing…">
-                Undo
-              </Button>
-            </div>
-            {error && (
-              <p className="tt-field__error" role="alert">
-                {error}
-              </p>
-            )}
+            <Button variant="tertiary" onClick={() => void undo()} busy={busy} busyLabel="Undoing…">
+              Undo
+            </Button>
           </div>
-        </div>
+          {error && (
+            <p className="tt-field__error" role="alert">
+              {error}
+            </p>
+          )}
+        </SuccessCallout>
       ) : (
         <form onSubmit={mark} noValidate>
           <h2 className="tt-h2">Does this look resolved to you?</h2>

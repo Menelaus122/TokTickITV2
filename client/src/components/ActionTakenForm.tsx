@@ -3,7 +3,7 @@ import { ACTION_LIMITS, ApiError, type ActionTaken, type Role } from "../api.js"
 import { RoleBadge } from "./Badge.js";
 import { Button } from "./Button.js";
 import { ReadOnlyField, TextArea, TextInput } from "./Inputs.js";
-import { WarningCallout } from "./States.js";
+import { ErrorCallout, WarningCallout } from "./States.js";
 
 // Lab 4, Issue 5 — the form for recording and for editing one Action Taken
 // (ui-spec §4.2, §4.3). Both modes are the same form, so a field cannot behave
@@ -212,10 +212,7 @@ export function ActionTakenForm({ mode, initial, performer, ticketCreatedAt, onS
             )}
           </WarningCallout>
         ) : (
-          <div className="tt-callout tt-callout--error" role="alert" data-state="error">
-            <span aria-hidden="true">!</span>
-            <div>{problem.message}</div>
-          </div>
+          <ErrorCallout>{problem.message}</ErrorCallout>
         ))}
 
       <TextInput

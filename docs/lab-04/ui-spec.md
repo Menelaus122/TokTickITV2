@@ -549,6 +549,17 @@ again**, the forbidden callout, the §1.5 warning callout for a conflict, and th
 success status message. A conflict is never shown as a generic failure, and no raw
 error detail — a code, a stack, SQL — is ever shown (AC-28).
 
+The shared components are in `States.tsx`, and no screen draws a callout of its own (UI-32 checks the
+source for one). Two were added in Issue 9 for what the screens had each been drawing by hand:
+
+* **Forbidden** (`ForbiddenState`) reads "You do not have access to *what*." with an optional second
+  line saying who can, for example "Only an Administrator can open it." It is not an outage, so it has
+  no "Something went wrong" title and no **Try again**. The Dashboards, the Ticket Queue, the IT Staff
+  Ticket Detail, User Management, the Actions Taken region, and a page the router refuses all use it.
+* **Error callout** (`ErrorCallout`) is the Error callout's frame with the message and nothing else,
+  for a failure the person can put right where they are: a wrong password, a refused save, a removal
+  that failed. The title and **Try again** belong to a region that could not load (`ErrorState`).
+
 ---
 
 ## 9. Accessibility
@@ -573,6 +584,12 @@ Lab 2's and Lab 3's rules carry over in full (labsheet §8.6). Lab 4 adds:
 * No dialog is introduced. The only confirmation — discarding edits in **Show
   latest** — is an inline confirm that does not trap focus, closes with Escape, and
   returns focus to its trigger.
+* The two dialogs of Labs 2 and 3 — removing an attachment, and the Create and Edit user panel — are
+  modal, and follow one set of keyboard rules (`useModal`; UI-35): focus moves into the dialog when it
+  opens; Tab and Shift+Tab go round inside it and never out to the page behind it; Escape closes it,
+  except while a request is in flight; and focus returns to the control that opened it, or to the
+  nearest control that is still on the page. The removal dialog stays open after a failure, with the
+  reason the person typed and the message inside it, so a retry is one press (BR-54).
 * Status, priority, role, and follow-up are never colour-only: each has a text
   label (FR-31).
 * Every control, including each metric card, shows a visible focus outline and is

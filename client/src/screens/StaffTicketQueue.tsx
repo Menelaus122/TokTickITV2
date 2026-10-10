@@ -19,6 +19,7 @@ import {
   Card,
   EmptyState,
   ErrorState,
+  ForbiddenState,
   LoadingState,
   NoResultsState,
   OwnerPresentation,
@@ -388,12 +389,7 @@ export function StaffTicketQueue({ currentUserId, query, onQueryChange }: StaffT
 
       {loadState === "loading" && <LoadingState rows={5} label="Loading the ticket queue…" />}
 
-      {loadState === "forbidden" && (
-        <div className="tt-callout tt-callout--error" role="alert" data-state="forbidden">
-          <span aria-hidden="true">⚠</span>
-          <div>You do not have access to the ticket queue.</div>
-        </div>
-      )}
+      {loadState === "forbidden" && <ForbiddenState what="the ticket queue" />}
 
       {loadState === "error" && (
         <ErrorState message="Cannot load the ticket queue. Make sure the TokTickIT API is running, then try again." onRetry={load} />

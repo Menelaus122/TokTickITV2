@@ -1,6 +1,9 @@
 import { ReactNode } from "react";
 
-// The five shared states every data-driven region must define (ui-spec.md 6).
+// The shared states every data-driven region must define (ui-spec.md 6, Lab 4 §8): loading, empty,
+// no results, error, forbidden, success, and the warning a conflict uses. Every screen draws a state
+// with the component here and with no markup of its own (Lab 4 FR-26, AC-28), so the same state looks,
+// reads, and is announced the same way on every screen.
 //
 // Empty and NoResults are separate components on purpose. They are different
 // situations with different copy and different actions (BR-44): "you have
@@ -98,6 +101,37 @@ export function ErrorState({ message, onRetry, retryLabel = "Try again" }: Error
             {retryLabel}
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+// --- Error callout ---------------------------------------------------------
+
+// The Error callout's frame with the message and nothing else: a failure the person can put right
+// where they are (a wrong password, a refused save), where "Something went wrong" would say less
+// than the message does. ErrorState is the same frame with a title and Try again, for a region
+// that could not load. As there, the message must already be safe.
+export function ErrorCallout({ children, state = "error", className }: { children: ReactNode; state?: "error" | "refused"; className?: string }) {
+  return (
+    <div className={`tt-callout tt-callout--error${className ? ` ${className}` : ""}`} role="alert" data-state={state}>
+      <span aria-hidden="true">⚠</span>
+      <div>{children}</div>
+    </div>
+  );
+}
+
+// --- Forbidden -------------------------------------------------------------
+
+// The server (or the router) said this role may not have this. One wording for every screen:
+// "You do not have access to <what>.", with an optional second line saying who can (Lab 4 AC-28).
+export function ForbiddenState({ what, hint }: { what: string; hint?: string }) {
+  return (
+    <div className="tt-callout tt-callout--error" role="alert" data-state="forbidden">
+      <span aria-hidden="true">⚠</span>
+      <div>
+        <p>You do not have access to {what}.</p>
+        {hint && <p>{hint}</p>}
       </div>
     </div>
   );

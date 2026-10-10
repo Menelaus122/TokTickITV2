@@ -4,6 +4,8 @@
 // authority (BR-29). Everything here is pure so it can be unit-tested at its
 // boundaries without a database or an HTTP request.
 
+import { MAX_ID } from "./queryParams.js";
+
 export const SUMMARY_MIN = 5;
 export const SUMMARY_MAX = 120;
 export const DESCRIPTION_MIN = 20;
@@ -35,10 +37,13 @@ function trimmed(value: unknown): string | null {
   return typeof value === "string" ? value.trim() : null;
 }
 
-/** Accepts a positive integer, or a string that is exactly one. */
+/**
+ * Accepts a positive integer, or a string that is exactly one, no larger than the column holds
+ * (Lab 4 BR-52: past that, PostgreSQL throws, and the answer was a 500).
+ */
 function positiveInteger(value: unknown): number | null {
   const parsed = typeof value === "string" && value.trim() !== "" ? Number(value) : value;
-  return typeof parsed === "number" && Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  return typeof parsed === "number" && Number.isInteger(parsed) && parsed > 0 && parsed <= MAX_ID ? parsed : null;
 }
 
 export function validateTicketInput(body: unknown): ValidationResult {

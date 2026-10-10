@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { ApiError, PasswordChange } from "../api.js";
-import { Button, Card, SuccessCallout, TextInput, WarningCallout } from "../components/index.js";
+import { Button, Card, ErrorCallout, SuccessCallout, TextInput, WarningCallout } from "../components/index.js";
 
 // Lab 3, Issue 5 — the Change Password screen (ui-spec §4, FR-03, FR-04).
 //
@@ -113,12 +113,7 @@ export function ChangePassword({ email, mandatory, onChange, onDone, onSignOut }
       </h1>
       {mandatory && <WarningCallout>Set your own password before continuing.</WarningCallout>}
       {done && !mandatory && <SuccessCallout>Password updated.</SuccessCallout>}
-      {problem && (
-        <div className="tt-callout tt-callout--error" role="alert" data-state="error">
-          <span aria-hidden="true">⚠</span>
-          <div>{problem}</div>
-        </div>
-      )}
+      {problem && <ErrorCallout>{problem}</ErrorCallout>}
       {/* The rules are stated before the fields, not tucked under one of them
           where a validation message would hide them (ui-spec §4). */}
       <p className="tt-field__help">{PASSWORD_RULES}</p>
