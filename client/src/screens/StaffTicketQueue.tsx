@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   ApiError,
   AssignableUser,
@@ -31,12 +31,18 @@ import {
   type TicketStatus,
 } from "../components/index.js";
 import { ROUTES } from "../routes.js";
+import { parseQueueUrl, toQueueUrl, type QueueState } from "../queueUrl.js";
 
 // Lab 3, Issue 8 — the IT Staff Ticket Queue (ui-spec §6; FR-26 to FR-30).
 //
 // One shared queue of every Requester's tickets. The server owns search,
 // filtering, sorting, and paging (api-spec §5.1); this screen only turns its
 // controls into that query and renders the page that comes back.
+//
+// Lab 4, Issue 8 (ui-spec §7, FR-21): the filters live in the address. The screen reads them
+// from the query string and writes every change back, so a dashboard card, a reload, and a
+// bookmark all show the same queue. The wrapper at the foot of this file connects the screen to
+// the address; the screen itself still works with no address to read, as Lab 3's tests mount it.
 
 export const SEARCH_DEBOUNCE_MS = 300;
 
@@ -63,6 +69,8 @@ export const QUEUE_COLUMNS = [
 interface Filters {
   search: string;
   status: string;
+  /** Lab 4 (D-12): the open group, which a single status cannot say. */
+  group?: "" | "open";
   itPriority: string;
   categoryId: string;
   owner: string;
@@ -71,22 +79,12 @@ interface Filters {
   pageSize: number;
 }
 
-const DEFAULT_FILTERS: Filters = {
-  search: "",
-  status: "",
-  itPriority: "",
-  categoryId: "",
-  owner: "any",
-  sort: "itPriority",
-  direction: "desc",
-  pageSize: 10,
-};
-
 /** True when anything narrows the queue — the empty/no-results distinction. */
 function hasActiveFilters(filters: Filters): boolean {
   return (
     filters.search.trim() !== "" ||
     filters.status !== "" ||
+    filters.group === "open" ||
     filters.itPriority !== "" ||
     filters.categoryId !== "" ||
     filters.owner !== "any"
@@ -133,34 +131,66 @@ function ResolvedSignal() {
 
 type LoadState = "loading" | "ready" | "forbidden" | "error";
 
-export function StaffTicketQueue({ currentUserId }: { currentUserId: number }) {
-  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [page, setPage] = useState(1);
+export interface StaffTicketQueueProps {
+  currentUserId: number;
+  /**
+   * The address' query string, when the address is where the filters live (ui-spec §7). The screen
+   * reads its filters from it, and `onQueryChange` is how it writes them back. Without it the
+   * screen keeps the same string itself, as Lab 3's did.
+   */
+  query?: string;
+  onQueryChange?: (query: string) => void;
+}
+
+export function StaffTicketQueue({ currentUserId, query, onQueryChange }: StaffTicketQueueProps) {
+  // The filters are one string, the query, whether the address holds it or the screen does.
+  const [ownQuery, setOwnQuery] = useState("");
+  const queryString = query ?? ownQuery;
+  const state = useMemo(() => parseQueueUrl(queryString), [queryString]);
+  const writeQuery = query !== undefined ? (onQueryChange ?? (() => undefined)) : setOwnQuery;
+  function commit(next: QueueState) {
+    writeQuery(toQueueUrl(next));
+  }
+  // The write for a typed search happens a moment later, so it has to be made from what the
+  // address says then, not from what it said when the person started typing: a filter chosen in
+  // between must not be undone by it.
+  const latest = useRef({ state, writeQuery });
+  latest.current = { state, writeQuery };
+
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersId = useId();
 
+  // The text in the search box is what the person has typed; the term in the address is what has
+  // been asked for, a moment after they stopped. The ref says which term this screen last wrote, so
+  // an address that changes for any other reason (Back, a link, Clear Filters) is the only change
+  // that replaces what is in the box, and a write that lands while the person is still typing never
+  // takes their next letters away.
+  const [searchText, setSearchText] = useState(state.search);
+  const written = useRef(state.search);
+  useEffect(() => {
+    if (state.search === written.current) return;
+    written.current = state.search;
+    setSearchText(state.search);
+  }, [state.search]);
+
+  // Typing should not fire a request per keystroke. A changed question starts again from page 1,
+  // so a narrowed queue never strands the user on a page that no longer exists; the page resets in
+  // the same update as the question, so no request for the new question on the old page is ever sent.
+  useEffect(() => {
+    const term = searchText.trim();
+    if (term === state.search) return;
+    const timer = setTimeout(() => {
+      written.current = term;
+      latest.current.writeQuery(toQueueUrl({ ...latest.current.state, search: term, page: 1 }));
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [searchText, state.search]);
+
   const [result, setResult] = useState<QueueResponse | null>(null);
-  const [state, setState] = useState<LoadState>("loading");
+  const [loadState, setState] = useState<LoadState>("loading");
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [staff, setStaff] = useState<AssignableUser[]>([]);
-
-  // Typing should not fire a request per keystroke. A changed question starts
-  // again from page 1, so a narrowed queue never strands the user on a page
-  // that no longer exists; the page resets in the same update as the question,
-  // so no request for the new question on the old page is ever sent.
-  const appliedSearch = useRef("");
-  useEffect(() => {
-    const term = filters.search.trim();
-    const timer = setTimeout(() => {
-      if (term === appliedSearch.current) return;
-      appliedSearch.current = term;
-      setDebouncedSearch(term);
-      setPage(1);
-    }, SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [filters.search]);
 
   useEffect(() => {
     // The filter options are not the queue: if they fail, the queue still
@@ -169,19 +199,33 @@ export function StaffTicketQueue({ currentUserId }: { currentUserId: number }) {
     void fetchAssignableUsers().then(setStaff, () => setStaff([]));
   }, []);
 
+  // What the controls show: the address' state, with the box showing what has been typed.
+  const filters: Filters = {
+    search: searchText,
+    status: state.status,
+    group: state.group,
+    itPriority: state.itPriority,
+    categoryId: state.categoryId,
+    owner: state.owner,
+    sort: state.sort,
+    direction: state.direction,
+    pageSize: state.pageSize,
+  };
+
   const params = useMemo<QueueParams>(
     () => ({
-      q: debouncedSearch || undefined,
-      status: (filters.status || undefined) as TicketStatus | undefined,
-      itPriority: (filters.itPriority || undefined) as RequestedPriority | undefined,
-      categoryId: filters.categoryId ? Number(filters.categoryId) : undefined,
-      owner: filters.owner === "any" ? undefined : filters.owner,
-      sort: filters.sort,
-      direction: filters.direction,
-      page,
-      pageSize: filters.pageSize,
+      q: state.search || undefined,
+      status: (state.status || undefined) as TicketStatus | undefined,
+      group: state.group || undefined,
+      itPriority: (state.itPriority || undefined) as RequestedPriority | undefined,
+      categoryId: state.categoryId ? Number(state.categoryId) : undefined,
+      owner: state.owner === "any" ? undefined : state.owner,
+      sort: state.sort,
+      direction: state.direction,
+      page: state.page,
+      pageSize: state.pageSize,
     }),
-    [debouncedSearch, filters.status, filters.itPriority, filters.categoryId, filters.owner, filters.sort, filters.direction, filters.pageSize, page],
+    [state],
   );
 
   // Only the latest request may set what is shown: an earlier one that
@@ -209,14 +253,36 @@ export function StaffTicketQueue({ currentUserId }: { currentUserId: number }) {
   }, [load]);
 
   function update<K extends keyof Filters>(key: K, value: Filters[K]) {
-    setFilters((current) => ({ ...current, [key]: value }));
-    // Search returns to page 1 when its debounced term changes, above.
-    if (key !== "search") setPage(1);
+    // Search is written a moment after the typing stops, above.
+    if (key === "search") {
+      setSearchText(value as string);
+      return;
+    }
+    const next: QueueState = { ...state, page: 1 };
+    if (key === "status") next.status = value as string;
+    if (key === "itPriority") next.itPriority = value as string;
+    if (key === "categoryId") next.categoryId = value as string;
+    if (key === "owner") next.owner = value as string;
+    if (key === "sort") next.sort = value as QueueSort;
+    if (key === "direction") next.direction = value as "asc" | "desc";
+    if (key === "pageSize") next.pageSize = Number(value);
+    commit(next);
+  }
+
+  function goToPage(page: number) {
+    commit({ ...state, page });
+  }
+
+  function removeGroup() {
+    commit({ ...state, group: "", page: 1 });
   }
 
   function clearFilters() {
-    setFilters(DEFAULT_FILTERS);
-    setPage(1);
+    // Everything, the sort and the page size included, as it always did; the box empties
+    // because the address no longer has a search term.
+    written.current = "";
+    setSearchText("");
+    writeQuery("");
   }
 
   const filtering = hasActiveFilters(filters);
@@ -237,6 +303,20 @@ export function StaffTicketQueue({ currentUserId }: { currentUserId: number }) {
 
   return (
     <Card title="Ticket Queue">
+      {/* The open group is not one of the controls below, so it is shown as its own chip, which
+          removes itself (ui-spec §7). It sits outside the filters so it stays in view when they
+          are folded away on a phone. */}
+      {filters.group === "open" && (
+        <div className="tt-queue__chips">
+          <span className="tt-chip">
+            <span>Open tickets</span>
+            <button type="button" className="tt-chip__remove" aria-label="Remove the Open tickets filter" onClick={removeGroup}>
+              <span aria-hidden="true">✕</span>
+            </button>
+          </span>
+        </div>
+      )}
+
       {/* Below 768 px the filters fold behind this toggle (ui-spec §6.4). */}
       <button
         type="button"
@@ -306,24 +386,24 @@ export function StaffTicketQueue({ currentUserId }: { currentUserId: number }) {
         )}
       </div>
 
-      {state === "loading" && <LoadingState rows={5} label="Loading the ticket queue…" />}
+      {loadState === "loading" && <LoadingState rows={5} label="Loading the ticket queue…" />}
 
-      {state === "forbidden" && (
+      {loadState === "forbidden" && (
         <div className="tt-callout tt-callout--error" role="alert" data-state="forbidden">
           <span aria-hidden="true">⚠</span>
           <div>You do not have access to the ticket queue.</div>
         </div>
       )}
 
-      {state === "error" && (
+      {loadState === "error" && (
         <ErrorState message="Cannot load the ticket queue. Make sure the TokTickIT API is running, then try again." onRetry={load} />
       )}
 
-      {state === "ready" && tickets.length === 0 && !filtering && (
+      {loadState === "ready" && tickets.length === 0 && !filtering && (
         <EmptyState title="No tickets in the queue yet." body="New tickets from Requesters will appear here." />
       )}
 
-      {state === "ready" && tickets.length === 0 && filtering && (
+      {loadState === "ready" && tickets.length === 0 && filtering && (
         <NoResultsState
           title="No tickets match your filters"
           body="Try a different search or clear your filters."
@@ -331,7 +411,7 @@ export function StaffTicketQueue({ currentUserId }: { currentUserId: number }) {
         />
       )}
 
-      {state === "ready" && tickets.length > 0 && result && (
+      {loadState === "ready" && tickets.length > 0 && result && (
         <>
           <table className="tt-table tt-queue-table">
             <caption className="visually-hidden">Ticket queue</caption>
@@ -426,13 +506,13 @@ export function StaffTicketQueue({ currentUserId }: { currentUserId: number }) {
           </div>
 
           <nav className="tt-pagination" aria-label="Ticket queue pagination">
-            <Button variant="secondary" disabled={result.page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>
+            <Button variant="secondary" disabled={result.page <= 1} onClick={() => goToPage(Math.max(1, state.page - 1))}>
               Previous
             </Button>
             <span data-testid="page-status">
               Page {result.page} of {Math.max(1, result.totalPages)}
             </span>
-            <Button variant="secondary" disabled={result.page >= result.totalPages} onClick={() => setPage((current) => current + 1)}>
+            <Button variant="secondary" disabled={result.page >= result.totalPages} onClick={() => goToPage(state.page + 1)}>
               Next
             </Button>
             <span className="tt-muted" data-testid="result-count">
@@ -454,6 +534,24 @@ export function StaffTicketQueue({ currentUserId }: { currentUserId: number }) {
         </>
       )}
     </Card>
+  );
+}
+
+
+/**
+ * The Ticket Queue as the route mounts it: the filters are the address' query string, and a change
+ * replaces the address instead of adding to the history, so Back still leaves the page rather than
+ * stepping through each filter the person tried.
+ */
+export function StaffTicketQueueWithUrl({ currentUserId }: { currentUserId: number }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  return (
+    <StaffTicketQueue
+      currentUserId={currentUserId}
+      query={location.search}
+      onQueryChange={(query) => navigate({ pathname: location.pathname, search: query ? `?${query}` : "" }, { replace: true })}
+    />
   );
 }
 

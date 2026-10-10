@@ -102,13 +102,13 @@ first, then the rule or requirement where it adds precision.
 
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| SEC-01 | Authorization | AC-17 | every Lab 4 endpoint with no cookie | `401 AUTH_REQUIRED`, never `403` | `server/tests/lab-04/authorization.api.test.ts` | Partial |
+| SEC-01 | Authorization | AC-17 | every Lab 4 endpoint with no cookie | `401 AUTH_REQUIRED`, never `403` | `server/tests/lab-04/authorization.api.test.ts` | Pass |
 | SEC-02 | Authorization | AC-08, AC-17, BR-43 | a Requester calls every `/api/staff/*` route, new and old | `403 FORBIDDEN` with no ticket data in the body | `server/tests/lab-04/authorization.api.test.ts` | Pass |
 | SEC-03 | Authorization | AC-17, BR-42, D-08 | IT Staff and an Administrator call every `/api/staff/*` route, read and write | both succeed on every route; the Administrator's queue, detail, owner, IT Priority, status, and Actions Taken calls all work | `server/tests/lab-04/authorization.api.test.ts` | Pass |
 | SEC-04 | Authorization | AC-17, BR-43 | IT Staff and a Requester call every `/api/admin/*` route | `403 FORBIDDEN` | `server/tests/lab-04/authorization.api.test.ts` | Pass |
-| SEC-05 | Authorization | AC-20, BR-42 | IT Staff and an Administrator call the Requester dashboard; a Requester calls the staff dashboard | `403 FORBIDDEN` each way | `server/tests/lab-04/authorization.api.test.ts` | Partial |
+| SEC-05 | Authorization | AC-20, BR-42 | IT Staff and an Administrator call the Requester dashboard; a Requester calls the staff dashboard | `403 FORBIDDEN` each way | `server/tests/lab-04/authorization.api.test.ts` | Pass |
 | SEC-06 | Authorization | AC-17, BR-44 | guard order: no session and wrong role together; a Requester posting to a missing Ticket on a staff route | `401` wins over `403`; `403` wins over `404` | `server/tests/lab-04/authorization.api.test.ts` | Pass |
-| SEC-07 | Authorization | AC-02, AC-19, BR-37 | `requesterId`, `userId`, and `me` in query, body, and header on both dashboards and the Actions Taken endpoints | all ignored; the session identity is used and no other user's data appears | `server/tests/lab-04/authorization.api.test.ts` | Partial |
+| SEC-07 | Authorization | AC-02, AC-19, BR-37 | `requesterId`, `userId`, and `me` in query, body, and header on both dashboards and the Actions Taken endpoints | all ignored; the session identity is used and no other user's data appears | `server/tests/lab-04/authorization.api.test.ts` | Pass |
 | SEC-08 | Authorization | AC-17, BR-45 | an Administrator records an action, changes a status, and posts a comment | `performedBy`, `changedBy`, and the author are the Administrator | `server/tests/lab-04/authorization.api.test.ts` | Pass |
 | SEC-09 | Authorization | AC-17, Lab 3 BR-65 | `POST` and `PATCH` to the new endpoints with a foreign `Origin` | `403` before the handler runs; the configured origin succeeds; a `GET` with a foreign origin succeeds | `server/tests/lab-04/authorization.api.test.ts` | Partial |
 
@@ -150,16 +150,75 @@ first, then the rule or requirement where it adds precision.
 | DASH-07 | Dashboard | AC-21, BR-40 | follow each Requester `href` against `GET /api/tickets` | `totalItems` equals the card's `value` for every card | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
 | DASH-08 | Dashboard | AC-21, BR-31 | `group=open` on My Tickets, alone, with `status`, repeated, and unknown | the open group; AND with `status`; `400 INVALID_QUERY` for the last two | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
 | DASH-09 | Dashboard | AC-18, FR-19 | the exact key set of the response and the size of the lists | only the documented keys; no `description`; lists bounded at 5 | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
-| DASH-10 | Dashboard | AC-19, BR-34 | the four staff cards against independent queries | every `value` equals its independent query | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
-| DASH-11 | Dashboard | AC-19, BR-35 | `byStatus` | exactly five rows in the documented order, each equal to an independent count | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
-| DASH-12 | Dashboard | AC-19, BR-37 | two different IT Staff members, and a `me` parameter | "me" figures differ per user and ignore the parameter | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
-| DASH-13 | Dashboard | AC-19, BR-39 | `idle.it@toktickit.local` | `assignedToMe` is `0`; `myTickets` and `myRecentActions` are empty | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
-| DASH-14 | Dashboard | AC-19, BR-36 | the three lists, with a description over 120 characters | order and limit per BR-36; the description cut at 120 characters with an ellipsis | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
-| DASH-15 | Dashboard | AC-19, BR-31 | a `CANCELLED` Ticket with no owner and a `CANCELLED` urgent Ticket | counted in no open metric | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
-| DASH-16 | Dashboard | AC-20, BR-38 | an Administrator and an IT Staff member read the dashboard | the Administrator's `userCounts` (active per role, and inactive) equal the user table and no entry has an `href`; IT Staff have no `userCounts` key | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
-| DASH-17 | Dashboard | AC-21, BR-40 | follow each staff `href` against `GET /api/staff/tickets` | `totalItems` equals `value` for every card and status row; the account counts carry no `href`, so nothing is followed for them | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
-| DASH-18 | Dashboard | AC-21, BR-31 | `group=open` on the queue, alone, with `status`, `owner`, and `itPriority`, repeated, and unknown | AND with every filter; `400 INVALID_QUERY` for the last two | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
-| DASH-19 | Dashboard | AC-20, BR-43 | a Requester and no session call the staff dashboard | `403` and `401` | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
+| DASH-10 | Dashboard | AC-19, BR-34 | the four staff cards against independent queries | every `value` equals its independent query | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-11 | Dashboard | AC-19, BR-35 | `byStatus` | exactly five rows in the documented order, each equal to an independent count | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-12 | Dashboard | AC-19, BR-37 | two different IT Staff members, and a `me` parameter | "me" figures differ per user and ignore the parameter | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-13 | Dashboard | AC-19, BR-39 | `idle.it@toktickit.local` | `assignedToMe` is `0`; `myTickets` and `myRecentActions` are empty | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-14 | Dashboard | AC-19, BR-36 | the three lists, with a description over 120 characters | order and limit per BR-36; the description cut at 120 characters with an ellipsis | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-15 | Dashboard | AC-19, BR-31 | a `CANCELLED` Ticket with no owner and a `CANCELLED` urgent Ticket | counted in no open metric | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-16 | Dashboard | AC-20, BR-38 | an Administrator and an IT Staff member read the dashboard | the Administrator's `userCounts` (active per role, and inactive) equal the user table and no entry has an `href`; IT Staff have no `userCounts` key | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-17 | Dashboard | AC-21, BR-40 | follow each staff `href` against `GET /api/staff/tickets` | `totalItems` equals `value` for every card and status row; the account counts carry no `href`, so nothing is followed for them | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-18 | Dashboard | AC-21, BR-31 | `group=open` on the queue, alone, with `status`, `owner`, and `itPriority`, repeated, and unknown | AND with every filter; `400 INVALID_QUERY` for the last two | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-19 | Dashboard | AC-20, BR-43 | a Requester and no session call the staff dashboard | `403` and `401` | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+
+#### 2.5.1 The query behind every number (labsheet Part 5)
+
+Each figure a dashboard shows is a count or a short list, and each can be reproduced with the SQL
+below. The tests of §2.5 ask the database these same questions, in raw SQL of their own, and compare
+the answer with the endpoint's; the live check of Issues 7 and 8 did the same against the development
+database in a real browser. To run one by hand:
+
+```sh
+docker exec toktickit-db psql -U toktickit -d toktickit -c "<the query>"
+```
+
+`:me` is the signed-in user's id. "Open" is `"currentStatus"::text IN ('NEW', 'OPEN', 'IN_PROGRESS',
+'WAITING_FOR_REQUESTER', 'REOPENED')` (BR-31). None of these has a date, so none depends on a time zone (BR-41).
+
+**Requester dashboard** (`GET /api/dashboard/requester`)
+
+```sql
+-- openTickets
+SELECT count(*) FROM "Ticket" WHERE "requesterId" = :me AND "currentStatus"::text IN ('NEW','OPEN','IN_PROGRESS','WAITING_FOR_REQUESTER','REOPENED');
+-- waitingForYou, resolved, closed (one status each)
+SELECT count(*) FROM "Ticket" WHERE "requesterId" = :me AND "currentStatus" = 'WAITING_FOR_REQUESTER';
+SELECT count(*) FROM "Ticket" WHERE "requesterId" = :me AND "currentStatus" = 'RESOLVED';
+SELECT count(*) FROM "Ticket" WHERE "requesterId" = :me AND "currentStatus" = 'CLOSED';
+-- needsAttention: the longest-waiting first
+SELECT id FROM "Ticket" WHERE "requesterId" = :me AND "currentStatus" = 'WAITING_FOR_REQUESTER' ORDER BY "updatedAt" ASC, id ASC LIMIT 5;
+-- recentTickets: the newest change first, any status
+SELECT id FROM "Ticket" WHERE "requesterId" = :me ORDER BY "updatedAt" DESC, id DESC LIMIT 5;
+```
+
+**IT Staff and Administrator dashboard** (`GET /api/staff/dashboard`)
+
+```sql
+-- unassigned
+SELECT count(*) FROM "Ticket" WHERE "ownerId" IS NULL AND "currentStatus"::text IN ('NEW','OPEN','IN_PROGRESS','WAITING_FOR_REQUESTER','REOPENED');
+-- assignedToMe
+SELECT count(*) FROM "Ticket" WHERE "ownerId" = :me AND "currentStatus"::text IN ('NEW','OPEN','IN_PROGRESS','WAITING_FOR_REQUESTER','REOPENED');
+-- waitingForRequester: any owner
+SELECT count(*) FROM "Ticket" WHERE "currentStatus" = 'WAITING_FOR_REQUESTER';
+-- urgent
+SELECT count(*) FROM "Ticket" WHERE "itPriority" = 'URGENT' AND "currentStatus"::text IN ('NEW','OPEN','IN_PROGRESS','WAITING_FOR_REQUESTER','REOPENED');
+-- byStatus: one count per open status, over every Ticket (0 where none)
+SELECT "currentStatus", count(*) FROM "Ticket" WHERE "currentStatus"::text IN ('NEW','OPEN','IN_PROGRESS','WAITING_FOR_REQUESTER','REOPENED') GROUP BY 1;
+-- myTickets: the newest change first
+SELECT id FROM "Ticket" WHERE "ownerId" = :me AND "currentStatus"::text IN ('NEW','OPEN','IN_PROGRESS','WAITING_FOR_REQUESTER','REOPENED') ORDER BY "updatedAt" DESC, id DESC LIMIT 5;
+-- urgentTickets: the one that has waited longest first
+SELECT id FROM "Ticket" WHERE "itPriority" = 'URGENT' AND "currentStatus"::text IN ('NEW','OPEN','IN_PROGRESS','WAITING_FOR_REQUESTER','REOPENED') ORDER BY "createdAt" ASC, id ASC LIMIT 5;
+-- myRecentActions: in the order they were recorded, not the order of the dates typed on them
+SELECT id FROM "ActionTaken" WHERE "performedById" = :me ORDER BY "createdAt" DESC, id DESC LIMIT 5;
+-- userCounts (Administrator only)
+SELECT count(*) FROM "User" WHERE "isActive" AND role::text = 'REQUESTER';
+SELECT count(*) FROM "User" WHERE "isActive" AND role::text = 'IT_STAFF';
+SELECT count(*) FROM "User" WHERE "isActive" AND role::text = 'ADMINISTRATOR';
+SELECT count(*) FROM "User" WHERE NOT "isActive";
+```
+
+Every card's link opens a list whose total is the card's value: `GET /api/tickets` for the Requester's
+(the route's `status` is sent as `currentStatus`) and `GET /api/staff/tickets` for the staff's (the
+route's query string unchanged). DASH-07 and DASH-17 follow every link and compare.
 
 ### 2.6 Migration and regression — `server/tests/lab-04/migration.regression.test.ts`
 
@@ -210,12 +269,12 @@ first, then the rule or requirement where it adds precision.
 | UI-19 | UI | AC-18, FR-15 | the two Requester lists | rows link to the Ticket Detail; empty lists show their explicit message | `client/tests/lab-04/RequesterDashboard.test.tsx` | Pass |
 | UI-20 | UI | AC-18, BR-39 | all-zero data | every card shows `0` and keeps its link; both lists show their empty message; the quick actions remain | `client/tests/lab-04/RequesterDashboard.test.tsx` | Pass |
 | UI-21 | UI | AC-22, FR-20 | loading, forbidden, failure, and Refresh | skeletons; the forbidden callout; a failure callout with **Try again**; Refresh disables itself, keeps the old numbers until the new ones arrive, and keeps them if the refresh fails | `client/tests/lab-04/RequesterDashboard.test.tsx` | Pass |
-| UI-22 | UI | AC-19, AC-21, FR-16 | the four staff cards and the status row | values and links per BR-34 and BR-35; every `href` followed unchanged | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
-| UI-23 | UI | AC-19, FR-16 | the three staff lists | rows link to the Ticket; the follow-up pill carries text; descriptions are cut | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
-| UI-24 | UI | AC-20, FR-17 | an Administrator, then IT Staff | the Administrator sees the accounts region with all four counts as plain numbers and only **Open User Management** as a link; IT Staff do not | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
-| UI-25 | UI | AC-22, FR-20 | loading, zero data, forbidden, failure, and Refresh | as UI-21; zero data keeps the cards and shows the staff empty messages | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
-| UI-26 | UI | AC-19, D-11 | the quick actions | **Open Ticket Queue**, **Unassigned Tickets**, and **My Queue** only; no Create Ticket, no Profile, no "from yesterday" | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
-| UI-27 | UI | AC-17, FR-23, FR-24 | the Administrator's navigation and routes | **Ticket Queue** is offered and opens; a Requester typing `/queue` or `/users` lands on their Dashboard with the forbidden callout | `client/tests/lab-04/RoleNavigation.test.tsx` | Partial |
+| UI-22 | UI | AC-19, AC-21, FR-16 | the four staff cards and the status row | values and links per BR-34 and BR-35; every `href` followed unchanged | `client/tests/lab-04/StaffDashboard.test.tsx` | Pass |
+| UI-23 | UI | AC-19, FR-16 | the three staff lists | rows link to the Ticket; the follow-up pill carries text; descriptions are cut | `client/tests/lab-04/StaffDashboard.test.tsx` | Pass |
+| UI-24 | UI | AC-20, FR-17 | an Administrator, then IT Staff | the Administrator sees the accounts region with all four counts as plain numbers and only **Open User Management** as a link; IT Staff do not | `client/tests/lab-04/StaffDashboard.test.tsx` | Pass |
+| UI-25 | UI | AC-22, FR-20 | loading, zero data, forbidden, failure, and Refresh | as UI-21; zero data keeps the cards and shows the staff empty messages | `client/tests/lab-04/StaffDashboard.test.tsx` | Pass |
+| UI-26 | UI | AC-19, D-11 | the quick actions | **Open Ticket Queue**, **Unassigned Tickets**, and **My Queue** only; no Create Ticket, no Profile, no "from yesterday" | `client/tests/lab-04/StaffDashboard.test.tsx` | Pass |
+| UI-27 | UI | AC-17, FR-23, FR-24 | the Administrator's navigation and routes | **Ticket Queue** is offered and opens; a Requester typing `/queue` or `/users` lands on their Dashboard with the forbidden callout | `client/tests/lab-04/RoleNavigation.test.tsx` | Pass |
 | UI-28 | UI | AC-17, BR-45 | an Administrator on the Ticket Detail | the owner, IT Priority, status, and Actions Taken controls are present and send requests under the session | `client/tests/lab-04/RoleNavigation.test.tsx` | Pass |
 | UI-29 | UI | AC-21, FR-21 | My Tickets opened with `?group=open&status=…` | the request carries both; the filter chip shows; Clear Filters removes it; an unknown parameter is ignored | `client/tests/lab-04/DrillDown.test.tsx` | Pass |
 | UI-30 | UI | AC-27, BR-53 | every write form: create ticket, comment, note, owner, IT Priority, status, user management, Action Taken | one request per submission under repeated clicks | `client/tests/lab-04/FinalRegression.test.tsx` | Planned |
@@ -225,8 +284,8 @@ first, then the rule or requirement where it adds precision.
 | UI-34 | UI | AC-31, FR-30 | search every screen for placeholder text, the old `RoleHome` page, and any Development Requester control | none found | `client/tests/lab-04/FinalRegression.test.tsx` | Planned |
 | UI-35 | UI | AC-30, FR-31 | keyboard: tab order, visible focus, labels, and the focus moves after create, edit, and **Go to Actions Taken** | every control reachable and named; focus lands where `ui-spec.md` §9 says | `client/tests/lab-04/FinalRegression.test.tsx` | Planned |
 | UI-36 | UI | AC-30, FR-31 | status, priority, role, and follow-up badges | each carries text, not colour alone | `client/tests/lab-04/FinalRegression.test.tsx` | Planned |
-| UI-37 | UI | AC-34, FR-22, D-09 | each role's navigation and landing page | **Dashboard** first and marked `aria-current="page"` on `/dashboard`; the wordmark links to it; each role lands on its own dashboard | `client/tests/lab-04/RoleNavigation.test.tsx` | Partial |
-| UI-38 | UI | AC-21, FR-21 | the Ticket Queue with `?owner=unassigned&group=open` | the filters read from the URL and written back; the chip shows; Clear Filters works | `client/tests/lab-04/DrillDown.test.tsx` | Planned |
+| UI-37 | UI | AC-34, FR-22, D-09 | each role's navigation and landing page | **Dashboard** first and marked `aria-current="page"` on `/dashboard`; the wordmark links to it; each role lands on its own dashboard | `client/tests/lab-04/RoleNavigation.test.tsx` | Pass |
+| UI-38 | UI | AC-21, FR-21 | the Ticket Queue with `?owner=unassigned&group=open` | the filters read from the URL and written back; the chip shows; Clear Filters works | `client/tests/lab-04/DrillDown.test.tsx` | Pass |
 
 ### 2.9 UI style — `client/tests/lab-04/ZenGreenLab4.test.tsx`
 
@@ -346,12 +405,12 @@ that adds the thing they test, by appending a row to the route tables in
 
 | Test | Complete at Issue 2 | Completed in |
 | :--- | :--- | :--- |
-| SEC-01 | no cookie → 401 on every staff and admin route, including one that is not written | ~~4~~ (done: the Actions Taken routes), ~~6~~ (done: the status-history route), ~~7~~ (done: the Requester dashboard), 8 adds the staff dashboard |
-| SEC-05 | not possible: both dashboards are later | ~~7~~ (done: the Requester half), 8 (staff half) |
-| SEC-07 | not possible: the dashboards and Actions Taken take no ids yet | ~~4~~ (done: the Actions Taken endpoints), ~~7~~ (done: the Requester dashboard), 8 |
+| SEC-01 | no cookie → 401 on every staff and admin route, including one that is not written | ~~4~~ (done: the Actions Taken routes), ~~6~~ (done: the status-history route), ~~7~~ (done: the Requester dashboard), ~~8~~ (done: the staff dashboard) — complete |
+| SEC-05 | not possible: both dashboards are later | ~~7~~ (done: the Requester half), ~~8~~ (done: the staff half) — complete |
+| SEC-07 | not possible: the dashboards and Actions Taken take no ids yet | ~~4~~ (done: the Actions Taken endpoints), ~~7~~ (done: the Requester dashboard), ~~8~~ (done: the staff dashboard) — complete |
 | SEC-08 | an Administrator is the author of their comments and notes, and the Owner of what they claim | ~~4~~ (done: `performedBy`), ~~6~~ (done: `changedBy`, including the `NEW` to `OPEN` a claim causes) — complete |
 | SEC-09 | a foreign `Origin` is refused on an Administrator's writes to the existing staff routes | ~~4~~ (done: the Actions Taken writes) |
-| UI-27 | the Administrator's navigation and routes; the sign-in deep link; the refusals; "sent home" means the role's Lab 3 home | ~~7~~ (done for the Requester: a Requester typing `/queue` or `/users` lands on their Dashboard with the callout), 8: the Dashboard becomes the home of IT Staff and Administrators (UI-37) |
+| UI-27 | the Administrator's navigation and routes; the sign-in deep link; the refusals; "sent home" means the role's Lab 3 home | ~~7~~ (done for the Requester: a Requester typing `/queue` or `/users` lands on their Dashboard with the callout), ~~8~~ (done: the Dashboard is the home of IT Staff and Administrators, UI-37) — complete |
 | UI-28 | the owner, IT Priority, and status controls, and the Internal Notes region | ~~5~~ (done: the Actions Taken controls) |
 
 SEC-02, SEC-03, SEC-04, and SEC-06 are complete at Issue 2.
@@ -470,13 +529,13 @@ forces it, and the **Status** column records it when it is done.
 | `server/tests/lab-03/staff-queue.api.test.ts` — "is refused to a Requester and an Administrator (BR-19)" and the same name under "assignable users" (two cases) | queue endpoints refuse an Administrator | each splits in two: refuse a Requester (unchanged assertions), and a new case that an Administrator is let in (the queue returns the same `totalItems` IT Staff see) | D-08 | 2 | Done |
 | `server/tests/lab-03/staff-ticket-detail.api.test.ts` — "is refused to a Requester and an Administrator…" and "refuses a Requester and an Administrator on each operation" | detail and every operation refuse an Administrator | refuse a Requester only (same assertions, `before`/after row unchanged); a new case that an Administrator opens the detail | D-08 | 2 | Done |
 | `server/tests/lab-03/staff-ticket-detail.api.test.ts` — "keeps the staff download to IT Staff, and keeps IT Staff off the Requester routes (BR-18)" | **not foreseen when this table was written; found by running the suite.** The staff attachment-download route refuses an Administrator | the Requester is still `403`, an Administrator now gets `200`, and IT Staff are still refused the Requester's route | D-08: the guard is on the `/api/staff` prefix, so this route opens too | 2 | Done |
-| `client/tests/lab-03/RoleNavigation.test.tsx` — UI-07 | the Administrator's only item is User Management; the first nav link is the current page after landing; an Administrator typing `/queue` is sent home | the list is Ticket Queue then User Management; the current-page assertion names the landing link (User Management) because the first link is no longer it; the `/queue` row is removed (it is allowed now and the Lab 4 suite covers it) | D-08. Landing stays User Management until the Dashboard (Issue 8) | 2 (nav and `/queue`); 7, 8 (Dashboard-first lists) | Issue 2 part Done; **Issue 7 part Done** (the Requester's list is Dashboard, My Tickets, Create Ticket, its home is the Dashboard, and the two Requester typed-URL rows are sent to the Dashboard, with a `fetchRequesterDashboard` mock added); Issue 8 part Planned |
+| `client/tests/lab-03/RoleNavigation.test.tsx` — UI-07 | the Administrator's only item is User Management; the first nav link is the current page after landing; an Administrator typing `/queue` is sent home | the list is Ticket Queue then User Management; the current-page assertion names the landing link (User Management) because the first link is no longer it; the `/queue` row is removed (it is allowed now and the Lab 4 suite covers it) | D-08. Landing stays User Management until the Dashboard (Issue 8) | 2 (nav and `/queue`); 7, 8 (Dashboard-first lists) | Issue 2 part Done; **Issue 7 part Done** (the Requester's list is Dashboard, My Tickets, Create Ticket, its home is the Dashboard, and the two Requester typed-URL rows are sent to the Dashboard, with a `fetchRequesterDashboard` mock added); **Issue 8 part Done** (IT Staff's list is Dashboard, Ticket Queue; an Administrator's is Dashboard, Ticket Queue, User Management; the Dashboard is every role's home, so the three IT Staff and Administrator typed-URL rows are sent to it, with a `fetchStaffDashboard` mock added) |
 | `server/tests/lab-03/staff-ticket-detail.api.test.ts` — API-51 and the assertions that compare `permittedTransitions` with the bare matrix | `permittedTransitions` equals the matrix row | `permittedTransitions` plus `blockedTransitions` equals the matrix row (a `wholeRow` helper, compared sorted); the two tests are API-51 and API-45 | BR-17, api-spec §3.1: the list now excludes moves the owner rule or the gate blocks | 6 | Done |
 | `server/tests/lab-03/staff-ticket-detail.api.test.ts` — the cases that move a Ticket to `RESOLVED` | a Ticket resolves with only an owner and a reason | the fixture records an Action Taken first (a `recordAction` helper writing the table, as the suite writes its other fixtures): API-45 for the move to `RESOLVED`, API-48, and "two simultaneous transitions". The new case that proves the refusal is WF-04, in the Lab 4 suite | BR-17: the gate. Lab 3 D-20 said this would come | 6 | Done |
 | `client/tests/lab-03/StaffTicketDetail.test.tsx` — the mock | the mocked detail has no `version` or `blockedTransitions`, and its owner has no `role` | the mock gains `version: 1`, `blockedTransitions: []`, and the owner's `role`; the inactive-owner mock gets a `role` too | api-spec §3.1: a mock-shape change, no assertion changes | 6 | Done |
 | `e2e/lab-03/staff-ticket-flow.spec.ts` — E2E-05 | an IT Staff member resolves a Ticket with only a reason, and reads "TT-… moved to In Progress." | the journey first sees Resolved listed under "Not available now" with the API's reason and absent from the select, follows **Go to Actions Taken**, records an action through the screen, then resolves; the message it reads is "Status changed to In Progress." and "Status changed to Resolved." | BR-17, ui-spec §5: the gate and the status message | 6 | Done |
 | `client/tests/lab-03/RequesterRegression.test.tsx` — "a signed-in Requester lands on My Tickets" | the landing page is My Tickets | the landing page is the Dashboard (the test is renamed, looks for the Dashboard link as the current page, and its `fetch` stub answers the dashboard route with an empty board) | D-09 | 7 | Done |
-| `e2e/lab-03/authentication.spec.ts` — E2E-01 and the landing-page table | the Requester's navigation is exactly My Tickets and Create Ticket; IT Staff land on `/queue` and an Administrator on `/users` | the Administrator's list gains Ticket Queue (**Issue 2, Done**: `Ticket Queue, User Management`, landing still `/users`); then each role's navigation starts with Dashboard and each lands on `/dashboard` (Issues 7, 8) | D-08, D-09 | 2, 7, 8 | Issue 2 part Done; **Issue 7 part Done** (a Requester's navigation is Dashboard, My Tickets, Create Ticket, they land on `/dashboard`, and Dashboard is the current page; plus the two landings the issue did not name, which the run found: E2E-02 after the forced password change, and E2E-08 in `user-administration.spec.ts`, both now `/dashboard`); Issue 8 part Planned |
+| `e2e/lab-03/authentication.spec.ts` — E2E-01 and the landing-page table | the Requester's navigation is exactly My Tickets and Create Ticket; IT Staff land on `/queue` and an Administrator on `/users` | the Administrator's list gains Ticket Queue (**Issue 2, Done**: `Ticket Queue, User Management`, landing still `/users`); then each role's navigation starts with Dashboard and each lands on `/dashboard` (Issues 7, 8) | D-08, D-09 | 2, 7, 8 | Issue 2 part Done; **Issue 7 part Done** (a Requester's navigation is Dashboard, My Tickets, Create Ticket, they land on `/dashboard`, and Dashboard is the current page; plus the two landings the issue did not name, which the run found: E2E-02 after the forced password change, and E2E-08 in `user-administration.spec.ts`, both now `/dashboard`); **Issue 8 part Done** (IT Staff's navigation is Dashboard, Ticket Queue and an Administrator's is Dashboard, Ticket Queue, User Management; each lands on `/dashboard` with Dashboard the current page; the six other specs the run found are in the rows below) |
 | `client/tests/lab-02/Navigation.test.tsx` | iterates the Requester's navigation items | **re-verified, and it did not pass unchanged:** the iteration over `NAV_ITEMS` does, but two tests assert the landing page. "sends an unknown route to My Tickets" and "skips Login when someone is already signed in" now expect the Dashboard's heading, and the file mocks `fetchRequesterDashboard` | D-09 | 7 | Done |
 | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | mocks each client call with `vi.spyOn(api, …)`: the ticket detail, comments, and attachments | the mocks gain the two calls the Requester Ticket Detail now makes, `fetchActionsTaken` (Issue 5) and `fetchStatusHistory` (Issue 6); no assertion changes | the screen loads two more resources; an unmocked call would reach the network | 5, 6 | Done |
 | `client/tests/lab-03/RequesterComments.test.tsx` | the same per-call mocks, with `fetchComments` | the same two mocks are added; and the helper text the panel shows is asserted as "Only IT Staff can resolve a ticket. This tells them you think it is fixed." | as above, and ui-spec §5.1: the panel's helper text changed because a Requester no longer "closes" anything | 5, 6 | Done |
@@ -491,6 +550,9 @@ forces it, and the **Status** column records it when it is done.
 | `server/tests/lab-02/list-query.test.ts` — "applies the documented defaults when nothing is supplied" | the parsed query is exactly the nine Lab 2 fields | the parsed query also carries `group: null` | **not foreseen; found by running the suite.** D-12: `group` is a new optional parameter, so a query without it parses to a shape with the new field empty. No Lab 2 request changes meaning | 7 | Done |
 | `client/tests/lab-03/ZenGreenLab3.test.tsx` — STYLE-01 "introduces no new font size" | **not changed, and worth knowing:** the test reads from "Lab 3: Login" to the **end** of the stylesheet, so every Lab 4 section is held to "every font size is a `--tt-font` variable". The metric card's 12 px label and 32 px value (ui-spec §1.1; Lab 2 already draws 12 px in the badge and 32 px in the empty-state icon) are therefore named as `--tt-font-caption` and `--tt-font-metric` on the card, so the test passes as written | none | FR-26 and ui-spec §1.1 | 7 | No change |
 | `client/tests/lab-04/RoleNavigation.test.tsx` — UI-27 (Issue 2) | a Requester typing `/queue`, `/queue/12`, or `/users` is sent to My Tickets | they are sent to the Dashboard (three rows), and the suite mocks `fetchRequesterDashboard` | D-09. A Lab 4 test from Issue 2, changed by a Lab 4 rule from Issue 7 | 7 | Done |
+| `e2e/lab-03/responsive.spec.ts` — RESP-03 "the queue" and RESP-05 "User Management" (three viewports each); `e2e/lab-03/staff-ticket-flow.spec.ts` — E2E-04, E2E-05's `openFromQueue`, and E2E-07; `e2e/lab-03/user-administration.spec.ts` — E2E-08 and E2E-09 | each signs in as IT Staff or an Administrator and goes straight on to the queue's search box or User Management's "+ Create user", as if signing in landed there | each opens its screen first: `page.goto("/queue")` or `page.goto("/users")` in the two responsive specs, the Ticket Queue or User Management link of the navigation in the others; E2E-04 takes the Dashboard's **Unassigned Tickets** quick action, and so also asserts the filtered queue it opens (the address, the Owner control, the "Open tickets" chip) | **not foreseen when this table was written; found by running the suite.** D-09: signing in lands on the Dashboard. The issue named E2E-01 only | 8 | Done |
+| `server/tests/lab-03/queue-query.test.ts` — UNIT-09 "applies the documented defaults when nothing is supplied" | the parsed queue query is exactly the nine Lab 3 fields | it also carries `group: null` | **not foreseen; found by running the suite.** D-12: `group` is a new optional parameter, so a query without it parses to a shape with the new field empty. No Lab 3 request changes meaning | 8 | Done |
+| `client/tests/lab-04/RoleNavigation.test.tsx` — UI-27 (Issue 2), and three tests of Issue 7 | IT Staff and an Administrator typing a forbidden URL are sent to the queue and to User Management; an Administrator's navigation is Ticket Queue, User Management; and three tests written in Issue 7 said `/dashboard` is the Requester's alone "until Issue 8": other roles are sent home from it, a staff sign-in that began there goes home without the notice, and their navigation is unchanged | the three rows are sent to the Dashboard; the Administrator's list starts with Dashboard; and the three Issue 7 tests are replaced by their Issue 8 form: each role opens its own Dashboard on `/dashboard`, has the navigation and landing UI-37 gives it, and is taken back to the page it asked for | D-09. Tests of Lab 4's own, changed by a Lab 4 rule from Issue 8; the Issue 7 ones were written knowing they were interim | 8 | Done |
 
 No Lab 1 test changes. A change not in this table is a defect to be fixed in the
 code, not in the test. If implementation finds a Lab 3 test that must change and

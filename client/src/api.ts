@@ -497,6 +497,8 @@ export type QueueSort = "itPriority" | "createdAt" | "updatedAt";
 export interface QueueParams {
   q?: string;
   status?: TicketStatus;
+  /** Lab 4 (D-12): `open` is the five statuses nobody has resolved, closed, or cancelled (BR-31). */
+  group?: "open";
   itPriority?: RequestedPriority;
   categoryId?: number;
   // "any" | "unassigned" | "me" | a user id (D-18)
@@ -688,6 +690,64 @@ export async function fetchRequesterDashboard(): Promise<RequesterDashboard> {
   const response = await apiFetch(`${API_URL}/api/dashboard/requester`);
   if (!response.ok) throw await failure(response, "The dashboard could not be loaded.");
   return (await response.json()) as RequesterDashboard;
+}
+
+// --- Lab 4, Issue 8 — the IT Staff and Administrator dashboard (api-spec §4.2) -------------------
+
+/** A Ticket in a staff list: the concise row plus the IT Priority and the owner (api-spec §1.4). */
+export interface StaffDashboardTicket extends DashboardTicket {
+  itPriority: RequestedPriority;
+  owner: QueueOwner | null;
+}
+
+/** An Action Taken the signed-in member recorded, with its Ticket's number. The description arrives already cut to 120 characters. */
+export interface DashboardAction {
+  id: number;
+  ticketId: number;
+  ticketNumber: string;
+  actionAt: string;
+  description: string;
+  followUpRequired: boolean;
+}
+
+/** One row of the status breakdown: a status, how many Tickets are in it, and the queue that lists them. */
+export interface DashboardStatusRow extends DashboardMetric {
+  status: TicketStatus;
+}
+
+/** A count with no destination: no list can reproduce an *active* number (BR-40). */
+export interface PlainCount {
+  value: number;
+}
+
+export interface AccountCounts {
+  activeRequesters: PlainCount;
+  activeItStaff: PlainCount;
+  activeAdministrators: PlainCount;
+  inactive: PlainCount;
+}
+
+export interface StaffDashboard {
+  generatedAt: string;
+  metrics: {
+    unassigned: DashboardMetric;
+    assignedToMe: DashboardMetric;
+    waitingForRequester: DashboardMetric;
+    urgent: DashboardMetric;
+  };
+  byStatus: DashboardStatusRow[];
+  myTickets: StaffDashboardTicket[];
+  urgentTickets: StaffDashboardTicket[];
+  myRecentActions: DashboardAction[];
+  /** Present only for an Administrator (BR-38). */
+  userCounts?: AccountCounts;
+}
+
+/** The signed-in IT Staff member's or Administrator's dashboard. A refused role is an `ApiError` with status 403. */
+export async function fetchStaffDashboard(): Promise<StaffDashboard> {
+  const response = await apiFetch(`${API_URL}/api/staff/dashboard`);
+  if (!response.ok) throw await failure(response, "The dashboard could not be loaded.");
+  return (await response.json()) as StaffDashboard;
 }
 
 export async function fetchNotes(ticketId: number): Promise<ThreadEntry[]> {

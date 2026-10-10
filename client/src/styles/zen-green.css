@@ -1047,10 +1047,82 @@ a.tt-btn { text-decoration: none; }
   outline-offset: 2px;
 }
 
+/* The Ticket Queue's chip sits above its filters, outside them so a phone's folded filters do
+   not hide it, and needs a gap before them. */
+.tt-queue__chips { margin-bottom: var(--tt-space-3); }
+
 @media (max-width: 767px) {
   /* Lab 2 gives the search box `flex: 1 1 240px`, a width in a row. In the column the toolbar
      becomes on a phone it is a height, and the box was 240 px tall. */
   .tt-toolbar input[type="search"] { flex: 0 0 auto; }
   .tt-chip { align-self: flex-start; }
   .tt-chip__remove { min-width: 44px; min-height: 44px; }
+}
+
+/* --- Lab 4: Staff Dashboard (ui-spec §3.2, §3.3, §3.6) -----------------------------
+   The IT Staff and Administrator Dashboard, built from the metric card and the rows of the
+   Requester Dashboard above: the status counts, the two lists side by side, the one-line
+   action rows, and the Administrator's plain counts. No new colour. */
+
+.tt-dash__statuses { margin-bottom: var(--tt-space-6); }
+.tt-dash__status-row {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tt-space-3);
+}
+.tt-dash-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tt-space-2);
+  padding: var(--tt-space-2) var(--tt-space-4);
+  background: var(--tt-surface);
+  border: 1px solid var(--tt-border);
+  border-radius: var(--tt-radius);
+  color: var(--tt-text);
+  text-decoration: none;
+}
+.tt-dash-status:hover { background: var(--tt-green-pale); border-color: var(--tt-green-primary); }
+.tt-dash-status:focus-visible {
+  outline: 2px solid var(--tt-green-secondary);
+  outline-offset: 2px;
+}
+.tt-dash-status__value { font-size: var(--tt-font-h2); font-weight: 600; color: var(--tt-green-primary); }
+
+.tt-accounts { margin-bottom: var(--tt-space-6); }
+.tt-accounts > .tt-muted { margin: 0; }
+.tt-accounts .tt-dash__cards { margin: var(--tt-space-3) 0 0; }
+
+.tt-dash__pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tt-space-6);
+  margin-bottom: var(--tt-space-6);
+}
+.tt-dash__pair > .tt-card { margin-top: 0; }
+
+.tt-dash-row--staff { grid-template-columns: auto minmax(0, 1fr) auto; }
+.tt-dash-row__meta {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tt-space-2) var(--tt-space-3);
+}
+.tt-dash-row--action { grid-template-columns: auto auto minmax(0, 1fr) auto; }
+
+.tt-skeleton--row { height: 72px; margin-bottom: var(--tt-space-6); }
+
+@media (max-width: 991px) {
+  .tt-dash__pair { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 767px) {
+  .tt-dash-row--staff,
+  .tt-dash-row--action { grid-template-columns: minmax(0, 1fr) auto; }
+  .tt-dash-row__meta { order: 5; }
+  .tt-dash__status-row { flex-direction: column; }
+  .tt-dash-status { justify-content: space-between; }
 }

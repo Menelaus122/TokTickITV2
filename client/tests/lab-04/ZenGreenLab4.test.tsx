@@ -441,6 +441,11 @@ describe("The filter chip of My Tickets (ui-spec §7; AC-29)", () => {
     expect(chip()).not.toMatch(/\b(rgb|rgba|hsl|hsla)\(/);
   });
 
+  // Found by looking at the queue's screenshots: the chip sat on the filter labels beneath it.
+  it("leaves a gap between the Ticket Queue's chip and the filters beneath it, on a desktop and on a phone", () => {
+    expect(rule(".tt-queue__chips", chip())).toMatch(/margin-bottom:\s*var\(--tt-space-3\)/);
+  });
+
   // Found by looking at the phone screenshot: Lab 2's `flex: 1 1 240px` on the search box is a
   // width in a row, and a 240 px tall box in the column the toolbar becomes on a phone.
   it("keeps the search box one control tall on a phone, where the toolbar is a column", () => {
@@ -452,5 +457,76 @@ describe("The filter chip of My Tickets (ui-spec §7; AC-29)", () => {
 describe("The Requester Dashboard's empty list (ui-spec §3.1)", () => {
   it("leaves no gap under the message, so an empty card is as tight as one with a button", () => {
     expect(rule(".tt-dash__list > .tt-muted", sectionOf("Metric card and Requester Dashboard"))).toMatch(/margin:\s*0/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Lab 4, Issue 8 — the staff dashboard's layout (ui-spec §3.2, §3.3, §3.6)
+// ---------------------------------------------------------------------------
+
+describe("STYLE-02 the staff dashboard's layout (AC-29, ui-spec §3.2, §3.6)", () => {
+  const section = () => sectionOf("Staff Dashboard");
+
+  it("draws a status count as a link with the focus outline, a hover state, and no underline from the browser", () => {
+    const body = rule(".tt-dash-status", section());
+    expect(body).toMatch(/text-decoration:\s*none/);
+    expect(body).toMatch(/border:\s*1px solid var\(--tt-border\)/);
+    expect(body).toMatch(/background:\s*var\(--tt-surface\)/);
+    expect(rule(".tt-dash-status:hover", section())).toMatch(/background:\s*var\(--tt-green-pale\)/);
+    expect(rule(".tt-dash-status:focus-visible", section())).toMatch(/outline:\s*2px solid var\(--tt-green-secondary\)/);
+  });
+
+  it("lets the five status counts wrap onto a second line instead of squeezing, from tablet down", () => {
+    expect(rule(".tt-dash__status-row", section())).toMatch(/flex-wrap:\s*wrap/);
+  });
+
+  it("draws the status value in the brand green, bold, in the size of the card's link text", () => {
+    const value = rule(".tt-dash-status__value", section());
+    expect(value).toMatch(/(?<![-\w])color:\s*var\(--tt-green-primary\)/);
+    expect(value).toMatch(/font-weight:\s*(600|700)/);
+  });
+
+  it("puts My Tickets and Urgent Tickets side by side from 992 px, and stacks them below", () => {
+    expect(rule(".tt-dash__pair", section())).toMatch(/grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+    expect(rule(".tt-dash__pair", mediaBlock("(max-width: 991px)", section()))).toMatch(/grid-template-columns:\s*1fr/);
+  });
+
+  it("does not let Lab 2's rule between neighbouring cards push the second list down beside the first", () => {
+    expect(rule(".tt-dash__pair > .tt-card", section())).toMatch(/margin-top:\s*0/);
+  });
+
+  it("puts a Ticket row's badges and owner on a second line, so six things fit a half-width list", () => {
+    const meta = rule(".tt-dash-row__meta", section());
+    expect(meta).toMatch(/grid-column:\s*1\s*\/\s*-1/);
+    expect(meta).toMatch(/flex-wrap:\s*wrap/);
+    expect(rule(".tt-dash-row--staff", section())).toMatch(/grid-template-columns:\s*auto\s+minmax\(0,\s*1fr\)\s+auto/);
+  });
+
+  it("keeps an action row's description on one line with an ellipsis, in a cell that may shrink", () => {
+    expect(rule(".tt-dash-row--action", section())).toMatch(/minmax\(0,\s*1fr\)/);
+    // The shared rule of the Requester Dashboard's section, which an action row's description uses.
+    expect(rule(".tt-dash-row__summary")).toMatch(/text-overflow:\s*ellipsis/);
+  });
+
+  it("orders a staff row on a phone as the number, the Summary, the date, and then the badges", () => {
+    const small = mediaBlock("(max-width: 767px)", section());
+    expect(rule(".tt-dash-row__meta", small)).toMatch(/order:\s*5/);
+    expect(rule(".tt-dash-row--staff", small)).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto/);
+  });
+
+  it("styles the status row's skeleton at a fixed height, so the page does not jump", () => {
+    expect(rule(".tt-skeleton--row", section())).toMatch(/height:\s*\d+px/);
+  });
+
+  it("keeps the Administrator's plain counts in the same grid as the cards, with no space of their own beneath", () => {
+    expect(rule(".tt-accounts .tt-dash__cards", section())).toMatch(/margin:\s*var\(--tt-space-3\)\s+0\s+0/);
+  });
+
+  it("adds no hard-coded colour, and every colour in the section is a token", () => {
+    expect(section()).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(section()).not.toMatch(/\b(rgb|rgba|hsl|hsla)\(/);
+    for (const match of section().matchAll(/(?<![-\w])(?:color|background|border-color):\s*([^;]+);/g)) {
+      expect(match[1], match[0]).toMatch(/^(var\(--tt-|transparent|inherit|none)/);
+    }
   });
 });

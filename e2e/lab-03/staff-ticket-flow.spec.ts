@@ -28,6 +28,8 @@ test.beforeAll(async () => {
 const operational = (page: Page) => page.getByRole("region", { name: "Operational" });
 
 async function openFromQueue(page: Page, number: string) {
+  // Changed in Lab 4 (Issue 8, D-09): signing in lands on the Dashboard, so open the queue first.
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Ticket Queue" }).click();
   await page.getByLabel("Search number or summary").fill(number);
   // The queue shows a table from 768px and cards below; either way the
   // Ticket Number is the link to the detail screen.
@@ -37,9 +39,13 @@ async function openFromQueue(page: Page, number: string) {
 
 test("E2E-04 IT Staff find the new ticket among the unassigned ones, claim it, and it becomes Open", async ({ page }) => {
   await signIn(page, ACCOUNTS.staff.email, ACCOUNTS.staff.name);
-  await expect(page).toHaveURL(/\/queue$/);
-
-  await page.getByLabel("Owner").selectOption("unassigned");
+  // Changed in Lab 4 (Issue 8, D-09): IT Staff land on the Dashboard, and the way to the
+  // unassigned work is its quick action, which opens the queue already filtered.
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await page.getByRole("link", { name: "Unassigned Tickets" }).click();
+  await expect(page).toHaveURL(/\/queue\?owner=unassigned&group=open$/);
+  await expect(page.getByLabel("Owner")).toHaveValue("unassigned");
+  await expect(page.getByText("Open tickets", { exact: true })).toBeVisible();
   await page.getByLabel("Search number or summary").fill(ticket.ticketNumber);
   const row = page.getByRole("row").filter({ hasText: ticket.ticketNumber });
   await expect(row).toBeVisible();
@@ -143,6 +149,8 @@ test("E2E-07 the Requester marks a problem as appearing resolved, and IT Staff s
   await logOut(page);
 
   await signIn(page, ACCOUNTS.staff.email, ACCOUNTS.staff.name);
+  // Changed in Lab 4 (Issue 8, D-09): signing in lands on the Dashboard, so open the queue first.
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Ticket Queue" }).click();
   await page.getByLabel("Search number or summary").fill(flagged.ticketNumber);
   const row = page.getByRole("row").filter({ hasText: flagged.ticketNumber });
   await expect(row.getByText("Requester says resolved")).toBeVisible();

@@ -16,9 +16,10 @@ import { Login } from "./screens/Login.js";
 import { ChangePassword } from "./screens/ChangePassword.js";
 import { CreateTicket } from "./screens/CreateTicket.js";
 import { RequesterDashboard } from "./screens/RequesterDashboard.js";
+import { StaffDashboard } from "./screens/StaffDashboard.js";
 import { MyTicketsWithUrl } from "./screens/MyTickets.js";
 import { RequesterTicketDetail } from "./screens/RequesterTicketDetail.js";
-import { StaffTicketQueue } from "./screens/StaffTicketQueue.js";
+import { StaffTicketQueueWithUrl } from "./screens/StaffTicketQueue.js";
 import { StaffTicketDetail } from "./screens/StaffTicketDetail.js";
 import { UserManagement } from "./screens/UserManagement.js";
 import { AppShell } from "./components/AppShell.js";
@@ -31,7 +32,7 @@ export { ROUTES };
 //
 //   /login              Login, outside the shell
 //   /change-password    mandatory (no shell) or voluntary (in the shell)
-//   /dashboard          Requester (Lab 4, Issue 7)
+//   /dashboard          every role, each its own (Lab 4, Issues 7 and 8)
 //   /tickets, /tickets/new, /tickets/:id    Requester
 //   /queue, /queue/:id  IT Staff and Administrator
 //   /users              Administrator
@@ -45,8 +46,8 @@ export { ROUTES };
 // when it belongs to the role that signed in. The queue is shared by IT Staff
 // and Administrators (Lab 4 D-08); every other page has one owner.
 function rolesForPath(path: string): Role[] {
-  // Lab 4, Issue 7: the Dashboard is the Requester's until Issue 8 gives the others theirs.
-  if (path.startsWith(ROUTES.dashboard)) return ["REQUESTER"];
+  // Lab 4: the Dashboard is every role's, and shows that role's own (Issues 7 and 8).
+  if (path.startsWith(ROUTES.dashboard)) return ["REQUESTER", "IT_STAFF", "ADMINISTRATOR"];
   if (path.startsWith(ROUTES.list)) return ["REQUESTER"];
   if (path.startsWith(ROUTES.queue)) return ["IT_STAFF", "ADMINISTRATOR"];
   if (path.startsWith(ROUTES.users)) return ["ADMINISTRATOR"];
@@ -174,12 +175,18 @@ function CatchAll() {
   return <Navigate to={user ? LANDING[user.role] : ROUTES.login} replace />;
 }
 
+// One address, the Dashboard of whoever is signed in: a Requester's is theirs alone (Issue 7), IT Staff
+// and an Administrator share one, the Administrator's with the account counts the server adds (Issue 8).
 function DashboardRoute() {
   const { user } = useAuth();
   if (!user) return null;
   return (
     <Page>
-      <RequesterDashboard fullName={user.fullName} />
+      {user.role === "REQUESTER" ? (
+        <RequesterDashboard fullName={user.fullName} />
+      ) : (
+        <StaffDashboard fullName={user.fullName} currentUserId={user.id} />
+      )}
     </Page>
   );
 }
@@ -224,7 +231,7 @@ function QueueRoute() {
   if (!user) return null;
   return (
     <Page>
-      <StaffTicketQueue currentUserId={user.id} />
+      <StaffTicketQueueWithUrl currentUserId={user.id} />
     </Page>
   );
 }
@@ -265,7 +272,14 @@ function AppRoutes() {
       <Route path={ROUTES.login} element={<LoginRoute />} />
       <Route path={ROUTES.password} element={<PasswordRoute />} />
 
-      <Route path={ROUTES.dashboard} element={<RequesterRoute><DashboardRoute /></RequesterRoute>} />
+      <Route
+        path={ROUTES.dashboard}
+        element={
+          <RequireAuth roles={["REQUESTER", "IT_STAFF", "ADMINISTRATOR"]}>
+            <DashboardRoute />
+          </RequireAuth>
+        }
+      />
       <Route path={ROUTES.list} element={<RequesterRoute><MyTicketsRoute /></RequesterRoute>} />
       <Route path={ROUTES.create} element={<RequesterRoute><CreateTicketRoute /></RequesterRoute>} />
       <Route path="/tickets/:id" element={<RequesterRoute><TicketDetailRoute /></RequesterRoute>} />

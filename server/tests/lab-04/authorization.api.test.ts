@@ -15,10 +15,9 @@ import { endTestSessions, signInAs } from "../helpers/signIn.js";
 // The seam is the HTTP boundary: a real login cookie, the real Express app, the
 // real database. Nothing here reaches into the guard to test it.
 //
-// The staff half of SEC-05 and the staff dashboard's parts of SEC-01 and SEC-07 cannot be
-// written until that endpoint exists. They arrive with Issue 8, which adds its route to the
-// tables below. The status-history route (SEC-01) and the `changedBy` of SEC-08 arrived with
-// Issue 6; the Requester dashboard's (SEC-01, SEC-05, SEC-07) with Issue 7. See tests.md §3.1.
+// The status-history route (SEC-01) and the `changedBy` of SEC-08 arrived with Issue 6; the
+// Requester dashboard's SEC-01, SEC-05, and SEC-07 with Issue 7; and the staff dashboard's,
+// with its route in the staff table below, with Issue 8. See tests.md §3.1.
 
 const prisma = getPrisma();
 const ALLOWED_ORIGIN = "http://localhost:5173";
@@ -39,6 +38,8 @@ const STAFF_ROUTES: Row[] = [
   ["GET", "/api/staff/attachments/1/download"],
   ["POST", "/api/staff/tickets/1/actions-taken"],
   ["PATCH", "/api/staff/tickets/1/actions-taken/1"],
+  // Lab 4, Issue 8: the staff dashboard, behind the same prefix guard.
+  ["GET", "/api/staff/dashboard"],
 ];
 // Routes that any signed-in role reaches, with ownership deciding what a Requester sees.
 const SHARED_ROUTES: Row[] = [
@@ -581,5 +582,59 @@ describe("SEC-07 a caller cannot name someone else in the Requester dashboard (B
     // And the other Requester, asking plainly, does see it: it is theirs.
     const own = await call("GET", "/api/dashboard/requester", cookies.otherRequester);
     expect((own.body.recentTickets as Array<{ id: number }>)[0].id).toBe(theirs.id);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Lab 4, Issue 8 — the staff dashboard under SEC-05 and SEC-07
+// ---------------------------------------------------------------------------------------------
+
+describe("SEC-05 the staff dashboard answers IT Staff and an Administrator, and refuses a Requester (AC-20, BR-42, BR-43)", () => {
+  it.each(["staff", "admin"] as const)("is 200 for %s", async (who) => {
+    const res = await call("GET", "/api/staff/dashboard", cookies[who]);
+    expect(res.status).toBe(200);
+  });
+
+  it("is 403 FORBIDDEN for a Requester, with the bare error envelope and no figure in it", async () => {
+    const res = await call("GET", "/api/staff/dashboard", cookies.requester);
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe("FORBIDDEN");
+    expect(Object.keys(res.body)).toEqual(["error"]);
+  });
+
+  it("keeps the guard order: 401 for no session before 403 for the wrong role (BR-44)", async () => {
+    expect((await call("GET", "/api/staff/dashboard")).status).toBe(401);
+    expect((await call("GET", "/api/staff/dashboard", cookies.requester)).status).toBe(403);
+  });
+
+  it("gives the account counts to the Administrator and to nobody else", async () => {
+    expect((await call("GET", "/api/staff/dashboard", cookies.admin)).body.userCounts).toBeDefined();
+    expect("userCounts" in (await call("GET", "/api/staff/dashboard", cookies.staff)).body).toBe(false);
+  });
+});
+
+describe("SEC-07 a caller cannot name someone else in the staff dashboard (BR-37)", () => {
+  it("shows IT Staff only their own 'mine' whatever me, userId, owner, or requesterId they send, in the query or the headers", async () => {
+    const mine = await prisma.ticket.count({
+      where: { ownerId: ids.staff, currentStatus: { in: ["NEW", "OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "REOPENED"] } },
+    });
+    const claim = `me=${ids.admin}&userId=${ids.admin}&owner=${ids.admin}&requesterId=${ids.otherRequester}`;
+    const res = await call("GET", `/api/staff/dashboard?${claim}`, cookies.staff, {
+      "X-User-Id": String(ids.admin),
+      "X-Requester-Id": String(ids.otherRequester),
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.metrics.assignedToMe.value).toBe(mine);
+    for (const t of res.body.myTickets as Array<{ owner: { id: number } | null }>) expect(t.owner?.id).toBe(ids.staff);
+    const plain = await call("GET", "/api/staff/dashboard", cookies.staff);
+    const { generatedAt: _a, ...left } = plain.body;
+    const { generatedAt: _b, ...right } = res.body;
+    expect(right).toEqual(left);
+  });
+
+  it("does not let IT Staff ask for the account counts: userCounts is not a parameter, and the answer has none", async () => {
+    const res = await call("GET", "/api/staff/dashboard?userCounts=true&role=ADMINISTRATOR", cookies.staff);
+    expect(res.status).toBe(200);
+    expect("userCounts" in res.body).toBe(false);
   });
 });

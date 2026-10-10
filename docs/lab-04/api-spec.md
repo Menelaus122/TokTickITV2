@@ -96,7 +96,9 @@ Dashboards list Tickets in this smaller row, never in the queue's full shape
 }
 ```
 
-The staff lists add `itPriority` and `owner` (`null`, or `{ id, fullName }`).
+The staff lists add `itPriority` and `owner` (`null`, or `{ id, fullName, isActive }`): the
+same owner shape the Ticket Queue's rows have, so a screen can say an owner's account is inactive
+(Lab 3 BR-26). It has no `role` until Issue 9 adds one to every staff shape together (BR-55).
 
 ---
 
@@ -443,9 +445,16 @@ IT Staff and Administrators. A Requester is `403 FORBIDDEN`.
   `activeItStaff` says 4 (BR-40, D-12). The counts are plain numbers.
 * `byStatus` always has the five open statuses in this order (BR-35), `0` where
   none.
+* `byStatus` counts **every** Ticket in each open status, whoever owns it, so it is the
+  same for every caller; only the cards and lists named "me" depend on the caller.
 * `myTickets`, `urgentTickets`, and `myRecentActions` hold at most 5 entries in the
-  order BR-36 sets. `description` in `myRecentActions` is cut to 120 characters
-  with an ellipsis; the full text is on the Ticket.
+  order BR-36 sets. `myRecentActions` is in the order the actions were **recorded**
+  (`createdAt`, then `id`), not the order of the dates typed on them, so an action recorded
+  now with an earlier Action Date/Time is still the newest. `description` in
+  `myRecentActions` is cut to the first 120 **characters** (not UTF-16 code units, so an
+  emoji at the boundary is never split) followed by `…` when it is longer than 120; a
+  description of 120 or fewer is returned whole, and its line breaks are kept. The full
+  text is on the Ticket.
 * "Me" is the session user, so two IT Staff members calling it get different
   `assignedToMe`, `myTickets`, and `myRecentActions` (AC-19).
 

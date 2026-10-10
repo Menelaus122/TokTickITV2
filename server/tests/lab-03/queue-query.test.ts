@@ -20,6 +20,8 @@ describe("UNIT-09 defaults, permitted values, and rejection", () => {
     expect(ok({})).toEqual({
       q: null,
       status: null,
+      // Lab 4 (D-12): the optional `group` filter, none by default.
+      group: null,
       itPriority: null,
       categoryId: null,
       owner: { kind: "any" },

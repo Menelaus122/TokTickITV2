@@ -13,9 +13,9 @@ import type { AuthUser, Role, StaffTicketDetail as Detail } from "../../src/api.
 // boundary, so it is the only thing mocked.
 //
 // UI-27's "lands on their Dashboard" and the Dashboard navigation item (UI-37) arrived for
-// the Requester with Issue 7; IT Staff and Administrators get theirs with Issue 8, so until
-// then a staff role bounced from a page lands on its own Lab 3 home. UI-28's Actions Taken
-// controls arrived with Issue 5.
+// the Requester with Issue 7 and for IT Staff and Administrators with Issue 8, so every role
+// bounced from a page lands on its own Dashboard. UI-28's Actions Taken controls arrived with
+// Issue 5.
 
 const USERS: Record<Role, AuthUser> = {
   REQUESTER: { id: 1, fullName: "Anucha Wongsawat", email: "anucha.wong@kmutt.ac.th", role: "REQUESTER", isActive: true, mustChangePassword: false },
@@ -60,9 +60,31 @@ const BOARD: api.RequesterDashboard = {
   recentTickets: [],
 };
 
+const STAFF_BOARD: api.StaffDashboard = {
+  generatedAt: "2026-10-05T09:00:00.000Z",
+  metrics: {
+    unassigned: { value: 2, href: "/queue?owner=unassigned&group=open" },
+    assignedToMe: { value: 4, href: "/queue?owner=me&group=open" },
+    waitingForRequester: { value: 3, href: "/queue?status=WAITING_FOR_REQUESTER" },
+    urgent: { value: 5, href: "/queue?itPriority=URGENT&group=open" },
+  },
+  byStatus: [
+    { status: "NEW", value: 1, href: "/queue?status=NEW" },
+    { status: "OPEN", value: 1, href: "/queue?status=OPEN" },
+    { status: "IN_PROGRESS", value: 1, href: "/queue?status=IN_PROGRESS" },
+    { status: "WAITING_FOR_REQUESTER", value: 1, href: "/queue?status=WAITING_FOR_REQUESTER" },
+    { status: "REOPENED", value: 1, href: "/queue?status=REOPENED" },
+  ],
+  myTickets: [],
+  urgentTickets: [],
+  myRecentActions: [],
+};
+
 beforeEach(() => {
   // Lab 4, Issue 7: a Requester lands on the Dashboard, so every Requester sign-in asks for it.
   vi.spyOn(api, "fetchRequesterDashboard").mockResolvedValue(BOARD);
+  // Lab 4, Issue 8: and so does every IT Staff member and Administrator, for theirs.
+  vi.spyOn(api, "fetchStaffDashboard").mockResolvedValue(STAFF_BOARD);
   vi.spyOn(api, "fetchMyTickets").mockResolvedValue({
     data: [], meta: { page: 1, pageSize: 10, totalItems: 0, totalPages: 0, hasPrev: false, hasNext: false },
   });
@@ -97,7 +119,7 @@ describe("UI-27 an Administrator works from the Ticket Queue (FR-23, FR-24, D-08
     render(<TokTickITApp initialEntries={["/users"]} />);
 
     const nav = await screen.findByRole("navigation", { name: "Main" });
-    expect(within(nav).getAllByRole("link").map((link) => link.textContent)).toEqual(["Ticket Queue", "User Management"]);
+    expect(within(nav).getAllByRole("link").map((link) => link.textContent)).toEqual(["Dashboard", "Ticket Queue", "User Management"]);
   });
 
   it("opens the Ticket Queue, with the queue's own data and no forbidden notice", async () => {
@@ -142,9 +164,9 @@ describe("UI-27 an Administrator works from the Ticket Queue (FR-23, FR-24, D-08
     ["REQUESTER", "/queue", "Dashboard", "fetchQueue"],
     ["REQUESTER", "/queue/12", "Dashboard", "fetchStaffTicket"],
     ["REQUESTER", "/users", "Dashboard", "fetchUsers"],
-    ["IT_STAFF", "/users", "Ticket Queue", "fetchUsers"],
-    ["IT_STAFF", "/tickets", "Ticket Queue", "fetchMyTickets"],
-    ["ADMINISTRATOR", "/tickets/new", "User Management", "fetchCategories"],
+    ["IT_STAFF", "/users", "Dashboard", "fetchUsers"],
+    ["IT_STAFF", "/tickets", "Dashboard", "fetchMyTickets"],
+    ["ADMINISTRATOR", "/tickets/new", "Dashboard", "fetchCategories"],
   ] as [Role, string, string, "fetchQueue" | "fetchStaffTicket" | "fetchUsers" | "fetchMyTickets" | "fetchCategories"][])(
     "a %s typing %s is still sent home with a forbidden notice",
     async (role, path, home, refusedRequest) => {
@@ -315,7 +337,7 @@ describe("UI-28 an Administrator on the ticket detail acts as themself (BR-45)",
 // Lab 4, Issue 7 — UI-37 (the Requester's part) and the Requester's half of UI-27
 // ---------------------------------------------------------------------------------------------
 
-describe("UI-37 the Requester's navigation starts with Dashboard, and Dashboard is where they land (AC-34, FR-22, D-09)", () => {
+describe("UI-37 each role's navigation starts with Dashboard, and Dashboard is where they land (AC-34, FR-22, D-09)", () => {
   const nav = () => within(screen.getByRole("navigation", { name: "Main" }));
 
   it("offers Dashboard, My Tickets, and Create Ticket, in that order", async () => {
@@ -388,40 +410,108 @@ describe("UI-37 the Requester's navigation starts with Dashboard, and Dashboard 
     expect(api.fetchRequesterDashboard).not.toHaveBeenCalled();
   });
 
-  it("is a Requester's page only: IT Staff and an Administrator typing /dashboard are sent to their own home with the notice, and nothing breaks", async () => {
-    for (const [role, home] of [["IT_STAFF", "Ticket Queue"], ["ADMINISTRATOR", "User Management"]] as const) {
+  it("opens each role's own Dashboard on /dashboard, and asks only for the data that role has", async () => {
+    for (const role of ["IT_STAFF", "ADMINISTRATOR"] as const) {
       signedInAs(role);
       const { unmount } = render(<TokTickITApp initialEntries={["/dashboard"]} />);
-      expect(await screen.findByText(FORBIDDEN), role).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: home }), role).toHaveAttribute("aria-current", "page");
+      const first = USERS[role].fullName.split(" ")[0];
+      expect(await screen.findByRole("heading", { level: 1, name: `Welcome back, ${first}` }), role).toBeInTheDocument();
+      expect(api.fetchStaffDashboard, role).toHaveBeenCalled();
       expect(api.fetchRequesterDashboard, role).not.toHaveBeenCalled();
+      expect(screen.queryByText(FORBIDDEN), role).not.toBeInTheDocument();
+      unmount();
+      vi.mocked(api.fetchStaffDashboard).mockClear();
+    }
+    signedInAs("REQUESTER");
+    render(<TokTickITApp initialEntries={["/dashboard"]} />);
+    expect(await screen.findByRole("heading", { level: 1, name: "Welcome, Anucha" })).toBeInTheDocument();
+    expect(api.fetchStaffDashboard).not.toHaveBeenCalled();
+  });
+
+  it("gives the Administrator the account counts the server sent, and shows IT Staff none", async () => {
+    vi.spyOn(api, "fetchStaffDashboard").mockResolvedValue({
+      ...STAFF_BOARD,
+      userCounts: { activeRequesters: { value: 6 }, activeItStaff: { value: 4 }, activeAdministrators: { value: 2 }, inactive: { value: 3 } },
+    });
+    signedInAs("ADMINISTRATOR");
+    const { unmount } = render(<TokTickITApp initialEntries={["/dashboard"]} />);
+    expect(await screen.findByRole("region", { name: "Accounts" })).toBeInTheDocument();
+    unmount();
+
+    vi.spyOn(api, "fetchStaffDashboard").mockResolvedValue(STAFF_BOARD);
+    signedInAs("IT_STAFF");
+    render(<TokTickITApp initialEntries={["/dashboard"]} />);
+    await screen.findByRole("link", { name: /^Unassigned: / });
+    expect(screen.queryByRole("region", { name: "Accounts" })).not.toBeInTheDocument();
+  });
+
+  it.each(["IT_STAFF", "ADMINISTRATOR"] as const)("offers %s a Dashboard first, then the screens Lab 3 and Issue 2 gave them, with the Dashboard current on /dashboard", async (role) => {
+    signedInAs(role);
+    render(<TokTickITApp initialEntries={["/dashboard"]} />);
+    await screen.findByRole("link", { name: /^Unassigned: / });
+    const expected = role === "ADMINISTRATOR" ? ["Dashboard", "Ticket Queue", "User Management"] : ["Dashboard", "Ticket Queue"];
+    expect(nav().getAllByRole("link").map((link) => link.textContent)).toEqual(expected);
+    expect(nav().getByRole("link", { name: "Dashboard" })).toHaveAttribute("aria-current", "page");
+    expect(nav().getByRole("link", { name: "Ticket Queue" })).not.toHaveAttribute("aria-current");
+  });
+
+  it.each(["IT_STAFF", "ADMINISTRATOR"] as const)("lands %s on the Dashboard after signing in, at the root, and at a page that does not exist", async (role) => {
+    vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(null);
+    vi.spyOn(api, "login").mockResolvedValue(USERS[role]);
+    const first = render(<TokTickITApp initialEntries={["/login"]} />);
+    await userEvent.type(await screen.findByLabelText(/^Email/), USERS[role].email);
+    await userEvent.type(screen.getByLabelText(/^Password/), "Toktickit#2026");
+    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByRole("heading", { level: 1, name: /^Welcome back, / })).toBeInTheDocument();
+    expect(nav().getByRole("link", { name: "Dashboard" })).toHaveAttribute("aria-current", "page");
+    first.unmount();
+
+    for (const path of ["/", "/nonsense"]) {
+      signedInAs(role);
+      const { unmount } = render(<TokTickITApp initialEntries={[path]} />);
+      expect(await screen.findByRole("heading", { level: 1, name: /^Welcome back, / }), path).toBeInTheDocument();
       unmount();
     }
   });
 
-  it("takes IT Staff who were sent away from /dashboard to their own home on sign-in, without the 'no access' notice", async () => {
-    vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(null);
-    vi.spyOn(api, "login").mockResolvedValue(USERS.IT_STAFF);
-    render(<TokTickITApp initialEntries={["/dashboard"]} />);
-
-    await userEvent.type(await screen.findByLabelText(/^Email/), USERS.IT_STAFF.email);
-    await userEvent.type(screen.getByLabelText(/^Password/), "Toktickit#2026");
-    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
-
-    expect(await screen.findByRole("heading", { name: "Ticket Queue" })).toBeInTheDocument();
-    expect(screen.queryByText(FORBIDDEN)).not.toBeInTheDocument();
+  it.each(["IT_STAFF", "ADMINISTRATOR"] as const)("links the wordmark of %s to the Dashboard from any page", async (role) => {
+    signedInAs(role);
+    render(<TokTickITApp initialEntries={["/queue"]} />);
+    expect(await screen.findByRole("link", { name: "TokTickIT" })).toHaveAttribute("href", "/dashboard");
   });
 
-  it("keeps the other roles' navigation as Lab 3 and Issue 2 left it, until Issue 8 gives them a Dashboard", async () => {
-    signedInAs("IT_STAFF");
-    const { unmount } = render(<TokTickITApp initialEntries={["/queue"]} />);
-    await screen.findByRole("heading", { name: "Ticket Queue" });
-    expect(nav().getAllByRole("link").map((link) => link.textContent)).toEqual(["Ticket Queue"]);
-    unmount();
+  it.each(["IT_STAFF", "ADMINISTRATOR"] as const)("takes %s who were sent from /dashboard back to it on sign-in, and to the page they asked for when it is theirs", async (role) => {
+    vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(null);
+    vi.spyOn(api, "login").mockResolvedValue(USERS[role]);
+    const asked = render(<TokTickITApp initialEntries={["/dashboard"]} />);
+    await userEvent.type(await screen.findByLabelText(/^Email/), USERS[role].email);
+    await userEvent.type(screen.getByLabelText(/^Password/), "Toktickit#2026");
+    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByRole("heading", { level: 1, name: /^Welcome back, / })).toBeInTheDocument();
+    expect(screen.queryByText(FORBIDDEN)).not.toBeInTheDocument();
+    asked.unmount();
 
-    signedInAs("ADMINISTRATOR");
-    render(<TokTickITApp initialEntries={["/users"]} />);
-    await screen.findByRole("link", { name: "User Management" });
-    expect(nav().getAllByRole("link").map((link) => link.textContent)).toEqual(["Ticket Queue", "User Management"]);
+    render(<TokTickITApp initialEntries={["/queue?group=open&owner=unassigned"]} />);
+    await userEvent.type(await screen.findByLabelText(/^Email/), USERS[role].email);
+    await userEvent.type(screen.getByLabelText(/^Password/), "Toktickit#2026");
+    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByRole("heading", { name: "Ticket Queue" })).toBeInTheDocument();
+    await waitFor(() => expect(api.fetchQueue).toHaveBeenCalled());
+  });
+
+  it("sends a Requester who types /queue or /users to their own Dashboard, and never to a staff one", async () => {
+    signedInAs("REQUESTER");
+    render(<TokTickITApp initialEntries={["/queue"]} />);
+    expect(await screen.findByText(FORBIDDEN)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Welcome, Anucha" })).toBeInTheDocument();
+    expect(api.fetchStaffDashboard).not.toHaveBeenCalled();
+  });
+
+  it("keeps the Ticket Queue the current page on /queue, with the Dashboard beside it and not marked", async () => {
+    signedInAs("IT_STAFF");
+    render(<TokTickITApp initialEntries={["/queue"]} />);
+    await screen.findByRole("heading", { name: "Ticket Queue" });
+    expect(nav().getByRole("link", { name: "Ticket Queue" })).toHaveAttribute("aria-current", "page");
+    expect(nav().getByRole("link", { name: "Dashboard" })).not.toHaveAttribute("aria-current");
   });
 });
