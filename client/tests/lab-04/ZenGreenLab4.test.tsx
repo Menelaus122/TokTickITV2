@@ -8,6 +8,8 @@ import * as api from "../../src/api.js";
 import { FollowUpPill } from "../../src/components/index.js";
 import { ActionsTakenRegion } from "../../src/components/ActionsTakenRegion.js";
 import { StatusHistoryRegion } from "../../src/components/StatusHistoryRegion.js";
+import { MetricCard } from "../../src/components/MetricCard.js";
+import { MemoryRouter } from "react-router-dom";
 
 // Lab 4 UI style — docs/lab-04/tests.md §2.9. Issue 5 adds STYLE-03: the
 // follow-up pill and the Follow-up Note's asterisk (ui-spec §1.2, §1.3, §4.2;
@@ -237,5 +239,218 @@ describe("STYLE-06 the Action Taken card and the timeline (AC-29, ui-spec §1.2,
     expect(step).toMatch(/overflow-wrap:\s*anywhere/);
     expect(step).not.toMatch(/overflow:\s*hidden|text-overflow|white-space:\s*nowrap/);
     expect(rule(".tt-staff-detail__blocked li", sectionOf("Status control"))).toMatch(/overflow-wrap:\s*anywhere/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Lab 4, Issue 7 — STYLE-02 (docs/lab-04/tests.md §2.9; AC-29, ui-spec §1.1, §3.1, §3.6)
+// ---------------------------------------------------------------------------
+
+/** The text inside the `@media` block with this exact query, braces balanced. */
+function mediaBlock(query: string, source: string): string {
+  const start = source.indexOf(`@media ${query} {`);
+  if (start === -1) throw new Error(`No @media ${query} in the section`);
+  let depth = 0;
+  for (let i = source.indexOf("{", start); i < source.length; i += 1) {
+    if (source[i] === "{") depth += 1;
+    if (source[i] === "}") depth -= 1;
+    if (depth === 0) return source.slice(source.indexOf("{", start) + 1, i);
+  }
+  throw new Error(`Unbalanced @media ${query}`);
+}
+
+describe("STYLE-02 the metric card (AC-29, ui-spec §1.1)", () => {
+  const metric = () => sectionOf("Metric card and Requester Dashboard");
+
+  it("is one link holding the label, the value, and View all, so the whole card is the target", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <MetricCard label="Open Tickets" value={3} to="/tickets?group=open" />
+      </MemoryRouter>,
+    );
+    const links = container.querySelectorAll("a");
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute("href", "/tickets?group=open");
+    expect(within(links[0] as HTMLElement).getByText("Open Tickets")).toBeInTheDocument();
+    expect(within(links[0] as HTMLElement).getByText("3")).toBeInTheDocument();
+    expect(links[0]).toHaveTextContent(/View all/);
+    expect(screen.getByRole("link", { name: "Open Tickets: 3. View all" })).toBe(links[0]);
+  });
+
+  it("is a plain block, with no link and no View all, when it has nowhere to go (BR-40)", () => {
+    const { container } = render(<MetricCard label="Active Administrators" value={2} />);
+    expect(container.querySelector("a")).toBeNull();
+    expect(container.firstElementChild?.tagName).toBe("DIV");
+    expect(container).not.toHaveTextContent(/View all/);
+    expect(container).toHaveTextContent("Active Administrators");
+    expect(container).toHaveTextContent("2");
+  });
+
+  it("draws 0 as 0 and keeps the link (BR-39)", () => {
+    render(
+      <MemoryRouter>
+        <MetricCard label="Resolved" value={0} to="/tickets?status=RESOLVED" />
+      </MemoryRouter>,
+    );
+    const card = screen.getByRole("link", { name: "Resolved: 0. View all" });
+    expect(within(card).getByText("0")).toBeInTheDocument();
+  });
+
+  it("draws the label at 12 px, uppercase, in the muted colour", () => {
+    const label = rule(".tt-metric__label", metric());
+    expect(rule(".tt-metric", metric())).toMatch(/--tt-font-caption:\s*12px/);
+    expect(label).toMatch(/font-size:\s*var\(--tt-font-caption\)/);
+    expect(label).toMatch(/text-transform:\s*uppercase/);
+    expect(label).toMatch(/(?<![-\w])color:\s*var\(--tt-text-muted\)/);
+  });
+
+  it("draws the value at 32 px in the brand green", () => {
+    const value = rule(".tt-metric__value", metric());
+    expect(rule(".tt-metric", metric())).toMatch(/--tt-font-metric:\s*32px/);
+    expect(value).toMatch(/font-size:\s*var\(--tt-font-metric\)/);
+    expect(value).toMatch(/(?<![-\w])color:\s*var\(--tt-green-primary\)/);
+  });
+
+  it("draws View all at 14 px, the label size, in the brand green", () => {
+    const link = rule(".tt-metric__link", metric());
+    expect(link).toMatch(/font-size:\s*var\(--tt-font-label\)/);
+    expect(link).toMatch(/(?<![-\w])color:\s*var\(--tt-green-primary\)/);
+  });
+
+  it("is built from Lab 2's card: its surface, border, radius, and shadow", () => {
+    const card = rule(".tt-metric", metric());
+    expect(card).toMatch(/background:\s*var\(--tt-surface\)/);
+    expect(card).toMatch(/border:\s*1px solid var\(--tt-border\)/);
+    expect(card).toMatch(/border-radius:\s*var\(--tt-radius\)/);
+    expect(card).toMatch(/box-shadow:\s*var\(--tt-shadow-card\)/);
+  });
+
+  it("shows the focus outline of Lab 2's links on the card, and has a hover and an active state", () => {
+    expect(rule(".tt-metric--link:focus-visible", metric())).toMatch(/outline:\s*2px solid var\(--tt-green-secondary\)/);
+    expect(rule(".tt-metric--link:focus-visible", metric())).toMatch(/outline-offset:\s*2px/);
+    expect(rule(".tt-metric--link:hover", metric())).toMatch(/border-color:\s*var\(--tt-green-primary\)/);
+    expect(rule(".tt-metric--link:active", metric())).toMatch(/background:\s*var\(--tt-green-pale\)/);
+  });
+
+  it("takes no underline from the browser's link style, so the number is not struck through", () => {
+    expect(rule(".tt-metric", metric())).toMatch(/text-decoration:\s*none/);
+  });
+
+  it("adds no hard-coded colour: every colour in the section is a token", () => {
+    const section = sectionOf("Metric card and Requester Dashboard");
+    expect(section).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(section).not.toMatch(/\b(rgb|rgba|hsl|hsla)\(/);
+    for (const match of section.matchAll(/(?<![-\w])(?:color|background|border-color):\s*([^;]+);/g)) {
+      expect(match[1], match[0]).toMatch(/^(var\(--tt-|transparent|inherit|none)/);
+    }
+  });
+});
+
+describe("STYLE-02 the Requester Dashboard's layout (AC-29, ui-spec §3.6)", () => {
+  const section = () => sectionOf("Metric card and Requester Dashboard");
+
+  it("puts four cards in one row from 992 px, as an even grid that cannot be pushed wider by its content", () => {
+    expect(rule(".tt-dash__cards", section())).toMatch(/grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/);
+  });
+
+  it("puts the cards two by two from 768 to 991 px, and one per row below 768 px", () => {
+    expect(rule(".tt-dash__cards", mediaBlock("(max-width: 991px)", section()))).toMatch(/repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+    expect(rule(".tt-dash__cards", mediaBlock("(max-width: 767px)", section()))).toMatch(/grid-template-columns:\s*1fr/);
+  });
+
+  it("keeps a row's Summary to one line with an ellipsis, so a long one cannot widen the page", () => {
+    const summary = rule(".tt-dash-row__summary", section());
+    expect(summary).toMatch(/white-space:\s*nowrap/);
+    expect(summary).toMatch(/overflow:\s*hidden/);
+    expect(summary).toMatch(/text-overflow:\s*ellipsis/);
+    // The cell that holds it may shrink below its text.
+    expect(rule(".tt-dash-row", section())).toMatch(/minmax\(0,\s*1fr\)/);
+  });
+
+  it("draws the Ticket Number in monospace, in the brand green, on one line", () => {
+    const number = rule(".tt-dash-row__number", section());
+    expect(number).toMatch(/font-family:[^;]*monospace/);
+    expect(number).toMatch(/(?<![-\w])color:\s*var\(--tt-green-primary\)/);
+    expect(number).toMatch(/white-space:\s*nowrap/);
+  });
+
+  it("shows the same focus outline on a row and on View all as on every other link", () => {
+    expect(section()).toMatch(/\.tt-dash-row:focus-visible[^{]*\{[^}]*outline:\s*2px solid var\(--tt-green-secondary\)/);
+    expect(section()).toMatch(/\.tt-dash__view-all:focus-visible[^{]*\{[^}]*outline:\s*2px solid var\(--tt-green-secondary\)/);
+  });
+
+  it("moves Refresh below the greeting, and stacks the quick actions with the primary on top, below 768 px", () => {
+    const small = mediaBlock("(max-width: 767px)", section());
+    expect(rule(".tt-dash__head", small)).toMatch(/flex-direction:\s*column/);
+    expect(rule(".tt-dash__buttons", small)).toMatch(/flex-direction:\s*column/);
+    // column, not column-reverse: the primary action is first in the page and stays first.
+    expect(rule(".tt-dash__buttons", small)).not.toMatch(/column-reverse/);
+  });
+
+  it("lets a row break onto lines on a phone: the Summary on its own line, the date below", () => {
+    const small = mediaBlock("(max-width: 767px)", section());
+    expect(rule(".tt-dash-row", small)).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s*auto/);
+    expect(rule(".tt-dash-row__summary", small)).toMatch(/grid-column:\s*1\s*\/\s*-1/);
+  });
+
+  it("styles the Requester Dashboard's skeletons at the size of the cards and the lists, so nothing jumps", () => {
+    expect(rule(".tt-skeleton--card", section())).toMatch(/height:\s*\d+px/);
+    expect(rule(".tt-skeleton--list", section())).toMatch(/height:\s*\d+px/);
+  });
+
+  it("gives a link styled as a button no underline, so Create Ticket looks like Lab 2's button", () => {
+    expect(rule("a.tt-btn", section())).toMatch(/text-decoration:\s*none/);
+  });
+});
+
+describe("The filter chip of My Tickets (ui-spec §7; AC-29)", () => {
+  const chip = () => sectionOf("Filter chip");
+
+  it("names its cross for what it does, and keeps the drawn symbol out of the accessible name", async () => {
+    const { MyTickets } = await import("../../src/screens/MyTickets.js");
+    vi.spyOn(api, "fetchMyTickets").mockResolvedValue({ data: [], meta: { page: 1, pageSize: 10, totalItems: 0, totalPages: 0, hasPrev: false, hasNext: false } });
+    vi.spyOn(api, "fetchCategories").mockResolvedValue([]);
+    vi.spyOn(api, "fetchRelatedSystems").mockResolvedValue([]);
+    const { container } = render(<MyTickets query="group=open" onQueryChange={() => undefined} />);
+    const cross = await screen.findByRole("button", { name: "Remove the Open tickets filter" });
+    expect(cross.textContent).toBe("✕");
+    expect(cross.querySelector("[aria-hidden='true']")).not.toBeNull();
+    expect(container.querySelector(".tt-chip")).toHaveTextContent("Open tickets");
+  });
+
+  it("is drawn in the pale green with the brand green text and border, like Lab 2's green badge", () => {
+    const body = rule(".tt-chip", chip());
+    expect(body).toMatch(/background:\s*var\(--tt-green-pale\)/);
+    expect(body).toMatch(/(?<![-\w])color:\s*var\(--tt-green-primary\)/);
+    expect(body).toMatch(/border:\s*1px solid var\(--tt-green-secondary\)/);
+    expect(body).toMatch(/border-radius:\s*999px/);
+  });
+
+  it("shows the same focus outline on its cross as on every other control", () => {
+    expect(rule(".tt-chip__remove:focus-visible", chip())).toMatch(/outline:\s*2px solid var\(--tt-green-secondary\)/);
+  });
+
+  it("makes its cross a touch target of 44 px on a phone", () => {
+    const small = mediaBlock("(max-width: 767px)", chip());
+    expect(rule(".tt-chip__remove", small)).toMatch(/min-width:\s*44px/);
+    expect(rule(".tt-chip__remove", small)).toMatch(/min-height:\s*44px/);
+  });
+
+  it("adds no hard-coded colour", () => {
+    expect(chip()).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(chip()).not.toMatch(/\b(rgb|rgba|hsl|hsla)\(/);
+  });
+
+  // Found by looking at the phone screenshot: Lab 2's `flex: 1 1 240px` on the search box is a
+  // width in a row, and a 240 px tall box in the column the toolbar becomes on a phone.
+  it("keeps the search box one control tall on a phone, where the toolbar is a column", () => {
+    const search = rule('.tt-toolbar input[type="search"]', mediaBlock("(max-width: 767px)", chip()));
+    expect(search).toMatch(/flex:\s*0 0 auto/);
+  });
+});
+
+describe("The Requester Dashboard's empty list (ui-spec §3.1)", () => {
+  it("leaves no gap under the message, so an empty card is as tight as one with a button", () => {
+    expect(rule(".tt-dash__list > .tt-muted", sectionOf("Metric card and Requester Dashboard"))).toMatch(/margin:\s*0/);
   });
 });

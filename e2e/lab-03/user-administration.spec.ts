@@ -74,7 +74,8 @@ test("E2E-08 an Administrator creates a user, who must change the password; a ne
   // The new one forces the change, then the user lands in the app.
   await fillLogin(page, email, "Second-initial#2026");
   await changeForcedPassword(page, "Second-initial#2026", "Their-own#2026");
-  await expect(page).toHaveURL(/\/tickets$/);
+  // Changed in Lab 4, Issue 7 (D-09): they land on the Dashboard.
+  await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByTestId("current-user")).toHaveText(fullName);
 });
 

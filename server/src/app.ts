@@ -6,10 +6,11 @@ import { attachSession, authRouter, enforcePasswordChange, requireSession } from
 import { apiNotFound, rejectForeignOrigin, requireRole, resolveRequesterIdentity, safeErrors } from "./authorization.js";
 import { validateTicketInput } from "./validation.js";
 import { nextTicketNumber } from "./ticketNumber.js";
-import { parseTicketListQuery, buildPageMeta } from "./listQuery.js";
+import { allowedStatuses, parseTicketListQuery, buildPageMeta } from "./listQuery.js";
 import { conversationRouter } from "./conversation.js";
 import { actionsTakenReadRouter, actionsTakenStaffRouter } from "./actionsTaken.js";
 import { statusHistoryRouter } from "./statusHistory.js";
+import { dashboardRouter } from "./dashboard.js";
 import { staffRouter } from "./staff.js";
 import { adminRouter } from "./admin.js";
 import { routeId } from "./routeId.js";
@@ -295,6 +296,8 @@ app.get("/api/tickets", async (req: Request, res: Response) => {
     return res.status(400).json({ error: { code: "INVALID_QUERY", message: parsed.message } });
   }
   const query = parsed.value;
+  // Lab 4 (D-12): `group` and `currentStatus` narrow the same column, and combine by AND.
+  const statuses = allowedStatuses(query.group, query.currentStatus);
 
   try {
     const where = {
@@ -302,7 +305,7 @@ app.get("/api/tickets", async (req: Request, res: Response) => {
       ...(query.categoryId ? { categoryId: query.categoryId } : {}),
       ...(query.relatedSystemId ? { relatedSystemId: query.relatedSystemId } : {}),
       ...(query.requestedPriority ? { requestedPriority: query.requestedPriority } : {}),
-      ...(query.currentStatus ? { currentStatus: query.currentStatus } : {}),
+      ...(statuses ? { currentStatus: { in: statuses } } : {}),
       // Search spans Ticket Number and Summary, case-insensitively (BR-18),
       // and combines with the filters above using AND (BR-19).
       ...(query.search
@@ -683,6 +686,8 @@ app.use("/api/tickets", conversationRouter);
 app.use("/api/tickets", actionsTakenReadRouter);
 // Lab 4, Issue 6 — the Status History of a Ticket, read-only.
 app.use("/api/tickets", statusHistoryRouter);
+// Lab 4, Issue 7 — the Requester dashboard. The staff dashboard is under /api/staff (Issue 8).
+app.use("/api/dashboard", dashboardRouter);
 // Lab 3, Issue 8 — the IT Staff queue, behind the /api/staff role guard above.
 app.use("/api/staff", staffRouter);
 // Lab 4, Issue 4 — recording and editing Actions Taken, behind the same role guard.

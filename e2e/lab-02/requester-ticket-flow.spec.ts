@@ -104,6 +104,8 @@ test.describe("E2E-02 cross-requester isolation", () => {
 
     await switchRequester(page, REQUESTER_B);
 
+    // Changed in Lab 4, Issue 7 (D-09): signing in lands on the Dashboard, so open the list.
+    await page.getByRole("link", { name: "My Tickets" }).first().click();
     await expect(page.getByLabel("Search tickets")).toBeVisible();
     await page.getByLabel("Search tickets").fill(summary);
 

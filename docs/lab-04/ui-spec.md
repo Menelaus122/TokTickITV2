@@ -44,6 +44,10 @@ A card that is also a link. Built from Lab 2's card, so it adds no token.
 * A count with no destination (the Administrator's account counts, §3.3) is a plain
   `<div>` with no "View all" and no link, so no dead or misleading link exists
   (BR-40).
+* The label is 12 px and the value 32 px, as drawn above. Lab 2 already uses 12 px (the
+  badge) and 32 px (the empty-state icon) as literals, so these are not new sizes; the card
+  names them `--tt-font-caption` and `--tt-font-metric`, so every font size in the stylesheet
+  is still a variable (Lab 3's STYLE-01 reads to the end of the file and holds Lab 4 to it).
 * A value of `0` renders as `0`, never blank (BR-39). The card keeps its link.
 * The card never encodes meaning in colour alone: the label and value carry it.
 
@@ -149,6 +153,10 @@ underline with `aria-current="page"` are unchanged.
 | Administrator | **Dashboard**, **Ticket Queue**, User Management | **Dashboard** |
 
 * The wordmark links to the Dashboard (D-09).
+* **Until Issue 8**, `/dashboard` belongs to the Requester alone. IT Staff and Administrators
+  who type it land on their own home with the forbidden notice, and a sign-in that began at
+  `/dashboard` takes them home without the notice, because the page was never theirs. Their
+  navigation and landing are Lab 3's and Issue 2's until Issue 8 gives them a Dashboard.
 * Dashboard shows the active-page indication on `/dashboard`. While a Ticket Detail
   is open, its parent list — My Tickets or Ticket Queue — is the active item, as in
   Lab 3.
@@ -198,9 +206,14 @@ A list row is one link to the Ticket Detail: Ticket Number in monospace, Summary
 (one line, ellipsis, full text in `title`), status badge, and the date. A Requester
 sees only their own Tickets (AC-02).
 
+The row's date is in the browser's time zone (BR-41): *Recently updated* shows the date and
+the time, "5 Oct, 10:12", and *Needs your attention* the date alone, "3 Oct", because what
+matters there is how long a Ticket has waited. The year appears only when it is not this
+year. *View all* in *Recently updated* opens My Tickets with no filter.
+
 **Zero data.** Every card shows `0`. *Needs your attention* reads "Nothing is
-waiting on you." and *Recently updated* reads "You have no tickets yet." beside
-**Create Ticket**. Neither region is hidden, so the layout does not jump (BR-39).
+waiting on you." and *Recently updated* reads "You have no tickets yet." with a **Create
+Ticket** button beside it, as My Tickets does; the **Create Ticket** quick action stays. Neither region is hidden, so the layout does not jump (BR-39).
 
 ### 3.2 IT Staff Dashboard
 
@@ -477,6 +490,21 @@ dashboard link opens it with a filter (§3.3, BR-40).
   hand-edited URL cannot break the page; an unrecognised *value* for a known
   parameter is dropped to its default and the filter control shows the default.
 * Changing a filter resets the page to 1, as Lab 3 does.
+
+**The parameters of My Tickets.** `group` (`open`), `status` (one of the eight statuses),
+`search`, `categoryId`, `relatedSystemId`, `requestedPriority`, `sortBy` (`createdAt` |
+`updatedAt`), `sortDir` (`asc` | `desc`), `page`, and `pageSize` (10, 20, or 50). Only what
+differs from the default is written, always in that order, so one list has one address. The
+list API calls `status` `currentStatus` (api-spec §5.1), and the client makes that
+translation when it asks. A change replaces the address instead of adding to the history, so
+the Back button leaves My Tickets for the page before it, not for the filter before. A search
+is written a moment after the typing stops, from the address as it is then, so a filter chosen
+in between is not undone, and the person's next letters are never replaced by an address that
+catches up. A NUL character in a search is dropped before the API sees it. The chip's cross is
+named "Remove the Open tickets filter".
+
+**On a phone** the toolbar is a column, and the search box keeps its one-control height
+there; Lab 2's `flex: 1 1 240px` is a width in a row and had made it 240 px tall.
 * The number the list shows is the API's `totalItems`; for a dashboard link it
   equals the card's number (BR-40, AC-21).
 

@@ -15,10 +15,10 @@ import { endTestSessions, signInAs } from "../helpers/signIn.js";
 // The seam is the HTTP boundary: a real login cookie, the real Express app, the
 // real database. Nothing here reaches into the guard to test it.
 //
-// SEC-05 and the dashboard parts of SEC-01 and SEC-07 cannot be written until the
-// dashboard endpoints exist. They arrive with Issues 7 and 8, which add their
-// routes to the tables below. The status-history route (SEC-01) and the
-// `changedBy` of SEC-08 arrived with Issue 6. See tests.md §3.1.
+// The staff half of SEC-05 and the staff dashboard's parts of SEC-01 and SEC-07 cannot be
+// written until that endpoint exists. They arrive with Issue 8, which adds its route to the
+// tables below. The status-history route (SEC-01) and the `changedBy` of SEC-08 arrived with
+// Issue 6; the Requester dashboard's (SEC-01, SEC-05, SEC-07) with Issue 7. See tests.md §3.1.
 
 const prisma = getPrisma();
 const ALLOWED_ORIGIN = "http://localhost:5173";
@@ -45,6 +45,9 @@ const SHARED_ROUTES: Row[] = [
   ["GET", "/api/tickets/1/actions-taken"],
   ["GET", "/api/tickets/1/status-history"],
 ];
+// The dashboards. The Requester's is outside /api/staff, so it answers its own guard (Issue 7);
+// the staff one is under /api/staff and arrives with Issue 8.
+const DASHBOARD_ROUTES: Row[] = [["GET", "/api/dashboard/requester"]];
 // A path nobody has written and nobody will: the prefix guard answers for it.
 const UNWRITTEN_STAFF_ROUTE: Row = ["GET", "/api/staff/this-route-does-not-exist"];
 const ADMIN_ROUTES: Row[] = [
@@ -119,8 +122,8 @@ afterAll(async () => {
 });
 
 describe("SEC-01 without a session every protected route answers 401, never 403 (BR-44)", () => {
-  it("covers the staff routes, the admin routes, the shared routes, and a staff route that does not exist", async () => {
-    for (const [method, path] of [...STAFF_ROUTES, ...ADMIN_ROUTES, ...SHARED_ROUTES, UNWRITTEN_STAFF_ROUTE]) {
+  it("covers the staff routes, the admin routes, the shared routes, the dashboard, and a staff route that does not exist", async () => {
+    for (const [method, path] of [...STAFF_ROUTES, ...ADMIN_ROUTES, ...SHARED_ROUTES, ...DASHBOARD_ROUTES, UNWRITTEN_STAFF_ROUTE]) {
       const res = await call(method, path);
       expect(res.status, `${method} ${path}`).toBe(401);
       expect(res.body.error.code, `${method} ${path}`).toBe("AUTH_REQUIRED");
@@ -519,5 +522,64 @@ describe("The Actions Taken routes stop a session that must change its password 
       await prisma.user.delete({ where: { id: user.id } });
       resetLoginThrottle();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Lab 4, Issue 7 — the Requester dashboard under SEC-05 and SEC-07
+// ---------------------------------------------------------------------------------------------
+
+describe("SEC-05 the Requester dashboard answers a Requester, and refuses IT Staff and an Administrator (AC-20, BR-42, BR-43)", () => {
+  it("is 200 for a Requester, who is the only role it is for", async () => {
+    const res = await call("GET", "/api/dashboard/requester", cookies.requester);
+    expect(res.status).toBe(200);
+  });
+
+  it.each(["staff", "admin"] as const)("is 403 FORBIDDEN for %s, with the bare error envelope and nothing of any Requester's in it", async (who) => {
+    const res = await call("GET", "/api/dashboard/requester", cookies[who]);
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe("FORBIDDEN");
+    expect(Object.keys(res.body)).toEqual(["error"]);
+  });
+
+  it("keeps the guard order: 401 for no session before 403 for the wrong role (BR-44)", async () => {
+    expect((await call("GET", "/api/dashboard/requester")).status).toBe(401);
+    expect((await call("GET", "/api/dashboard/requester", cookies.staff)).status).toBe(403);
+  });
+});
+
+describe("SEC-07 a caller cannot name someone else in the Requester dashboard (BR-37)", () => {
+  it("shows a Requester only their own figures and Tickets whatever requesterId, userId, or me they send, in the query or the headers", async () => {
+    const theirs = await prisma.ticket.create({
+      data: {
+        ticketNumber: `TT-9993-${String(numberBase + sequence++).padStart(5, "0")}`,
+        requesterId: ids.otherRequester,
+        categoryId,
+        relatedSystemId,
+        summary: "Another requester's waiting ticket",
+        description: "Not the first requester's to see.",
+        requestedPriority: "MEDIUM",
+        itPriority: "MEDIUM",
+        currentStatus: "WAITING_FOR_REQUESTER",
+        // Newest of everyone's, so a leak would put it first in both lists.
+        updatedAt: new Date(Date.now() + 60 * 1000),
+      },
+    });
+    ticketIds.push(theirs.id);
+
+    const claim = `requesterId=${ids.otherRequester}&userId=${ids.otherRequester}&me=${ids.otherRequester}&owner=me`;
+    const res = await call("GET", `/api/dashboard/requester?${claim}`, cookies.requester, {
+      "X-Requester-Id": String(ids.otherRequester),
+      "X-User-Id": String(ids.otherRequester),
+    });
+    expect(res.status).toBe(200);
+    const shown = [...res.body.needsAttention, ...res.body.recentTickets] as Array<{ id: number }>;
+    expect(shown.map((t) => t.id)).not.toContain(theirs.id);
+    const mine = await prisma.ticket.count({ where: { requesterId: ids.requester, currentStatus: "RESOLVED" } });
+    expect(res.body.metrics.resolved.value).toBe(mine);
+
+    // And the other Requester, asking plainly, does see it: it is theirs.
+    const own = await call("GET", "/api/dashboard/requester", cookies.otherRequester);
+    expect((own.body.recentTickets as Array<{ id: number }>)[0].id).toBe(theirs.id);
   });
 });

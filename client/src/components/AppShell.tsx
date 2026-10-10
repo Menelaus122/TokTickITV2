@@ -13,7 +13,10 @@ import { RoleBadge } from "./Badge.js";
 // hiding a link is not authorization.
 
 export const NAV_BY_ROLE: Record<Role, { to: string; label: string }[]> = {
+  // Lab 4, Issue 7 (D-09): the Dashboard is first, and the wordmark links to it. The other
+  // roles get theirs in Issue 8.
   REQUESTER: [
+    { to: ROUTES.dashboard, label: "Dashboard" },
     { to: ROUTES.list, label: "My Tickets" },
     { to: ROUTES.create, label: "Create Ticket" },
   ],
@@ -53,7 +56,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           key={item.to}
           to={item.to}
           // "end" keeps My Tickets from matching /tickets/new as well.
-          end={item.to === ROUTES.list}
+          end={item.to === ROUTES.list || item.to === ROUTES.dashboard}
           className={({ isActive }) => `tt-shell__link${isActive ? " tt-shell__link--active" : ""}`}
         >
           {item.label}

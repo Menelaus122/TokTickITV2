@@ -11,9 +11,12 @@ test.describe("E2E-01 sign in, see who you are, sign out", () => {
     await signIn(page, ACCOUNTS.requester.email, ACCOUNTS.requester.name);
     const banner = page.getByRole("banner");
     await expect(banner.getByText("Requester", { exact: true })).toBeVisible();
-    // The Requester lands on their own list (LANDING).
-    await expect(page).toHaveURL(/\/tickets$/);
-    await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["My Tickets", "Create Ticket"]);
+    // Changed in Lab 4, Issue 7 (D-09): the Requester lands on their Dashboard, which is the
+    // first item of their navigation and marked as the current page. docs/lab-04/tests.md §6.
+    await expect(page).toHaveURL(/\/dashboard$/);
+    const navigation = page.getByRole("navigation", { name: "Main" });
+    await expect(navigation.getByRole("link")).toHaveText(["Dashboard", "My Tickets", "Create Ticket"]);
+    await expect(navigation.getByRole("link", { name: "Dashboard" })).toHaveAttribute("aria-current", "page");
 
     await logOut(page);
 
@@ -80,7 +83,8 @@ test.describe("E2E-02 the forced first password change", () => {
     await page.getByLabel(/^New password/).fill("Brand-new#2026");
     await page.getByLabel(/^Confirm new password/).fill("Brand-new#2026");
     await page.getByRole("button", { name: "Save password" }).click();
-    await expect(page).toHaveURL(/\/tickets$/);
+    // Changed in Lab 4, Issue 7 (D-09): the app they enter is the Dashboard.
+    await expect(page).toHaveURL(/\/dashboard$/);
     await expect(page.getByTestId("current-user")).toHaveText(fullName);
 
     // The new password is the one that works from now on.
