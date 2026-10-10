@@ -110,6 +110,20 @@ describe("UNIT-09 the gate across a reopen (AC-12, BR-17, D-07)", () => {
     expect(resolutionGate([recorded(1, at(9), false), recorded(2, at(13), true)], reopened)).toEqual({ ok: false, code: "FOLLOW_UP_PENDING" });
   });
 
+  it("takes back, at a second reopen, what counted after the first (review of PR #87)", () => {
+    const firstReopen = at(10);
+    const secondReopen = at(14);
+    // Action 2 was recorded between the two reopens.
+    const closing = [recorded(1, at(9), false), recorded(2, at(12), false)];
+    expect(resolutionGate(closing, firstReopen)).toEqual({ ok: true });
+    expect(resolutionGate(closing, secondReopen)).toEqual({ ok: false, code: "ACTION_REQUIRED" });
+
+    // And a Yes between them holds the gate after the first reopen, and not after the second.
+    const holding = [recorded(1, at(9), false), recorded(2, at(12), true)];
+    expect(resolutionGate(holding, firstReopen)).toEqual({ ok: false, code: "FOLLOW_UP_PENDING" });
+    expect(resolutionGate(holding, secondReopen)).toEqual({ ok: false, code: "ACTION_REQUIRED" });
+  });
+
   it("treats a Ticket with no reopen entry as never reopened, so every action counts", () => {
     const actions = [recorded(1, at(1), false)];
     expect(resolutionGate(actions, null)).toEqual({ ok: true });
