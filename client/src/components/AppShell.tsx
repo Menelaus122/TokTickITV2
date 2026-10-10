@@ -13,17 +13,21 @@ import { RoleBadge } from "./Badge.js";
 // hiding a link is not authorization.
 
 export const NAV_BY_ROLE: Record<Role, { to: string; label: string }[]> = {
-  // Lab 4, Issue 7 (D-09): the Dashboard is first, and the wordmark links to it. The other
-  // roles get theirs in Issue 8.
+  // Lab 4 (D-09): the Dashboard is every role's first item, and the wordmark links to it.
+  // The Requester's arrived with Issue 7, IT Staff's and the Administrator's with Issue 8.
   REQUESTER: [
     { to: ROUTES.dashboard, label: "Dashboard" },
     { to: ROUTES.list, label: "My Tickets" },
     { to: ROUTES.create, label: "Create Ticket" },
   ],
-  IT_STAFF: [{ to: ROUTES.queue, label: "Ticket Queue" }],
+  IT_STAFF: [
+    { to: ROUTES.dashboard, label: "Dashboard" },
+    { to: ROUTES.queue, label: "Ticket Queue" },
+  ],
   // Lab 4 D-08: an Administrator performs IT Staff ticket operations, so the
-  // queue is theirs too. The Dashboard becomes the first item in Issue 8.
+  // queue is theirs too.
   ADMINISTRATOR: [
+    { to: ROUTES.dashboard, label: "Dashboard" },
     { to: ROUTES.queue, label: "Ticket Queue" },
     { to: ROUTES.users, label: "User Management" },
   ],

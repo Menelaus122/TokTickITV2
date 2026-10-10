@@ -4,9 +4,11 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { MyTickets, MyTicketsWithUrl } from "../../src/screens/MyTickets.js";
 import { parseTicketListUrl, toTicketListUrl, DEFAULT_LIST_STATE } from "../../src/ticketListUrl.js";
+import { StaffTicketQueue, StaffTicketQueueWithUrl } from "../../src/screens/StaffTicketQueue.js";
+import { parseQueueUrl, toQueueUrl, DEFAULT_QUEUE_STATE } from "../../src/queueUrl.js";
 import { TokTickITApp } from "../../src/TokTickITApp.js";
 import * as api from "../../src/api.js";
-import type { AuthUser, TicketListItem, TicketListResponse } from "../../src/api.js";
+import type { AuthUser, QueueResponse, QueueTicket, TicketListItem, TicketListResponse } from "../../src/api.js";
 
 // Lab 4, Issue 7 — UI-29 in docs/lab-04/tests.md §2.8 (ui-spec §7; specification.md FR-21,
 // D-12; AC-21): My Tickets reads its filters from the URL on load and writes them back as
@@ -469,5 +471,453 @@ describe("UI-29 a dashboard card leads to the list it counts, through the whole 
     await waitFor(() => expect(fetchList).toHaveBeenCalled());
     expect(firstRequest()).toMatchObject({ currentStatus: "CLOSED" });
     expect(within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", { name: "My Tickets" })).toHaveAttribute("aria-current", "page");
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Lab 4, Issue 8 — UI-38: the Ticket Queue reads its filters from the URL (ui-spec §7; FR-21, D-12)
+// ---------------------------------------------------------------------------------------------
+
+describe("UI-38 the Ticket Queue", () => {
+  const ME = 7;
+
+  function queued(overrides: Partial<QueueTicket> = {}): QueueTicket {
+    return {
+      id: 12,
+      ticketNumber: "TT-2026-00042",
+      summary: "Printer on floor 3 will not print",
+      categoryName: "Hardware",
+      requestedPriority: "MEDIUM",
+      itPriority: "HIGH",
+      currentStatus: "IN_PROGRESS",
+      owner: { id: ME, fullName: "Nattapong Saelim", isActive: true },
+      requesterResolvedAt: null,
+      createdAt: "2026-09-28T02:10:00.000Z",
+      updatedAt: "2026-09-29T09:14:22.310Z",
+      ...overrides,
+    };
+  }
+
+  const queuePage = (tickets: QueueTicket[], meta: Partial<QueueResponse> = {}): QueueResponse => ({
+    tickets,
+    page: 1,
+    pageSize: 10,
+    totalItems: tickets.length,
+    totalPages: Math.ceil(tickets.length / 10),
+    ...meta,
+  });
+
+  let fetchQueue: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchQueue = vi.spyOn(api, "fetchQueue").mockResolvedValue(queuePage([queued()])) as unknown as ReturnType<typeof vi.fn>;
+    vi.spyOn(api, "fetchAssignableUsers").mockResolvedValue([
+      { id: ME, fullName: "Nattapong Saelim", role: "IT_STAFF", isActive: true },
+      { id: 8, fullName: "Siriporn Kaewmanee", role: "IT_STAFF", isActive: true },
+    ]);
+  });
+
+  function QueueProbe() {
+    const location = useLocation();
+    const navigate = useNavigate();
+    return (
+      <>
+        <p data-testid="queue-url">{location.pathname + location.search}</p>
+        <button type="button" onClick={() => navigate("/queue?status=CLOSED")}>
+          Pretend Back
+        </button>
+        <button type="button" onClick={() => navigate(-1)}>
+          Go back
+        </button>
+      </>
+    );
+  }
+
+  function renderQueue(url: string) {
+    return render(
+      <MemoryRouter initialEntries={[url]}>
+        <StaffTicketQueueWithUrl currentUserId={ME} />
+        <QueueProbe />
+      </MemoryRouter>,
+    );
+  }
+
+  const queueUrl = () => screen.getByTestId("queue-url").textContent;
+  const lastAsked = () => fetchQueue.mock.calls.at(-1)![0] as Record<string, unknown>;
+  const firstAsked = () => fetchQueue.mock.calls[0][0] as Record<string, unknown>;
+  const queueReady = () => screen.findByLabelText("Search number or summary");
+
+  describe("reads its filters from the address on load", () => {
+    it("asks for the group, the owner, and the IT priority together, on the very first request", async () => {
+      renderQueue("/queue?owner=unassigned&group=open&itPriority=URGENT");
+      await queueReady();
+      await waitFor(() => expect(fetchQueue).toHaveBeenCalled());
+      expect(firstAsked()).toMatchObject({ group: "open", owner: "unassigned", itPriority: "URGENT" });
+      expect(fetchQueue.mock.calls.every(([p]) => (p as Record<string, unknown>).group === "open")).toBe(true);
+    });
+
+    it("shows what it was asked for in its own controls", async () => {
+      renderQueue("/queue?owner=me&status=WAITING_FOR_REQUESTER&itPriority=HIGH");
+      expect(await screen.findByLabelText("Owner")).toHaveValue("me");
+      expect(screen.getByLabelText("Status")).toHaveValue("WAITING_FOR_REQUESTER");
+      expect(screen.getByLabelText("IT Priority")).toHaveValue("HIGH");
+    });
+
+    it("reads every other filter the queue has: search, category, a named owner, sort, direction, page, and page size", async () => {
+      renderQueue("/queue?q=printer&categoryId=4&owner=8&sort=updatedAt&direction=asc&page=2&pageSize=20");
+      expect(await queueReady()).toHaveValue("printer");
+      await waitFor(() => expect(fetchQueue).toHaveBeenCalled());
+      expect(firstAsked()).toMatchObject({ q: "printer", categoryId: 4, owner: "8", sort: "updatedAt", direction: "asc", page: 2, pageSize: 20 });
+      expect(screen.getByLabelText("Sort by")).toHaveValue("updatedAt");
+      expect(screen.getByLabelText("Direction")).toHaveValue("asc");
+    });
+
+    it("asks for the documented defaults when the address says nothing, and for no group", async () => {
+      renderQueue("/queue");
+      await queueReady();
+      await waitFor(() => expect(fetchQueue).toHaveBeenCalled());
+      expect(firstAsked().group).toBeUndefined();
+      expect(firstAsked().owner).toBeUndefined();
+      expect(firstAsked()).toMatchObject({ sort: "itPriority", direction: "desc", page: 1, pageSize: 10 });
+    });
+  });
+
+  describe("shows the group as a chip, which Clear Filters and its own cross remove", () => {
+    it("shows 'Open tickets' as a chip when the group is open, and not otherwise", async () => {
+      renderQueue("/queue?group=open");
+      expect(await screen.findByText("Open tickets")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Remove the Open tickets filter" })).toBeInTheDocument();
+    });
+
+    it("shows no chip when there is no group", async () => {
+      renderQueue("/queue?owner=unassigned");
+      await queueReady();
+      expect(screen.queryByText("Open tickets")).not.toBeInTheDocument();
+    });
+
+    it("keeps the chip on the page when the filters are folded away behind their toggle on a phone", async () => {
+      renderQueue("/queue?group=open");
+      const chip = await screen.findByText("Open tickets");
+      expect(chip.closest(".tt-queue__filters")).toBeNull();
+    });
+
+    it("removes the group, and only the group, from its cross, and writes that to the address", async () => {
+      const user = userEvent.setup();
+      renderQueue("/queue?group=open&owner=unassigned");
+      await user.click(await screen.findByRole("button", { name: "Remove the Open tickets filter" }));
+      await waitFor(() => expect(screen.queryByText("Open tickets")).not.toBeInTheDocument());
+      expect(queueUrl()).toBe("/queue?owner=unassigned");
+      await waitFor(() => expect(lastAsked().group).toBeUndefined());
+      expect(lastAsked().owner).toBe("unassigned");
+    });
+
+    it("is removed by Clear Filters along with every other filter, and the address is the plain queue again", async () => {
+      const user = userEvent.setup();
+      renderQueue("/queue?group=open&owner=unassigned&itPriority=URGENT");
+      await user.click(await screen.findByRole("button", { name: "Clear Filters" }));
+      await waitFor(() => expect(screen.queryByText("Open tickets")).not.toBeInTheDocument());
+      expect(queueUrl()).toBe("/queue");
+      await waitFor(() => {
+        expect(lastAsked().group).toBeUndefined();
+        expect(lastAsked().owner).toBeUndefined();
+        expect(lastAsked().itPriority).toBeUndefined();
+      });
+      expect(screen.getByLabelText("Owner")).toHaveValue("any");
+    });
+
+    it("offers Clear Filters for the group alone, and calls an empty list 'no tickets match', not 'no tickets yet'", async () => {
+      fetchQueue.mockResolvedValue(queuePage([]));
+      renderQueue("/queue?group=open");
+      expect(await screen.findByRole("button", { name: "Clear Filters" })).toBeInTheDocument();
+      expect(await screen.findByText("No tickets match your filters")).toBeInTheDocument();
+      expect(screen.queryByText("No tickets in the queue yet.")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("writes a change back to the address, so a reload shows the same queue", () => {
+    it("writes a chosen owner and status beside the group, in the order the address always has", async () => {
+      const user = userEvent.setup();
+      renderQueue("/queue?group=open");
+      await user.selectOptions(await screen.findByLabelText("Owner"), "unassigned");
+      await waitFor(() => expect(queueUrl()).toBe("/queue?group=open&owner=unassigned"));
+      await user.selectOptions(screen.getByLabelText("Status"), "NEW");
+      await waitFor(() => expect(queueUrl()).toBe("/queue?group=open&status=NEW&owner=unassigned"));
+      await waitFor(() => expect(lastAsked()).toMatchObject({ group: "open", status: "NEW", owner: "unassigned" }));
+    });
+
+    it("writes IT priority, category, sort, and direction when they change, and leaves each default out", async () => {
+      const user = userEvent.setup();
+      renderQueue("/queue");
+      await user.selectOptions(await screen.findByLabelText("IT Priority"), "URGENT");
+      await waitFor(() => expect(queueUrl()).toBe("/queue?itPriority=URGENT"));
+      await user.selectOptions(screen.getByLabelText("Sort by"), "createdAt");
+      await waitFor(() => expect(queueUrl()).toContain("sort=createdAt"));
+      expect(queueUrl()).not.toContain("direction");
+      await user.selectOptions(screen.getByLabelText("Direction"), "asc");
+      await waitFor(() => expect(queueUrl()).toContain("direction=asc"));
+    });
+
+    it("goes back to the first page when a filter changes", async () => {
+      const user = userEvent.setup();
+      renderQueue("/queue?page=3");
+      await user.selectOptions(await screen.findByLabelText("Status"), "CLOSED");
+      await waitFor(() => expect(queueUrl()).toBe("/queue?status=CLOSED"));
+      await waitFor(() => expect(lastAsked().page).toBe(1));
+    });
+
+    it("writes the page when the person pages on, and a fresh load of that address shows that page", async () => {
+      const user = userEvent.setup();
+      fetchQueue.mockResolvedValue(queuePage([queued()], { totalItems: 25, totalPages: 3 }));
+      const first = renderQueue("/queue?group=open");
+      await user.click(await screen.findByRole("button", { name: "Next" }));
+      await waitFor(() => expect(queueUrl()).toBe("/queue?group=open&page=2"));
+      first.unmount();
+      fetchQueue.mockClear();
+      renderQueue("/queue?group=open&page=2");
+      await queueReady();
+      await waitFor(() => expect(fetchQueue).toHaveBeenCalled());
+      expect(firstAsked()).toMatchObject({ group: "open", page: 2 });
+    });
+
+    it("writes a search once the person has stopped typing, not on every key, and asks for it", async () => {
+      const user = userEvent.setup();
+      renderQueue("/queue?status=CLOSED");
+      await user.type(await queueReady(), "vpn");
+      expect(queueUrl()).toBe("/queue?status=CLOSED");
+      await waitFor(() => expect(queueUrl()).toBe("/queue?status=CLOSED&q=vpn"), { timeout: 1500 });
+      await waitFor(() => expect(lastAsked()).toMatchObject({ q: "vpn", status: "CLOSED", page: 1 }));
+      expect(fetchQueue.mock.calls.filter(([p]) => (p as Record<string, unknown>).q === "v")).toHaveLength(0);
+    });
+
+    it("does not undo a filter chosen while a search is still being typed, when the search is written", async () => {
+      const user = userEvent.setup();
+      renderQueue("/queue");
+      const box = await queueReady();
+      await user.type(box, "vpn");
+      await user.selectOptions(screen.getByLabelText("Status"), "CLOSED");
+      await waitFor(() => expect(queueUrl()).toBe("/queue?status=CLOSED&q=vpn"), { timeout: 1500 });
+      expect(box).toHaveValue("vpn");
+    });
+
+    it("keeps what the person typed when the address catches up a moment after the write", async () => {
+      const user = userEvent.setup();
+      const asked = vi.fn();
+      function Slow() {
+        const location = useLocation();
+        const navigate = useNavigate();
+        return (
+          <StaffTicketQueue
+            currentUserId={ME}
+            query={location.search}
+            onQueryChange={(query) => {
+              asked(query);
+              setTimeout(() => navigate({ pathname: "/queue", search: query ? `?${query}` : "" }, { replace: true }), 200);
+            }}
+          />
+        );
+      }
+      render(
+        <MemoryRouter initialEntries={["/queue"]}>
+          <Slow />
+          <QueueProbe />
+        </MemoryRouter>,
+      );
+      const box = await queueReady();
+      await user.type(box, "pri");
+      await waitFor(() => expect(asked).toHaveBeenCalledWith("q=pri"), { timeout: 1500 });
+      await user.type(box, "n");
+      await waitFor(() => expect(queueUrl()).toBe("/queue?q=pri"), { timeout: 1500 });
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(box).toHaveValue("prin");
+    });
+
+    it("replaces the history entry, so Back leaves the queue instead of stepping back through each filter", async () => {
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter initialEntries={["/dashboard", "/queue"]} initialIndex={1}>
+          <StaffTicketQueueWithUrl currentUserId={ME} />
+          <QueueProbe />
+        </MemoryRouter>,
+      );
+      await user.selectOptions(await screen.findByLabelText("Status"), "CLOSED");
+      await user.selectOptions(screen.getByLabelText("IT Priority"), "HIGH");
+      await waitFor(() => expect(queueUrl()).toBe("/queue?status=CLOSED&itPriority=HIGH"));
+      await user.click(screen.getByRole("button", { name: "Go back" }));
+      expect(queueUrl()).toBe("/dashboard");
+    });
+  });
+
+  describe("never breaks on an address it does not understand", () => {
+    it("ignores a parameter it does not know, and does not send it on", async () => {
+      renderQueue("/queue?nothing=at-all&status=CLOSED&utm_source=email");
+      await queueReady();
+      await waitFor(() => expect(fetchQueue).toHaveBeenCalled());
+      expect(firstAsked()).toMatchObject({ status: "CLOSED" });
+      expect(Object.keys(firstAsked())).not.toContain("nothing");
+      expect(Object.keys(firstAsked())).not.toContain("utm_source");
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    it("drops an unrecognised value to its default, and the control shows the default", async () => {
+      renderQueue("/queue?status=BOGUS&group=everything&itPriority=EXTREME&owner=nobody&categoryId=abc&sort=title&direction=sideways&page=0&pageSize=7");
+      await queueReady();
+      await waitFor(() => expect(fetchQueue).toHaveBeenCalled());
+      const asked = firstAsked();
+      expect(asked.status).toBeUndefined();
+      expect(asked.group).toBeUndefined();
+      expect(asked.itPriority).toBeUndefined();
+      expect(asked.owner).toBeUndefined();
+      expect(asked.categoryId).toBeUndefined();
+      expect(asked).toMatchObject({ sort: "itPriority", direction: "desc", page: 1, pageSize: 10 });
+      expect(screen.getByLabelText("Status")).toHaveValue("");
+      expect(screen.getByLabelText("Owner")).toHaveValue("any");
+      expect(screen.queryByText("Open tickets")).not.toBeInTheDocument();
+    });
+
+    it("takes the first of a parameter that is repeated, and does not fail", async () => {
+      renderQueue("/queue?status=CLOSED&status=RESOLVED&group=open&group=open");
+      await queueReady();
+      await waitFor(() => expect(fetchQueue).toHaveBeenCalled());
+      expect(firstAsked()).toMatchObject({ status: "CLOSED", group: "open" });
+    });
+
+    it("does not take a group in any other case, and does not take a user id of 0 or a negative one as an owner", async () => {
+      renderQueue("/queue?group=OPEN&owner=0");
+      await queueReady();
+      await waitFor(() => expect(fetchQueue).toHaveBeenCalled());
+      expect(firstAsked().group).toBeUndefined();
+      expect(firstAsked().owner).toBeUndefined();
+    });
+  });
+
+  describe("follows the address when it changes under it, as Back and Forward do", () => {
+    it("asks for the new queue, and shows the new filter, when the address changes", async () => {
+      const user = userEvent.setup();
+      renderQueue("/queue?group=open&owner=me");
+      await screen.findByText("Open tickets");
+      await user.click(screen.getByRole("button", { name: "Pretend Back" }));
+      await waitFor(() => expect(screen.queryByText("Open tickets")).not.toBeInTheDocument());
+      await waitFor(() => expect(lastAsked()).toMatchObject({ status: "CLOSED" }));
+      expect(lastAsked().group).toBeUndefined();
+      expect(lastAsked().owner).toBeUndefined();
+      expect(screen.getByLabelText("Status")).toHaveValue("CLOSED");
+      expect(screen.getByLabelText("Owner")).toHaveValue("any");
+    });
+
+    it("shows the search term of the new address in the search box", async () => {
+      const user = userEvent.setup();
+      renderQueue("/queue?q=vpn");
+      expect(await queueReady()).toHaveValue("vpn");
+      await user.click(screen.getByRole("button", { name: "Pretend Back" }));
+      await waitFor(() => expect(screen.getByLabelText("Search number or summary")).toHaveValue(""));
+    });
+  });
+
+  describe("the pure reading and writing of the address (ui-spec §7)", () => {
+    it("reads nothing as the defaults, with or without the question mark", () => {
+      expect(parseQueueUrl("")).toEqual(DEFAULT_QUEUE_STATE);
+      expect(parseQueueUrl("?")).toEqual(DEFAULT_QUEUE_STATE);
+      expect(parseQueueUrl("?status=CLOSED")).toEqual(parseQueueUrl("status=CLOSED"));
+    });
+
+    it("writes only what is not the default, in a fixed order, so one queue has one address", () => {
+      expect(toQueueUrl(DEFAULT_QUEUE_STATE)).toBe("");
+      expect(toQueueUrl({ ...DEFAULT_QUEUE_STATE, owner: "unassigned", group: "open", itPriority: "URGENT", page: 2 })).toBe(
+        "group=open&itPriority=URGENT&owner=unassigned&page=2",
+      );
+      expect(toQueueUrl(parseQueueUrl("page=2&owner=unassigned&itPriority=URGENT&group=open"))).toBe("group=open&itPriority=URGENT&owner=unassigned&page=2");
+    });
+
+    it("writes what it reads: every state it can read comes back as the same state", () => {
+      const query = "group=open&status=NEW&itPriority=LOW&owner=12&q=a%20b&categoryId=4&sort=createdAt&direction=asc&page=3&pageSize=50";
+      expect(parseQueueUrl(toQueueUrl(parseQueueUrl(query)))).toEqual(parseQueueUrl(query));
+      expect(parseQueueUrl(query).search).toBe("a b");
+      expect(parseQueueUrl(query).owner).toBe("12");
+    });
+
+    it("holds an owner of any, unassigned, me, or a positive user id, and no other", () => {
+      for (const owner of ["any", "unassigned", "me", "7", "2147483647"]) expect(parseQueueUrl(`owner=${owner}`).owner).toBe(owner);
+      for (const owner of ["nobody", "0", "-1", "1.5", "2147483648", "ME", ""]) expect(parseQueueUrl(`owner=${owner}`).owner, owner).toBe("any");
+    });
+
+    it("trims a search term, takes a NUL out of it, and an empty one is no search", () => {
+      expect(parseQueueUrl("q=%20%20").search).toBe("");
+      expect(parseQueueUrl("q=%20vpn%20").search).toBe("vpn");
+      expect(parseQueueUrl("q=a%00b").search).toBe("ab");
+    });
+
+    it("holds each sort and direction the queue has, and no other", () => {
+      for (const sort of ["itPriority", "createdAt", "updatedAt"]) expect(parseQueueUrl(`sort=${sort}`).sort).toBe(sort);
+      expect(parseQueueUrl("sort=title").sort).toBe("itPriority");
+      expect(parseQueueUrl("direction=asc").direction).toBe("asc");
+      expect(parseQueueUrl("direction=up").direction).toBe("desc");
+    });
+  });
+
+  describe("a dashboard card leads to the queue it counts, through the whole application (AC-21, BR-40)", () => {
+    const STAFF: AuthUser = { id: ME, fullName: "Nattapong Saelim", email: "nattapong.it@toktickit.local", role: "IT_STAFF", isActive: true, mustChangePassword: false };
+
+    beforeEach(() => {
+      vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(STAFF);
+      vi.spyOn(api, "fetchStaffDashboard").mockResolvedValue({
+        generatedAt: "2026-10-05T09:00:00.000Z",
+        metrics: {
+          unassigned: { value: 2, href: "/queue?owner=unassigned&group=open" },
+          assignedToMe: { value: 4, href: "/queue?owner=me&group=open" },
+          waitingForRequester: { value: 3, href: "/queue?status=WAITING_FOR_REQUESTER" },
+          urgent: { value: 5, href: "/queue?itPriority=URGENT&group=open" },
+        },
+        byStatus: [
+          { status: "NEW", value: 11, href: "/queue?status=NEW" },
+          { status: "OPEN", value: 12, href: "/queue?status=OPEN" },
+          { status: "IN_PROGRESS", value: 13, href: "/queue?status=IN_PROGRESS" },
+          { status: "WAITING_FOR_REQUESTER", value: 3, href: "/queue?status=WAITING_FOR_REQUESTER" },
+          { status: "REOPENED", value: 0, href: "/queue?status=REOPENED" },
+        ],
+        myTickets: [],
+        urgentTickets: [],
+        myRecentActions: [],
+      });
+    });
+
+    it.each([
+      ["Unassigned: 2. View all", { group: "open", owner: "unassigned" }],
+      ["Assigned to Me: 4. View all", { group: "open", owner: "me" }],
+      ["Waiting for Requester: 3. View all", { status: "WAITING_FOR_REQUESTER" }],
+      ["Urgent: 5. View all", { group: "open", itPriority: "URGENT" }],
+    ] as const)("opens the Ticket Queue for %s with exactly that filter, on the first request", async (name, expected) => {
+      const user = userEvent.setup();
+      render(<TokTickITApp initialEntries={["/dashboard"]} />);
+      const cards = await screen.findByRole("region", { name: "Your queue at a glance" });
+      await user.click(within(cards).getByRole("link", { name }));
+
+      expect(await screen.findByRole("heading", { name: "Ticket Queue" })).toBeInTheDocument();
+      await waitFor(() => expect(fetchQueue).toHaveBeenCalled());
+      expect(firstAsked()).toMatchObject(expected);
+      if ("group" in expected) expect(screen.getByText("Open tickets")).toBeInTheDocument();
+    });
+
+    it.each([["New", "NEW"], ["In Progress", "IN_PROGRESS"], ["Reopened", "REOPENED"]])("opens the Ticket Queue for the %s status row with that status alone", async (label, status) => {
+      const user = userEvent.setup();
+      render(<TokTickITApp initialEntries={["/dashboard"]} />);
+      const row = await screen.findByRole("region", { name: "By status" });
+      await user.click(within(row).getByRole("link", { name: new RegExp(`^${label}: `) }));
+      expect(await screen.findByRole("heading", { name: "Ticket Queue" })).toBeInTheDocument();
+      await waitFor(() => expect(fetchQueue).toHaveBeenCalled());
+      expect(firstAsked()).toMatchObject({ status });
+      expect(firstAsked().group).toBeUndefined();
+      expect(screen.getByLabelText("Status")).toHaveValue(status);
+    });
+
+    it("keeps the query string through a sign-in on the way to the queue", async () => {
+      vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(null);
+      vi.spyOn(api, "login").mockResolvedValue(STAFF);
+      render(<TokTickITApp initialEntries={["/queue?owner=unassigned&group=open"]} />);
+      await userEvent.type(await screen.findByLabelText(/^Email/), STAFF.email);
+      await userEvent.type(screen.getByLabelText(/^Password/), "Toktickit#2026");
+      await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+      await waitFor(() => expect(fetchQueue).toHaveBeenCalled());
+      expect(firstAsked()).toMatchObject({ group: "open", owner: "unassigned" });
+    });
   });
 });

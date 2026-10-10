@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { OPEN_GROUP, allowedStatuses, parseGroup, parseTicketListQuery, TICKET_STATUSES } from "../../src/listQuery.js";
+import { parseQueueQuery } from "../../src/queueQuery.js";
 
 // Lab 4, Issue 7 — UNIT-11 in docs/lab-04/tests.md §2.1 (api-spec §5.1; specification.md
 // BR-31, D-12). Pure parsing and the pure rule that combines `group` with `status`, so every
@@ -97,5 +98,44 @@ describe("UNIT-11 group combines with status by AND, never by OR (BR-31, api-spe
       const both = allowedStatuses("open", status) ?? [];
       expect(both.every((s) => s === status && OPEN_GROUP.includes(s as (typeof OPEN_GROUP)[number])), status).toBe(true);
     }
+  });
+});
+
+// Lab 4, Issue 8 — the same group on the Ticket Queue (api-spec §5.1), through the same two
+// functions, so what "open" means cannot differ between the Requester's list and the staff's.
+describe("UNIT-11 group inside the queue query (Issue 8)", () => {
+  it("is null when absent, so every Lab 3 request still means what it meant", () => {
+    const parsed = parseQueueQuery({});
+    expect(parsed.ok && parsed.value.group).toBeNull();
+  });
+
+  it("is carried with every other parameter, and changes none of their defaults", () => {
+    const withGroup = parseQueueQuery({ group: "open" });
+    const without = parseQueueQuery({});
+    expect(withGroup.ok && withGroup.value).toEqual({ ...(without.ok ? without.value : {}), group: "open" });
+  });
+
+  it("is carried with status, IT priority, and owner, which it combines with", () => {
+    const parsed = parseQueueQuery({ group: "open", status: "CLOSED", itPriority: "URGENT", owner: "unassigned" });
+    expect(parsed.ok && [parsed.value.group, parsed.value.status, parsed.value.itPriority, parsed.value.owner]).toEqual([
+      "open",
+      "CLOSED",
+      "URGENT",
+      { kind: "unassigned" },
+    ]);
+  });
+
+  it.each([{ group: "closed" }, { group: "OPEN" }, { group: ["open", "open"] }, { group: "open,closed" }])(
+    "is a rejected query for %j, and the message names it (Lab 3 BR-58)",
+    (raw) => {
+      const parsed = parseQueueQuery(raw);
+      expect(parsed.ok).toBe(false);
+      expect(!parsed.ok && parsed.message).toMatch(/group/);
+    },
+  );
+
+  it("treats an empty group as no group", () => {
+    const parsed = parseQueueQuery({ group: "" });
+    expect(parsed.ok && parsed.value.group).toBeNull();
   });
 });

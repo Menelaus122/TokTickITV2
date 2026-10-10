@@ -153,10 +153,9 @@ underline with `aria-current="page"` are unchanged.
 | Administrator | **Dashboard**, **Ticket Queue**, User Management | **Dashboard** |
 
 * The wordmark links to the Dashboard (D-09).
-* **Until Issue 8**, `/dashboard` belongs to the Requester alone. IT Staff and Administrators
-  who type it land on their own home with the forbidden notice, and a sign-in that began at
-  `/dashboard` takes them home without the notice, because the page was never theirs. Their
-  navigation and landing are Lab 3's and Issue 2's until Issue 8 gives them a Dashboard.
+* `/dashboard` is every role's, and shows that role's own: the Requester's (§3.1), or the
+  one IT Staff and Administrators share (§3.2, §3.3). A sign-in that began at `/dashboard`
+  returns there, whoever signed in.
 * Dashboard shows the active-page indication on `/dashboard`. While a Ticket Detail
   is open, its parent list — My Tickets or Ticket Queue — is the active item, as in
   Lab 3.
@@ -244,6 +243,14 @@ Ticket** button beside it, as My Tickets does; the **Create Ticket** quick actio
 | My Recent Actions | up to 5 rows: Ticket Number (a link to the Ticket), Action Date/Time, the first 120 characters of the description, the follow-up pill | BR-36 |
 | Quick actions | **Open Ticket Queue**, **Unassigned Tickets** (`/queue?owner=unassigned&group=open`), **My Queue** (`/queue?owner=me&group=open`) | D-11 |
 
+Each status count is one link, named like a card ("New: 11. View all"), with its Lab 3 status
+badge and its number, and a count of `0` is drawn as `0`. A Ticket row has two lines: the Ticket
+Number, the Summary, and the date and time on the first, and on the second the status badge, the IT
+Priority badge, and the Owner as the queue draws it, which says "You" for the signed-in member and
+"Inactive" for a closed account. A recent action's row is one line: the Ticket Number (the row
+opens the Ticket), the date and time, the description as the API cut it, and the follow-up pill.
+The status counts count every Ticket, not the member's.
+
 "View all" beside *My Tickets* opens `/queue?owner=me&group=open`; beside *Urgent
 Tickets*, `/queue?itPriority=URGENT&group=open`. There is **no Create Ticket**
 shortcut, since IT Staff and Administrators cannot create Tickets (Lab 3 BR-18),
@@ -262,7 +269,8 @@ The IT Staff dashboard of §3.2, unchanged, plus one region after *By status*:
 │ Accounts   Requesters 6  ·  IT Staff 4  ·  Administrators 2  ·  Inactive 2   [Open User Management →] │
 ```
 
-All four are **plain numbers with no link**. A link to `/users?role=IT_STAFF` would
+The four are labelled Requesters, IT Staff, Administrators, and Inactive. All four are **plain
+numbers with no link**. A link to `/users?role=IT_STAFF` would
 open a list that also shows inactive staff, so it could show 5 where the number says
 4, and the contract promises that a link's list matches its number (BR-40, D-12).
 The region says "Active accounts by role, and inactive accounts counted
@@ -490,6 +498,15 @@ dashboard link opens it with a filter (§3.3, BR-40).
   hand-edited URL cannot break the page; an unrecognised *value* for a known
   parameter is dropped to its default and the filter control shows the default.
 * Changing a filter resets the page to 1, as Lab 3 does.
+
+**The parameters of the Ticket Queue.** `group` (`open`), `status`, `itPriority`, `owner` (`any`,
+`unassigned`, `me`, or a user id), `q`, `categoryId`, `sort` (`itPriority` | `createdAt` | `updatedAt`),
+`direction` (`asc` | `desc`), `page`, and `pageSize` (10, 20, or 50), in that order when they are written,
+with the same rules as My Tickets' below: only what differs from the default is written, an address that
+changes replaces the one before it, and nothing it does not understand can break the page. The names are the
+queue API's own, so unlike My Tickets there is nothing to translate when the screen asks. The "Open
+tickets" chip sits above the filters and outside them, so it stays on the screen when a phone folds the
+filters behind their toggle.
 
 **The parameters of My Tickets.** `group` (`open`), `status` (one of the eight statuses),
 `search`, `categoryId`, `relatedSystemId`, `requestedPriority`, `sortBy` (`createdAt` |

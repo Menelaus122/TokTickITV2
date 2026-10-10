@@ -1,6 +1,6 @@
 import express, { type Request, type Response } from "express";
 import { getPrisma } from "./prisma.js";
-import { buildPageMeta } from "./listQuery.js";
+import { allowedStatuses, buildPageMeta } from "./listQuery.js";
 import { containsText } from "./queryParams.js";
 import { parseQueueQuery, queueOrderBy, type OwnerFilter } from "./queueQuery.js";
 import type { Prisma } from "@prisma/client";
@@ -60,9 +60,13 @@ staffRouter.get("/tickets", async (req: Request, res: Response) => {
   if (!parsed.ok) return res.status(400).json({ error: { code: "INVALID_QUERY", message: parsed.message } });
   const query = parsed.value;
 
+  // Lab 4 (D-12): `group` and `status` narrow the same column, and combine by AND, through
+  // the function the Requester's list uses.
+  const statuses = allowedStatuses(query.group, query.status);
+
   // Filters and search combine with AND (BR-54).
   const where = {
-    ...(query.status ? { currentStatus: query.status } : {}),
+    ...(statuses ? { currentStatus: { in: statuses } } : {}),
     ...(query.itPriority ? { itPriority: query.itPriority } : {}),
     ...(query.categoryId ? { categoryId: query.categoryId } : {}),
     ...ownerWhere(query.owner, req.auth!.user.id),

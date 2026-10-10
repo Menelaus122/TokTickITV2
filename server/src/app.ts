@@ -11,6 +11,7 @@ import { conversationRouter } from "./conversation.js";
 import { actionsTakenReadRouter, actionsTakenStaffRouter } from "./actionsTaken.js";
 import { statusHistoryRouter } from "./statusHistory.js";
 import { dashboardRouter } from "./dashboard.js";
+import { staffDashboardRouter } from "./staffDashboard.js";
 import { staffRouter } from "./staff.js";
 import { adminRouter } from "./admin.js";
 import { routeId } from "./routeId.js";
@@ -689,6 +690,8 @@ app.use("/api/tickets", statusHistoryRouter);
 // Lab 4, Issue 7 — the Requester dashboard. The staff dashboard is under /api/staff (Issue 8).
 app.use("/api/dashboard", dashboardRouter);
 // Lab 3, Issue 8 — the IT Staff queue, behind the /api/staff role guard above.
+// Lab 4, Issue 8 — the IT Staff and Administrator dashboard, behind the same role guard.
+app.use("/api/staff", staffDashboardRouter);
 app.use("/api/staff", staffRouter);
 // Lab 4, Issue 4 — recording and editing Actions Taken, behind the same role guard.
 app.use("/api/staff", actionsTakenStaffRouter);

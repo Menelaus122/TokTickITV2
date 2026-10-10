@@ -322,6 +322,61 @@ describe("WF-07 a reopened Ticket needs a new action before it can be resolved a
     expect((await status(id, "RESOLVED")).body.error.code).toBe("FOLLOW_UP_PENDING");
   });
 
+  // Review of PR #87: the gate must date itself from the LAST reopen. A lookup that took the first one
+  // would let an action recorded between two reopens justify a third resolve, which is exactly the
+  // "resolved again on work done before it failed again" that D-07 exists to stop.
+  it("dates the gate from the last reopen: an action recorded between two reopens does not justify the next resolve", async () => {
+    const id = await makeTicket({ status: "IN_PROGRESS" });
+    await record(id, false);
+    expect((await status(id, "RESOLVED")).status).toBe(200);
+    expect((await status(id, "REOPENED")).status).toBe(200);
+    expect((await status(id, "IN_PROGRESS")).status).toBe(200);
+
+    // Recorded after the first reopen, so it justifies the second resolve...
+    await record(id, false);
+    expect((await status(id, "RESOLVED")).status).toBe(200);
+    // ...and the Ticket fails again.
+    expect((await status(id, "REOPENED")).status).toBe(200);
+    expect((await status(id, "IN_PROGRESS")).status).toBe(200);
+
+    // That action now came before the latest reopen. Nothing has been done since.
+    const third = await status(id, "RESOLVED");
+    expect(third.status).toBe(409);
+    expect(third.body.error.code).toBe("ACTION_REQUIRED");
+    expect((await prisma.ticket.findUniqueOrThrow({ where: { id } })).currentStatus).toBe("IN_PROGRESS");
+
+    // The detail says the same, from the same lookup, so the screen and the API cannot differ.
+    const shown = await detail(id);
+    expect(shown.body.ticket.permittedTransitions).not.toContain("RESOLVED");
+    expect(shown.body.ticket.blockedTransitions).toContainEqual(expect.objectContaining({ to: "RESOLVED", code: "ACTION_REQUIRED" }));
+
+    // An action recorded after the second reopen is what opens it.
+    await record(id, false);
+    expect((await status(id, "RESOLVED")).status).toBe(200);
+  });
+
+  it("does not let a Yes recorded between two reopens hold the next resolve: after the second reopen the answer is ACTION_REQUIRED", async () => {
+    const id = await makeTicket({ status: "IN_PROGRESS" });
+    await record(id, false);
+    expect((await status(id, "RESOLVED")).status).toBe(200);
+    expect((await status(id, "REOPENED")).status).toBe(200);
+    expect((await status(id, "IN_PROGRESS")).status).toBe(200);
+
+    // After the first reopen a Yes holds the gate, as WF-05 says...
+    await record(id, true);
+    expect((await status(id, "RESOLVED")).body.error.code).toBe("FOLLOW_UP_PENDING");
+    // ...until a closing action follows it.
+    await record(id, false);
+    expect((await status(id, "RESOLVED")).status).toBe(200);
+    expect((await status(id, "REOPENED")).status).toBe(200);
+    expect((await status(id, "IN_PROGRESS")).status).toBe(200);
+
+    // The Yes, and the closing action after it, are both before the second reopen now: neither counts.
+    const third = await status(id, "RESOLVED");
+    expect(third.status).toBe(409);
+    expect(third.body.error.code).toBe("ACTION_REQUIRED");
+  });
+
   it("treats a legacy Reopened Ticket, with no history row to date the reopen from, as never reopened", async () => {
     const id = await makeTicket({ status: "REOPENED" });
     expect((await history(id)).body.history).toEqual([]);
