@@ -9,10 +9,10 @@ export type { TextInputProps, TextAreaProps, SelectInputProps, ReadOnlyFieldProp
 export { Button, IconButton } from "./Button.js";
 export type { ButtonProps, IconButtonProps, ButtonVariant } from "./Button.js";
 
-export { PriorityBadge, StatusBadge, AttachmentBadge, RoleBadge, FollowUpPill, UserStatusBadge, OwnerPresentation, ROLE_LABEL, STATUS_LABEL, TICKET_STATUSES } from "./Badge.js";
+export { PriorityBadge, StatusBadge, AttachmentBadge, RoleBadge, FollowUpPill, UserStatusBadge, OwnerPresentation, ownerProblem, ROLE_LABEL, STATUS_LABEL, TICKET_STATUSES } from "./Badge.js";
 export type { Priority, TicketStatus, RoleValue, OwnerValue } from "./Badge.js";
 
-export { LoadingState, EmptyState, NoResultsState, ErrorState, SuccessCallout, WarningCallout } from "./States.js";
+export { LoadingState, EmptyState, NoResultsState, ErrorState, ErrorCallout, ForbiddenState, SuccessCallout, WarningCallout } from "./States.js";
 export type { EmptyStateProps, NoResultsStateProps, ErrorStateProps } from "./States.js";
 
 export { Page, Card, FieldGrid, FullWidth, ActionBar, ResponsiveList } from "./Layout.js";

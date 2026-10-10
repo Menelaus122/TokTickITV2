@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
+import { OwnerPresentation } from "../../src/components/index.js";
+import { StaffDashboard } from "../../src/screens/StaffDashboard.js";
+import { StaffTicketQueue } from "../../src/screens/StaffTicketQueue.js";
 import { StaffTicketDetail } from "../../src/screens/StaffTicketDetail.js";
 import { RequesterTicketDetail } from "../../src/screens/RequesterTicketDetail.js";
 import * as api from "../../src/api.js";
@@ -673,3 +677,155 @@ describe("UI-10 (continued) the status control follows the gate as actions are r
 function fetchActions() {
   return vi.mocked(api.fetchActionsTaken);
 }
+
+// ---------------------------------------------------------------------------
+// UI-17 — the Owner label (AC-33, BR-55, ui-spec §1.6)
+// ---------------------------------------------------------------------------
+
+describe("UI-17 the Owner label tells an inactive owner from one who is no longer IT Staff (AC-33, BR-55, ui-spec §1.6)", () => {
+  const ACTIVE_STAFF = { id: ME, fullName: "Nattapong Saelim", role: "IT_STAFF" as const, isActive: true };
+  const ACTIVE_ADMIN = { id: 11, fullName: "Wirachat Thongdee", role: "ADMINISTRATOR" as const, isActive: true };
+  /** The account was deactivated: its role is still IT Staff. */
+  const INACTIVE = { id: 10, fullName: "Kanya Suthi", role: "IT_STAFF" as const, isActive: false };
+  /** The account is active, but its role was changed to Requester after the ticket was assigned. */
+  const NO_LONGER_STAFF = { id: 9, fullName: "Prasert Chaiyo", role: "REQUESTER" as const, isActive: true };
+  /** Both at once: the stronger fact is that the account is deactivated. */
+  const GONE = { id: 12, fullName: "Somchai Boon", role: "REQUESTER" as const, isActive: false };
+
+  const pills = (container: HTMLElement) =>
+    Array.from(container.querySelectorAll("[data-badge^='owner-']")).map((pill) => pill.textContent);
+
+  describe("the label itself", () => {
+    it.each([
+      ["an active IT Staff member", ACTIVE_STAFF, []],
+      ["an active Administrator", ACTIVE_ADMIN, []],
+      ["an owner whose account is deactivated", INACTIVE, ["Inactive"]],
+      ["an owner whose role is now Requester", NO_LONGER_STAFF, ["No longer IT Staff"]],
+      ["an owner who is both deactivated and a Requester now", GONE, ["Inactive"]],
+    ])("%s", (_label, owner, expected) => {
+      const { container } = render(<OwnerPresentation owner={owner} />);
+      expect(container).toHaveTextContent(owner.fullName);
+      expect(pills(container)).toEqual(expected);
+    });
+
+    it("never reads 'No longer IT Staff' for an inactive owner, nor 'Inactive' for an active one", () => {
+      const inactive = render(<OwnerPresentation owner={INACTIVE} />);
+      expect(inactive.container).not.toHaveTextContent("No longer IT Staff");
+      inactive.unmount();
+      const retired = render(<OwnerPresentation owner={NO_LONGER_STAFF} />);
+      expect(retired.container).not.toHaveTextContent("Inactive");
+    });
+
+    it("keeps the 'You' pill beside it for the signed-in member, and says Unassigned for no owner", () => {
+      const own = render(<OwnerPresentation owner={ACTIVE_STAFF} currentUserId={ME} />);
+      expect(pills(own.container)).toEqual(["You"]);
+      own.unmount();
+      const none = render(<OwnerPresentation owner={null} />);
+      expect(none.container).toHaveTextContent("Unassigned");
+      expect(pills(none.container)).toEqual([]);
+    });
+
+    it("carries the words as text, so the label is not colour alone (FR-31)", () => {
+      const { container } = render(<OwnerPresentation owner={NO_LONGER_STAFF} />);
+      const pill = container.querySelector("[data-badge^='owner-']")!;
+      expect(pill.textContent).toBe("No longer IT Staff");
+      expect(pill).toBeVisible();
+    });
+  });
+
+  describe("on the IT Staff Ticket Detail", () => {
+    it("reads Inactive for a deactivated owner, and offers them in the owner picker as (inactive)", async () => {
+      await ready(detail({ owner: INACTIVE }));
+      const region = operational();
+      expect(pills(region.getByText(INACTIVE.fullName, { selector: ".tt-owner" }))).toEqual(["Inactive"]);
+      expect(region.getByRole("option", { name: "Kanya Suthi (inactive)" })).toBeInTheDocument();
+      expect(region.queryByText("No longer IT Staff")).not.toBeInTheDocument();
+    });
+
+    it("reads No longer IT Staff for an active owner whose role changed, and the picker says so too", async () => {
+      await ready(detail({ owner: NO_LONGER_STAFF }));
+      const region = operational();
+      expect(pills(region.getByText(NO_LONGER_STAFF.fullName, { selector: ".tt-owner" }))).toEqual(["No longer IT Staff"]);
+      expect(region.getByRole("option", { name: "Prasert Chaiyo (no longer IT Staff)" })).toBeInTheDocument();
+      expect(region.queryByRole("option", { name: /inactive/i })).not.toBeInTheDocument();
+    });
+
+    it("shows no pill and no extra picker option for an owner who is still assignable", async () => {
+      await ready(detail({ owner: ACTIVE_STAFF }));
+      const region = operational();
+      expect(pills(region.getByText(ACTIVE_STAFF.fullName, { selector: ".tt-owner" }))).toEqual(["You"]);
+      expect(region.queryByRole("option", { name: /inactive|no longer/i })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("in the Ticket Queue and on the staff Dashboard", () => {
+    const row = (id: number, ticketNumber: string, owner: Detail["owner"]) => ({
+      id,
+      ticketNumber,
+      summary: "Printer on floor 3 will not print",
+      categoryName: "Hardware",
+      requestedPriority: "MEDIUM" as const,
+      itPriority: "HIGH" as const,
+      currentStatus: "IN_PROGRESS" as const,
+      owner,
+      requesterResolvedAt: null,
+      createdAt: "2026-09-28T02:10:00.000Z",
+      updatedAt: "2026-09-29T09:14:22.310Z",
+    });
+
+    it("the queue says Inactive for one row and No longer IT Staff for another", async () => {
+      vi.spyOn(api, "fetchCategories").mockResolvedValue([{ id: 1, name: "Hardware" }]);
+      vi.spyOn(api, "fetchQueue").mockResolvedValue({
+        tickets: [row(1, "TT-2026-00001", INACTIVE), row(2, "TT-2026-00002", NO_LONGER_STAFF), row(3, "TT-2026-00003", ACTIVE_ADMIN)],
+        page: 1,
+        pageSize: 10,
+        totalItems: 3,
+        totalPages: 1,
+      });
+      render(
+        <MemoryRouter>
+          <StaffTicketQueue currentUserId={ME} />
+        </MemoryRouter>,
+      );
+      const table = await screen.findByRole("table");
+      const owners = (number: string) => pills(within(table).getByRole("row", { name: new RegExp(number) }));
+      expect(owners("TT-2026-00001")).toEqual(["Inactive"]);
+      expect(owners("TT-2026-00002")).toEqual(["No longer IT Staff"]);
+      expect(owners("TT-2026-00003")).toEqual([]);
+    });
+
+    it("the Dashboard's Urgent list says the same of the owner of an urgent Ticket", async () => {
+      const urgent = (id: number, number: string, owner: Detail["owner"]) => ({
+        id,
+        ticketNumber: number,
+        summary: "Exam server is down",
+        currentStatus: "IN_PROGRESS" as const,
+        updatedAt: "2026-10-04T05:00:00.000Z",
+        itPriority: "URGENT" as const,
+        owner,
+      });
+      vi.spyOn(api, "fetchStaffDashboard").mockResolvedValue({
+        generatedAt: "2026-10-05T09:00:00.000Z",
+        metrics: {
+          unassigned: { value: 0, href: "/queue?owner=unassigned&group=open" },
+          assignedToMe: { value: 0, href: "/queue?owner=me&group=open" },
+          waitingForRequester: { value: 0, href: "/queue?status=WAITING_FOR_REQUESTER" },
+          urgent: { value: 2, href: "/queue?itPriority=URGENT&group=open" },
+        },
+        byStatus: [],
+        myTickets: [],
+        urgentTickets: [urgent(20, "TT-2026-00020", INACTIVE), urgent(21, "TT-2026-00021", NO_LONGER_STAFF)],
+        myRecentActions: [],
+      });
+      render(
+        <MemoryRouter>
+          <StaffDashboard fullName="Nattapong Saelim" currentUserId={ME} />
+        </MemoryRouter>,
+      );
+      await screen.findByText("TT-2026-00020");
+      const owners = (number: string) => pills(screen.getByText(number).closest("li") as HTMLElement);
+      expect(owners("TT-2026-00020")).toEqual(["Inactive"]);
+      expect(owners("TT-2026-00021")).toEqual(["No longer IT Staff"]);
+    });
+  });
+});

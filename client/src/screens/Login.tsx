@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import { ApiError } from "../api.js";
-import { Button, Card, ErrorState, TextInput, WarningCallout } from "../components/index.js";
+import { Button, Card, ErrorCallout, ErrorState, TextInput, WarningCallout } from "../components/index.js";
 
 // Lab 3, Issue 5 — the Login screen (ui-spec §3, FR-01).
 //
@@ -74,12 +74,7 @@ export function Login({ onSignIn }: LoginProps) {
           <h1 className="tt-auth__brand">TokTickIT</h1>
           <p className="tt-auth__lede">Sign in to continue</p>
 
-          {problem?.tone === "error" && (
-            <div className="tt-callout tt-callout--error" role="alert" data-state="error">
-              <span aria-hidden="true">⚠</span>
-              <div>{problem.message}</div>
-            </div>
-          )}
+          {problem?.tone === "error" && <ErrorCallout>{problem.message}</ErrorCallout>}
           {problem?.tone === "warning" && <WarningCallout>{problem.message}</WarningCallout>}
           {problem?.tone === "unavailable" && (
             // The API could not be reached: offer Try again (ui-spec §3.1),

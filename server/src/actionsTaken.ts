@@ -5,6 +5,7 @@ import { requireSession } from "./auth.js";
 import { visibleTicket } from "./conversation.js";
 import { checkActionEdit, checkNewAction, compareReadingOrder, isActiveStatus, readRequestKey, type FieldErrors } from "./actionTakenRules.js";
 import { routeId } from "./routeId.js";
+import { nulFailure } from "./bodyGuards.js";
 
 // Lab 4, Issue 4 — the Actions Taken API (docs/lab-04/api-spec.md §2;
 // specification.md BR-01 to BR-14, BR-27 to BR-29, BR-42 to BR-44, BR-52).
@@ -123,6 +124,10 @@ actionsTakenStaffRouter.post("/tickets/:id/actions-taken", async (req: Request, 
       const fields: FieldErrors = { ...(checked.ok ? {} : checked.fields), ...(requestKey.ok ? {} : { requestKey: requestKey.message }) };
       if (Object.keys(fields).length > 0 || !checked.ok) return validationFailed(fields);
 
+      // Lab 4 (BR-52): the rules above refuse a NUL in the fields they read; any other string of the body is refused here.
+      const nul = nulFailure(req.body);
+      if (nul) return { status: 400, body: nul };
+
       if (!isActiveStatus(ticket.currentStatus)) return TICKET_NOT_ACTIVE;
 
       const action = await tx.actionTaken.create({
@@ -168,6 +173,8 @@ actionsTakenStaffRouter.patch("/tickets/:id/actions-taken/:actionId", async (req
       // BR-05, BR-09 — only the six editable fields are read; the rest of the body is ignored.
       const checked = checkActionEdit(stored, req.body, { now: new Date(), ticketCreatedAt: ticket.createdAt });
       if (!checked.ok) return validationFailed(checked.fields);
+      const nul = nulFailure(req.body);
+      if (nul) return { status: 400, body: nul };
 
       // BR-10 comes before the version, so a stale edit of a closed Ticket is told it is closed.
       if (!isActiveStatus(ticket.currentStatus)) return TICKET_NOT_ACTIVE;

@@ -423,7 +423,7 @@ describe("busy, forbidden, not found, and failure (FR-37)", () => {
   });
 
   it.each([
-    [403, /do not have permission/],
+    [403, /do not have access to this ticket/],
     [404, /Ticket not found/],
     [500, /Cannot load this ticket/],
   ])("renders the %s state", async (status, text) => {

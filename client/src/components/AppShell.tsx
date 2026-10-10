@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext.js";
 import type { Role } from "../api.js";
 import { ROUTES } from "../routes.js";
 import { RoleBadge } from "./Badge.js";
+import { ErrorCallout } from "./States.js";
 
 // Application shell (ui-spec §2; Lab 2 ui-spec §7).
 //
@@ -128,12 +129,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </button>
       </header>
 
-      {signOutError && (
-        <div className="tt-callout tt-callout--error tt-shell__alert" role="alert">
-          <span aria-hidden="true">⚠</span>
-          <div>{signOutError}</div>
-        </div>
-      )}
+      {signOutError && <ErrorCallout className="tt-shell__alert">{signOutError}</ErrorCallout>}
 
       {menuOpen && (
         <div className="tt-shell__mobile-nav" id={menuId}>

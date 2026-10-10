@@ -11,7 +11,7 @@ import {
 import { ActionTakenForm, type ActionFormValues } from "./ActionTakenForm.js";
 import { FollowUpPill, RoleBadge, STATUS_LABEL, type TicketStatus } from "./Badge.js";
 import { Button } from "./Button.js";
-import { EmptyState, ErrorState, LoadingState, SuccessCallout } from "./States.js";
+import { EmptyState, ErrorState, ForbiddenState, LoadingState, SuccessCallout } from "./States.js";
 
 // Lab 4, Issue 5 — the Actions Taken region of a Ticket Detail screen
 // (ui-spec §1.2, §1.3, §4, §6; specification.md FR-01 to FR-08).
@@ -248,7 +248,7 @@ export function ActionsTakenRegion({ ticketId, ticketStatus, ticketCreatedAt, mo
 
       {state === "loading" && <LoadingState rows={2} label="Loading actions taken…" />}
       {state === "error" && <ErrorState message="Cannot load the actions taken right now." onRetry={() => void load()} />}
-      {state === "forbidden" && <ErrorState message="You do not have access to record actions." />}
+      {state === "forbidden" && <ForbiddenState what="record actions" />}
 
       {staff && creating && (
         <ActionTakenForm

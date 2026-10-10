@@ -5,6 +5,7 @@ import { requireSession } from "./auth.js";
 import { requireRole, resolveRequesterIdentity } from "./authorization.js";
 import { routeId } from "./routeId.js";
 import { lockTicketRow } from "./ticketLock.js";
+import { nulFailure } from "./bodyGuards.js";
 
 // Lab 3, Issue 7 — Public Comments, Internal Notes, and "Problem Appears
 // Resolved" (docs/lab-03/api-spec.md §3.1, §4; specification.md §5.6).
@@ -95,6 +96,10 @@ function postToThread(thread: Thread, label: string) {
     try {
       if (!(await visibleTicket(prisma, req, id))) return res.status(404).json(TICKET_NOT_FOUND);
 
+      // Lab 4 (BR-52): after the ownership check, and before the body is read.
+      const nul = nulFailure(req.body);
+      if (nul) return res.status(400).json(nul);
+
       const checked = checkBody((req.body as { body?: unknown } | undefined)?.body, 1, label);
       if (!checked.ok) return invalid(res, "body", checked.message);
 
@@ -144,6 +149,10 @@ conversationRouter.patch("/:id/appears-resolved", async (req: Request, res: Resp
   try {
     const owned = await prisma.ticket.findFirst({ where: { id, requesterId: context.requesterId }, select: { id: true } });
     if (!owned) return res.status(404).json(TICKET_NOT_FOUND);
+
+    // Lab 4 (BR-52): after the ownership check, and before the body is read.
+    const nul = nulFailure(req.body);
+    if (nul) return res.status(400).json(nul);
 
     const raw = (req.body ?? {}) as { appearsResolved?: unknown; comment?: unknown };
     if (typeof raw.appearsResolved !== "boolean") {

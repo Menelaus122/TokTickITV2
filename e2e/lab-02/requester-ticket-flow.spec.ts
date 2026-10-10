@@ -145,6 +145,10 @@ test.describe("E2E-03 attachment lifecycle", () => {
     await expect(confirm).toBeEnabled();
     await confirm.click();
 
+    // Lab 4 (BR-53, BR-54): the dialog stays open, busy, until the server has answered, so a failure can show its
+    // message beside the reason. Wait for the answer before reading the page behind it.
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+
     // Metadata is retained, and every route to the bytes is gone (BR-40).
     await expect(page.getByText("evidence.pdf")).toBeVisible();
     await expect(page.getByText(/Uploaded the wrong evidence/)).toBeVisible();

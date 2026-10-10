@@ -5,7 +5,8 @@ import {
   MAX_FILE_BYTES,
   PERMITTED_EXTENSIONS,
 } from "../api.js";
-import { AttachmentBadge, Button, IconButton, TextArea } from "./index.js";
+import { AttachmentBadge, Button, ErrorCallout, IconButton, TextArea } from "./index.js";
+import { useModal } from "./useModal.js";
 
 // Attachment list and lifecycle (ui-spec.md 11.1 and 11.2).
 //
@@ -44,9 +45,100 @@ export interface AttachmentSectionProps {
   /** Omitted where the role may not add files (IT Staff, BR-18): no Add control is drawn. */
   onUpload?: (file: File) => void;
   onDownload: (attachment: Attachment) => void;
-  /** Omitted where the role may not remove files (IT Staff, BR-18): no Remove control is drawn. */
-  onRemove?: (attachment: Attachment, reason: string) => void;
+  /**
+   * Omitted where the role may not remove files (IT Staff, BR-18): no Remove control is drawn. It resolves when
+   * the file is removed, and rejects with a message for the dialog to show, which then stays open (BR-54).
+   */
+  onRemove?: (attachment: Attachment, reason: string) => Promise<void> | void;
   onDismissRejection?: (filename: string) => void;
+}
+
+interface RemovalDialogProps {
+  attachment: Attachment;
+  onRemove?: AttachmentSectionProps["onRemove"];
+  onClose: () => void;
+  restoreFocusTo: () => HTMLElement | null;
+}
+
+/**
+ * Soft removal is irreversible through the UI, so it is confirmed and the reason is required (BR-39).
+ * The dialog stays open while the request runs, and after a failure, with the reason the person typed
+ * and the message inside it, so a retry is one press (BR-53, BR-54). It is a modal dialog the keyboard
+ * can use: see useModal.
+ */
+function RemovalDialog({ attachment, onRemove, onClose, restoreFocusTo }: RemovalDialogProps) {
+  const dialog = useRef<HTMLDivElement>(null);
+  const [reason, setReason] = useState("");
+  const [reasonError, setReasonError] = useState<string>();
+  const [failure, setFailure] = useState<string>();
+  /** True from the moment Remove attachment is pressed until the server has answered (BR-53). */
+  const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
+
+  useModal(dialog, { onEscape: () => !busy && onClose(), restoreFocusTo });
+
+  async function confirm() {
+    if (inFlight.current) return;
+    const trimmed = reason.trim();
+    if (trimmed.length < REMOVAL_REASON_MIN || trimmed.length > REMOVAL_REASON_MAX) {
+      setReasonError(`The removal reason must be between ${REMOVAL_REASON_MIN} and ${REMOVAL_REASON_MAX} characters.`);
+      return;
+    }
+    setReasonError(undefined);
+    setFailure(undefined);
+    inFlight.current = true;
+    setBusy(true);
+    try {
+      await onRemove?.(attachment, trimmed);
+      onClose();
+    } catch (error) {
+      // The dialog stays, with the reason.
+      setFailure(error instanceof Error ? error.message : "The attachment could not be removed.");
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="tt-dialog" role="dialog" aria-modal="true" aria-label="Remove attachment?" ref={dialog} tabIndex={-1}>
+      <div className="tt-card">
+        <h3 className="tt-h2">Remove attachment?</h3>
+        <p>
+          <strong>{attachment.originalFilename}</strong>
+        </p>
+        <p className="tt-muted">The file will stay on the ticket as a record but can no longer be downloaded.</p>
+
+        <TextArea
+          label="Removal reason"
+          required
+          rows={3}
+          value={reason}
+          error={reasonError}
+          help={`${REMOVAL_REASON_MIN}-${REMOVAL_REASON_MAX} characters.`}
+          disabled={busy}
+          onChange={(event) => setReason(event.target.value)}
+        />
+
+        {failure && <ErrorCallout>{failure}</ErrorCallout>}
+
+        <div className="tt-actions">
+          <Button variant="secondary" disabled={busy} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            busy={busy}
+            busyLabel="Removing…"
+            disabled={reason.trim().length < REMOVAL_REASON_MIN}
+            onClick={() => void confirm()}
+          >
+            Remove attachment
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function AttachmentSection({
@@ -61,9 +153,6 @@ export function AttachmentSection({
 }: AttachmentSectionProps) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [removing, setRemoving] = useState<Attachment | null>(null);
-  const [reason, setReason] = useState("");
-  const [reasonError, setReasonError] = useState<string>();
-
   const activeCount = attachments.filter((a) => a.removedAt === null).length;
   const atLimit = activeCount >= MAX_ACTIVE_ATTACHMENTS;
 
@@ -74,28 +163,10 @@ export function AttachmentSection({
     event.target.value = "";
   }
 
-  function confirmRemoval() {
-    const trimmed = reason.trim();
-    if (trimmed.length < REMOVAL_REASON_MIN || trimmed.length > REMOVAL_REASON_MAX) {
-      setReasonError(
-        `The removal reason must be between ${REMOVAL_REASON_MIN} and ${REMOVAL_REASON_MAX} characters.`,
-      );
-      return;
-    }
-    if (removing) onRemove?.(removing, trimmed);
-    closeDialog();
-  }
-
-  function closeDialog() {
-    setRemoving(null);
-    setReason("");
-    setReasonError(undefined);
-  }
-
   return (
     <section className="tt-card" aria-labelledby="attachments-heading">
       <div className="tt-attachments__header">
-        <h2 className="tt-h2" id="attachments-heading">
+        <h2 className="tt-h2" id="attachments-heading" tabIndex={-1}>
           Attachments ({activeCount} of {MAX_ACTIVE_ATTACHMENTS} active)
         </h2>
 
@@ -118,6 +189,7 @@ export function AttachmentSection({
               className="tt-visually-hidden"
               aria-label="Choose a file to attach"
               accept={PERMITTED_EXTENSIONS.join(",")}
+              disabled={uploading}
               onChange={handleFile}
             />
           </>
@@ -188,6 +260,7 @@ export function AttachmentSection({
                     <Button
                       variant="destructive"
                       busy={busyId === attachment.id}
+                      busyLabel="Removing…"
                       onClick={() => setRemoving(attachment)}
                     >
                       Remove
@@ -201,42 +274,12 @@ export function AttachmentSection({
       </ul>
 
       {removing && (
-        // Soft removal is irreversible through the UI, so it is confirmed and
-        // the reason is required (BR-39).
-        <div className="tt-dialog" role="dialog" aria-modal="true" aria-label="Remove attachment?">
-          <div className="tt-card">
-            <h3 className="tt-h2">Remove attachment?</h3>
-            <p>
-              <strong>{removing.originalFilename}</strong>
-            </p>
-            <p className="tt-muted">
-              The file will stay on the ticket as a record but can no longer be downloaded.
-            </p>
-
-            <TextArea
-              label="Removal reason"
-              required
-              rows={3}
-              value={reason}
-              error={reasonError}
-              help={`${REMOVAL_REASON_MIN}-${REMOVAL_REASON_MAX} characters.`}
-              onChange={(event) => setReason(event.target.value)}
-            />
-
-            <div className="tt-actions">
-              <Button variant="secondary" onClick={closeDialog}>
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                disabled={reason.trim().length < REMOVAL_REASON_MIN}
-                onClick={confirmRemoval}
-              >
-                Remove attachment
-              </Button>
-            </div>
-          </div>
-        </div>
+        <RemovalDialog
+          attachment={removing}
+          onRemove={onRemove}
+          onClose={() => setRemoving(null)}
+          restoreFocusTo={() => document.getElementById("attachments-heading")}
+        />
       )}
     </section>
   );

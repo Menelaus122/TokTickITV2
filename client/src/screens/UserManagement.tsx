@@ -11,11 +11,14 @@ import {
   issueInitialPassword,
   updateUser,
 } from "../api.js";
+import { useModal } from "../components/useModal.js";
 import {
   Button,
   Card,
   EmptyState,
+  ErrorCallout,
   ErrorState,
+  ForbiddenState,
   LoadingState,
   NoResultsState,
   ROLE_LABEL,
@@ -132,7 +135,7 @@ export function UserManagement({ currentUserId }: { currentUserId: number }) {
   }
 
   if (state === "forbidden") {
-    return <ErrorState message="You do not have permission to manage users. Only an Administrator can." />;
+    return <ForbiddenState what="User Management" hint="Only an Administrator can open it." />;
   }
 
   const filtering = debounced !== "" || role !== "";
@@ -142,6 +145,7 @@ export function UserManagement({ currentUserId }: { currentUserId: number }) {
       <div className="tt-users__head">
         <Button
           variant="primary"
+          data-control="create-user"
           onClick={() => {
             setSuccess(null);
             setPanel({ mode: "create" });
@@ -260,13 +264,10 @@ function UserPanel({ panel, currentUserId, onClose, onSaved }: UserPanelProps) {
   const [busy, setBusy] = useState(false);
   const [issuing, setIssuing] = useState(false);
 
-  useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape" && !busy) onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [busy, onClose]);
+  // Focus goes in, Tab stays inside, Escape closes it unless a request is in flight, and focus goes back to
+  // the control that opened it, or to + Create user when that row has been replaced by a reload (AC-30).
+  const panelRef = useRef<HTMLDivElement>(null);
+  useModal(panelRef, { onEscape: () => !busy && onClose(), restoreFocusTo: () => document.querySelector<HTMLElement>('[data-control="create-user"]') });
 
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -317,22 +318,12 @@ function UserPanel({ panel, currentUserId, onClose, onSaved }: UserPanelProps) {
   }
 
   return (
-    <div className="tt-drawer" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+    <div className="tt-drawer" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={panelRef} tabIndex={-1}>
       <form className="tt-drawer__panel tt-card" onSubmit={submit} noValidate>
         <h2 className="tt-h2" id={titleId}>{creating ? "Create user" : "Edit user"}</h2>
 
-        {refusal && (
-          <div className="tt-callout tt-callout--error" role="alert" data-state="refused">
-            <span aria-hidden="true">!</span>
-            <div>{refusal}</div>
-          </div>
-        )}
-        {failure && (
-          <div className="tt-callout tt-callout--error" role="alert" data-state="error">
-            <span aria-hidden="true">!</span>
-            <div>{failure}</div>
-          </div>
-        )}
+        {refusal && <ErrorCallout state="refused">{refusal}</ErrorCallout>}
+        {failure && <ErrorCallout>{failure}</ErrorCallout>}
 
         <TextInput label="Full name" required value={draft.fullName} error={errors.fullName} disabled={busy} onChange={(event) => set("fullName", event.target.value)} />
         <TextInput label="Email" type="email" required value={draft.email} error={errors.email} disabled={busy} onChange={(event) => set("email", event.target.value)} />

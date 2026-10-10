@@ -13,6 +13,7 @@ import { statusHistoryRouter } from "./statusHistory.js";
 import { dashboardRouter } from "./dashboard.js";
 import { staffDashboardRouter } from "./staffDashboard.js";
 import { staffRouter } from "./staff.js";
+import { nulFailure } from "./bodyGuards.js";
 import { adminRouter } from "./admin.js";
 import { routeId } from "./routeId.js";
 import { ATTACHMENT_SELECT, UPLOAD_DIR, attachmentView, sendAttachment } from "./attachmentResponse.js";
@@ -111,7 +112,7 @@ app.get("/api/categories", requireSession, async (_req: Request, res: Response) 
     res.status(200).json(categories);
   } catch {
     // Never leak internal/database details to the client.
-    res.status(500).json({ error: "Failed to load categories" });
+    res.status(500).json({ error: { code: "INTERNAL_ERROR", message: "Failed to load categories." } });
   }
 });
 
@@ -179,6 +180,10 @@ app.post("/api/tickets", async (req: Request, res: Response) => {
       .status(context.status)
       .json({ error: { code: context.code, message: context.message } });
   }
+
+  // Lab 4 (BR-52): a NUL character anywhere in the body is a 400 on its field, before the body is read.
+  const nul = nulFailure(req.body);
+  if (nul) return res.status(400).json(nul);
 
   // Any ticketNumber, requesterId, or currentStatus in the body is simply not
   // read — those are the server's to decide.
@@ -510,6 +515,10 @@ app.post("/api/tickets/:id/attachments", (req: Request, res: Response) => {
       // Ownership is checked before the file is even looked at (BR-37).
       if (!ticket) return res.status(404).json(NOT_FOUND);
 
+      // Lab 4 (BR-52): the file's name is a string of the request, and PostgreSQL text cannot hold a NUL.
+      const nul = nulFailure({ file: file.originalname });
+      if (nul) return res.status(400).json(nul);
+
       const check = checkUpload(file.originalname, file.mimetype, file.size);
       if (!check.ok) {
         return res
@@ -626,6 +635,10 @@ app.patch("/api/attachments/:id/remove", async (req: Request, res: Response) => 
       .status(400)
       .json({ error: { code: "INVALID_QUERY", message: "The attachment id is not valid." } });
   }
+
+  // Lab 4 (BR-52): a NUL character anywhere in the body is a 400 on its field, before the body is read.
+  const nul = nulFailure(req.body);
+  if (nul) return res.status(400).json(nul);
 
   const reason = checkRemovalReason((req.body as { removalReason?: unknown })?.removalReason);
   if (!reason.ok) {

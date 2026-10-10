@@ -96,9 +96,11 @@ Dashboards list Tickets in this smaller row, never in the queue's full shape
 }
 ```
 
-The staff lists add `itPriority` and `owner` (`null`, or `{ id, fullName, isActive }`): the
-same owner shape the Ticket Queue's rows have, so a screen can say an owner's account is inactive
-(Lab 3 BR-26). It has no `role` until Issue 9 adds one to every staff shape together (BR-55).
+The staff lists add `itPriority` and `owner` (`null`, or `{ id, fullName, role, isActive }`): the
+same owner shape the Ticket Queue's rows and the staff Ticket Detail have, so a screen can tell an
+owner whose account is deactivated (**Inactive**, Lab 3 BR-26) from one who is active but no longer
+IT Staff or an Administrator (**No longer IT Staff**, BR-55). Issue 9 gave every staff shape the
+`role` together, from one definition. It carries no email and nothing of the password or the session.
 
 ---
 
