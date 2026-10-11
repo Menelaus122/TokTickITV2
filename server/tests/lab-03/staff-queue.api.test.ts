@@ -153,7 +153,8 @@ describe("the queue", () => {
         "updatedAt",
       ].sort(),
     );
-    expect(row.owner).toEqual({ id: ids.me, fullName: expect.any(String), isActive: true });
+    // Lab 4 (BR-55): the owner carries role beside isActive, so the screen can tell "Inactive" from "No longer IT Staff".
+    expect(row.owner).toEqual({ id: ids.me, fullName: expect.any(String), role: "IT_STAFF", isActive: true });
   });
 
   it("API-31 orders by IT Priority descending, oldest first within a priority, by default", async () => {
@@ -224,7 +225,7 @@ describe("search and filters", () => {
   it("API-39 still shows the owner of a deactivated account, marked inactive (BR-26)", async () => {
     const rows = await mine({ owner: ids.inactiveStaff });
     expect(rows.length).toBe(fixtures.filter((f) => f.ownerId === ids.inactiveStaff).length);
-    for (const row of rows) expect(row.owner).toEqual({ id: ids.inactiveStaff, fullName: expect.any(String), isActive: false });
+    for (const row of rows) expect(row.owner).toEqual({ id: ids.inactiveStaff, fullName: expect.any(String), role: "IT_STAFF", isActive: false });
   });
 });
 

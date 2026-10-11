@@ -1139,6 +1139,8 @@ describe("UI-07 the Requester's view is read-only (FR-04, AC-08, BR-13)", () => 
       attachments: [],
     } as api.TicketDetail);
     vi.spyOn(api, "fetchComments").mockResolvedValue([]);
+    // The screen loads the Status History too (Issue 6); without this the test reached the real API.
+    vi.spyOn(api, "fetchStatusHistory").mockResolvedValue([]);
     fetchSpy.mockResolvedValue(entries);
     const create = vi.spyOn(api, "createActionTaken");
     const edit = vi.spyOn(api, "editActionTaken");

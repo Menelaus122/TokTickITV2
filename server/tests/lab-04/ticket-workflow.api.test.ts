@@ -978,3 +978,131 @@ describe("WF-20 an assignment racing the deactivation of the proposed owner (AC-
     expect((await detail(id)).body.ticket.owner).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// WF-18 — the owner is told apart: Inactive, or no longer IT Staff (AC-33, BR-55)
+// ---------------------------------------------------------------------------
+
+describe("WF-18 the owner object carries role and isActive in every staff shape (AC-33, BR-55, api-spec §1.4, §3.1)", () => {
+  const ownerIds: number[] = [];
+
+  async function newOwner(overrides: { role?: "IT_STAFF" | "ADMINISTRATOR" | "REQUESTER"; isActive?: boolean }) {
+    const user = await prisma.user.create({
+      data: {
+        fullName: "Workflow suite owner",
+        email: `wf18.${Date.now().toString(36)}.${ownerIds.length}@example.test`,
+        role: overrides.role ?? "IT_STAFF",
+        isActive: overrides.isActive ?? true,
+        mustChangePassword: false,
+        passwordHash: await hashPassword("Correct-horse-1"),
+      },
+    });
+    ownerIds.push(user.id);
+    return user;
+  }
+
+  afterAll(async () => {
+    // The tickets go first, so nothing still names these users.
+    await prisma.ticket.deleteMany({ where: { id: { in: ticketIds } } });
+    await prisma.user.deleteMany({ where: { id: { in: ownerIds } } });
+  });
+
+  const queueRow = async (id: number) => {
+    const number = (await prisma.ticket.findUniqueOrThrow({ where: { id } })).ticketNumber;
+    const res = await request(app).get(`/api/staff/tickets?q=${number}`).set("Cookie", cookies.owner);
+    expect(res.status).toBe(200);
+    expect(res.body.tickets).toHaveLength(1);
+    return res.body.tickets[0] as { owner: Record<string, unknown> | null };
+  };
+
+  /** Each Ticket is older than the last, so it sits first in the Urgent list, which is oldest created first (BR-36). */
+  let urgentSequence = 0;
+  const urgentRow = async (id: number) => {
+    const createdAt = new Date(Date.UTC(2001, 0, 1) - urgentSequence++ * 1000);
+    await prisma.ticket.update({ where: { id }, data: { itPriority: "URGENT", createdAt } });
+    const res = await request(app).get("/api/staff/dashboard").set("Cookie", cookies.owner);
+    expect(res.status).toBe(200);
+    const row = (res.body.urgentTickets as Array<{ id: number; owner: Record<string, unknown> | null }>).find((ticket) => ticket.id === id);
+    expect(row, "the Ticket is in the Urgent list").toBeDefined();
+    return row!;
+  };
+
+  const cases: Array<[string, { role?: "IT_STAFF" | "ADMINISTRATOR" | "REQUESTER"; isActive?: boolean }, { role: string; isActive: boolean }]> = [
+    ["an active IT Staff member", {}, { role: "IT_STAFF", isActive: true }],
+    ["an active Administrator", { role: "ADMINISTRATOR" }, { role: "ADMINISTRATOR", isActive: true }],
+    ["an IT Staff member whose account was deactivated", { isActive: false }, { role: "IT_STAFF", isActive: false }],
+    ["an owner whose role was changed to Requester", { role: "REQUESTER" }, { role: "REQUESTER", isActive: true }],
+    ["an owner who is a deactivated Requester", { role: "REQUESTER", isActive: false }, { role: "REQUESTER", isActive: false }],
+  ];
+
+  it.each(cases)("%s: the same owner object, id, name, role, and isActive, in the detail, the queue, and the Urgent list", async (_label, overrides, expected) => {
+    const owner = await newOwner(overrides);
+    const id = await makeTicket({ status: "OPEN", ownerId: owner.id });
+    const wanted = { id: owner.id, fullName: "Workflow suite owner", ...expected };
+
+    const shown = (await detail(id)).body.ticket.owner;
+    expect(shown).toEqual(wanted);
+    expect((await queueRow(id)).owner).toEqual(wanted);
+    expect((await urgentRow(id)).owner).toEqual(wanted);
+  });
+
+  it("an unassigned Ticket has owner null in all three, not an object with empty fields", async () => {
+    const id = await makeTicket({ status: "OPEN", ownerId: null });
+    expect((await detail(id)).body.ticket.owner).toBeNull();
+    expect((await queueRow(id)).owner).toBeNull();
+    expect((await urgentRow(id)).owner).toBeNull();
+  });
+
+  it("shows no more of the owner than that: no email, no password material, no session", async () => {
+    const owner = await newOwner({ role: "REQUESTER" });
+    const id = await makeTicket({ status: "OPEN", ownerId: owner.id });
+    for (const shape of [(await detail(id)).body.ticket.owner, (await queueRow(id)).owner, (await urgentRow(id)).owner]) {
+      expect(Object.keys(shape as object).sort()).toEqual(["fullName", "id", "isActive", "role"]);
+    }
+  });
+
+  it("follows the account when its role changes afterwards: the Ticket keeps the owner, and the shape says what they are now (Lab 3 D-19)", async () => {
+    const owner = await newOwner({});
+    const id = await makeTicket({ status: "OPEN", ownerId: owner.id });
+    expect((await detail(id)).body.ticket.owner).toMatchObject({ role: "IT_STAFF", isActive: true });
+    await prisma.user.update({ where: { id: owner.id }, data: { role: "REQUESTER" } });
+    expect((await detail(id)).body.ticket.owner).toMatchObject({ id: owner.id, role: "REQUESTER", isActive: true });
+    expect((await queueRow(id)).owner).toMatchObject({ id: owner.id, role: "REQUESTER", isActive: true });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// MIG-03 and MIG-04, the half that needs the workflow (tests.md §3.1): a Ticket from before Lab 4
+// ---------------------------------------------------------------------------
+
+describe("MIG-03 and MIG-04 a Ticket from before Lab 4 opens, and is gated or reopened like any other (AC-23, BR-47, BR-48)", () => {
+  // A legacy Ticket is exactly what makeTicket writes: no row in ActionTaken or TicketStatusChange, version 1.
+  it("MIG-03 opens with no actions, no history, and its version 1, and offers the moves its status allows", async () => {
+    const id = await makeTicket({ status: "RESOLVED" });
+    const shown = (await detail(id)).body.ticket;
+    expect(shown.version).toBe(1);
+    expect(shown.permittedTransitions).toEqual(["CLOSED", "REOPENED"]);
+    expect(shown.blockedTransitions).toEqual([]);
+    expect((await history(id)).body).toEqual({ history: [] });
+    const actions = await request(app).get(`/api/tickets/${id}/actions-taken`).set("Cookie", cookies.owner);
+    expect(actions.body).toEqual({ actions: [] });
+  });
+
+  it.each(["RESOLVED", "CLOSED"] as const)("MIG-04 a legacy %s Ticket is not re-gated: it can be reopened, and the history starts with that step", async (from) => {
+    const id = await makeTicket({ status: from });
+    const reopened = await status(id, "REOPENED");
+    expect(reopened.status, JSON.stringify(reopened.body)).toBe(200);
+    expect(reopened.body.ticket.currentStatus).toBe("REOPENED");
+    const steps = (await history(id)).body.history as Array<{ fromStatus: string; toStatus: string }>;
+    expect(steps.map((step) => [step.fromStatus, step.toStatus])).toEqual([[from, "REOPENED"]]);
+  });
+
+  it("MIG-04 a legacy In Progress Ticket is gated like any other: it cannot be resolved until an action is recorded", async () => {
+    const id = await makeTicket({ status: "IN_PROGRESS" });
+    const refused = await status(id, "RESOLVED");
+    expect(refused.status).toBe(409);
+    expect(refused.body.error.code).toBe("ACTION_REQUIRED");
+    await record(id);
+    expect((await status(id, "RESOLVED")).status).toBe(200);
+  });
+});

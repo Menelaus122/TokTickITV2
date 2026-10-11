@@ -23,7 +23,7 @@ import { StaffTicketQueueWithUrl } from "./screens/StaffTicketQueue.js";
 import { StaffTicketDetail } from "./screens/StaffTicketDetail.js";
 import { UserManagement } from "./screens/UserManagement.js";
 import { AppShell } from "./components/AppShell.js";
-import { ErrorState, LoadingState, Page } from "./components/index.js";
+import { ErrorState, ForbiddenState, LoadingState, Page } from "./components/index.js";
 import { ROUTES } from "./routes.js";
 
 export { ROUTES };
@@ -92,10 +92,7 @@ function RequireAuth({ roles, children }: { roles: Role[]; children: ReactNode }
     <AppShell>
       {forbidden && (
         <Page>
-          <div className="tt-callout tt-callout--error" role="alert" data-state="forbidden">
-            <span aria-hidden="true">⚠</span>
-            <div>You do not have access to that page.</div>
-          </div>
+          <ForbiddenState what="that page" />
         </Page>
       )}
       {children}
@@ -314,6 +311,13 @@ function AppRoutes() {
   );
 }
 
+// React Router 6.30 warns in the console, once per flag, that v7 changes two behaviours unless they
+// are opted into. Both are opted into here, so the console stays clean (Lab 4 AC-31) and the upgrade
+// holds no surprise: state updates of a navigation run in a transition, and a relative link inside a
+// splat route resolves against the route, not the URL. This application has no relative link in a
+// splat route, and its catch-all navigates to absolute paths.
+const ROUTER_FUTURE = { v7_startTransition: true, v7_relativeSplatPath: true } as const;
+
 export function TokTickITApp({
   /** Tests mount with MemoryRouter; the browser gets real URLs. */
   initialEntries,
@@ -326,9 +330,11 @@ export function TokTickITApp({
     </AuthProvider>
   );
   return initialEntries ? (
-    <MemoryRouter initialEntries={initialEntries}>{routes}</MemoryRouter>
+    <MemoryRouter initialEntries={initialEntries} future={ROUTER_FUTURE}>
+      {routes}
+    </MemoryRouter>
   ) : (
-    <BrowserRouter>{routes}</BrowserRouter>
+    <BrowserRouter future={ROUTER_FUTURE}>{routes}</BrowserRouter>
   );
 }
 

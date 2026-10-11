@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Attachment,
   AttachmentError,
@@ -53,6 +53,8 @@ export function RequesterTicketDetail({
   const [ticket, setTicket] = useState<TicketDetail | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "not-found" | "error">("loading");
   const [uploading, setUploading] = useState(false);
+  /** Taken before the first await, so a second file chosen in the same breath finds an upload already running (BR-53). */
+  const uploadInFlight = useRef(false);
   const [removingId, setRemovingId] = useState<number | null>(null);
   const [rejected, setRejected] = useState<{ filename: string; message: string }[]>([]);
   const [comments, setComments] = useState<ThreadEntry[]>([]);
@@ -114,7 +116,7 @@ export function RequesterTicketDetail({
   }
 
   async function handleUpload(file: File) {
-    if (!ticket) return;
+    if (!ticket || uploadInFlight.current) return;
 
     // Fast local feedback; the server re-validates and stays the authority.
     const localProblem = checkFileBeforeUpload(file);
@@ -123,10 +125,12 @@ export function RequesterTicketDetail({
       return;
     }
 
+    uploadInFlight.current = true;
     setUploading(true);
     try {
       const attachment = await uploadAttachment(ticket.id, file);
-      setTicket({ ...ticket, attachments: [...ticket.attachments, attachment] });
+      // From what the screen holds now, not what it held when the upload began: a removal may have landed since.
+      setTicket((current) => (current ? { ...current, attachments: [...current.attachments, attachment] } : current));
       setRejected((current) => current.filter((r) => r.filename !== file.name));
     } catch (error) {
       // A failed upload is reported on its own row and leaves the rest of the
@@ -136,25 +140,22 @@ export function RequesterTicketDetail({
         error instanceof AttachmentError ? error.message : "The file could not be attached.",
       );
     } finally {
+      uploadInFlight.current = false;
       setUploading(false);
     }
   }
 
+  /**
+   * Removes one attachment. A failure is not caught here: the removal dialog stays open with the reason the
+   * person typed and shows the message itself, so a retry is one click (BR-54).
+   */
   async function handleRemove(attachment: Attachment, reason: string) {
-    if (!ticket) return;
-
     setRemovingId(attachment.id);
     try {
       const updated = await removeAttachment(attachment.id, reason);
-      setTicket({
-        ...ticket,
-        attachments: ticket.attachments.map((a) => (a.id === updated.id ? updated : a)),
-      });
+      setTicket((current) => (current ? { ...current, attachments: current.attachments.map((a) => (a.id === updated.id ? updated : a)) } : current));
     } catch (error) {
-      reject(
-        attachment.originalFilename,
-        error instanceof AttachmentError ? error.message : "The attachment could not be removed.",
-      );
+      throw new Error(error instanceof AttachmentError ? error.message : "The attachment could not be removed.");
     } finally {
       setRemovingId(null);
     }

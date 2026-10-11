@@ -2,6 +2,7 @@ import express, { type Request, type Response } from "express";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "./prisma.js";
 import { OPEN_GROUP } from "./listQuery.js";
+import { OWNER_SELECT } from "./staff.js";
 
 // Lab 4, Issue 8 — the IT Staff and Administrator dashboard (api-spec §4.2, §6; specification.md
 // FR-16, FR-17, FR-19, BR-30, BR-31, BR-34 to BR-41).
@@ -53,8 +54,7 @@ const TICKET_ROW = {
   currentStatus: true,
   updatedAt: true,
   itPriority: true,
-  // `isActive` is what lets the screen say an owner's account is inactive (Lab 3 BR-26).
-  owner: { select: { id: true, fullName: true, isActive: true } },
+  owner: OWNER_SELECT,
 } as const;
 
 export const staffDashboardRouter = express.Router();

@@ -96,9 +96,11 @@ Dashboards list Tickets in this smaller row, never in the queue's full shape
 }
 ```
 
-The staff lists add `itPriority` and `owner` (`null`, or `{ id, fullName, isActive }`): the
-same owner shape the Ticket Queue's rows have, so a screen can say an owner's account is inactive
-(Lab 3 BR-26). It has no `role` until Issue 9 adds one to every staff shape together (BR-55).
+The staff lists add `itPriority` and `owner` (`null`, or `{ id, fullName, role, isActive }`): the
+same owner shape the Ticket Queue's rows and the staff Ticket Detail have, so a screen can tell an
+owner whose account is deactivated (**Inactive**, Lab 3 BR-26) from one who is active but no longer
+IT Staff or an Administrator (**No longer IT Staff**, BR-55). Issue 9 gave every staff shape the
+`role` together, from one definition. It carries no email and nothing of the password or the session.
 
 ---
 
@@ -529,7 +531,7 @@ No definition has a date window, so none has a day boundary or a time zone
 | Change | Detail |
 | :--- | :--- |
 | NUL in a body string | Every write endpoint — tickets, attachments' removal reason, comments, notes, appears-resolved, owner, status reason, user management, login, password, Actions Taken — answers `400 VALIDATION_FAILED` on the offending field. Lab 3 answered `500` (BR-52, AC-26). |
-| Body ids | `categoryId` and `relatedSystemId` in `POST /api/tickets`, and every id in an owner request, outside `1`–`2147483647` is `400 VALIDATION_FAILED` on that field, not `500`. Lab 3 bounded path and query ids only. |
+| Body ids | `categoryId` and `relatedSystemId` in `POST /api/tickets`, and every id in an owner request, outside `1`–`2147483647` is `400 VALIDATION_FAILED` on that field, not `500`. Lab 3 bounded path and query ids only. A ticket's id that is missing (absent, `null`, or blank) says "Category is required." or "Related System is required." as in Lab 2; one that is there and wrong, or names nothing active, says "Choose a valid category." or "Choose a valid related system." Digit text such as `"2"` is still accepted for these two, as Lab 2 documented; the ids of Labs 3 and 4 are JSON numbers and text is refused. |
 | Owner shape | `owner` in the staff Ticket shapes carries `role` (BR-55). |
 | Row lock | IT Priority joins owner and status under the Ticket's row lock (BR-29). |
 

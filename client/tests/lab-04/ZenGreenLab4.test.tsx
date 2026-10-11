@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 // Read as raw text, as Lab 2's and Lab 3's style tests do: what the stylesheet
 // declares is asserted from its source.
 import css from "../../src/styles/zen-green.css?raw";
 import * as api from "../../src/api.js";
-import { FollowUpPill } from "../../src/components/index.js";
+import { Button, FollowUpPill } from "../../src/components/index.js";
+import { STAFF_TICKET, mockApi, openApp, type Visitor } from "./harness.js";
 import { ActionsTakenRegion } from "../../src/components/ActionsTakenRegion.js";
 import { StatusHistoryRegion } from "../../src/components/StatusHistoryRegion.js";
 import { MetricCard } from "../../src/components/MetricCard.js";
@@ -19,6 +20,9 @@ import { MemoryRouter } from "react-router-dom";
 afterEach(() => {
   vi.restoreAllMocks();
 });
+
+/** The whole application's API, answered, for the Issue 9 tests that meet a screen as a person does. */
+let mocks: ReturnType<typeof mockApi>;
 
 /** The stylesheet Issue 5 added: from its heading to the next section, or the end. */
 function actionsTakenCss(): string {
@@ -528,5 +532,228 @@ describe("STYLE-02 the staff dashboard's layout (AC-29, ui-spec §3.2, §3.6)", 
     for (const match of section().matchAll(/(?<![-\w])(?:color|background|border-color):\s*([^;]+);/g)) {
       expect(match[1], match[0]).toMatch(/^(var\(--tt-|transparent|inherit|none)/);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue 9 — STYLE-01, STYLE-04, STYLE-05
+// ---------------------------------------------------------------------------
+
+/** Everything Lab 4 added to the stylesheet: from its first section heading to the end. */
+function lab4Css(): string {
+  const start = css.indexOf("/* --- Lab 4:");
+  if (start === -1) throw new Error("No Lab 4 section in zen-green.css");
+  return css.slice(start);
+}
+
+/** Lab 2's and Lab 3's stylesheet: everything before Lab 4's first section. */
+function earlierCss(): string {
+  return css.slice(0, css.indexOf("/* --- Lab 4:"));
+}
+
+describe("STYLE-01 every Lab 4 screen uses only the tokens of Labs 2 and 3, and no hard-coded colour (AC-29, FR-26)", () => {
+  const lab4 = lab4Css();
+  const declared = new Set(Array.from(earlierCss().matchAll(/(--tt-[\w-]+)\s*:/g)).map((match) => match[1]));
+  /** The two sizes ui-spec §1.1 asks for that no Lab 2 or Lab 3 token holds, named once and used by the metric card alone. */
+  const NAMED = new Set(["--tt-font-caption", "--tt-font-metric"]);
+
+  it("finds the tokens of Labs 2 and 3, so the checks below mean something", () => {
+    expect(lab4.length).toBeGreaterThan(3000);
+    for (const token of ["--tt-green-primary", "--tt-border", "--tt-readonly-bg", "--tt-disabled-bg", "--tt-error", "--tt-space-3", "--tt-font-body"]) {
+      expect(declared.has(token), token).toBe(true);
+    }
+  });
+
+  it("declares no token of its own, except the two sizes named by the metric card", () => {
+    const added = Array.from(lab4.matchAll(/(--tt-[\w-]+)\s*:/g)).map((match) => match[1]);
+    expect(added.filter((token) => !NAMED.has(token))).toEqual([]);
+    expect(new Set(added)).toEqual(NAMED);
+  });
+
+  it("uses no token that neither lab declared", () => {
+    const used = new Set(Array.from(lab4.matchAll(/var\((--tt-[\w-]+)/g)).map((match) => match[1]));
+    const unknown = [...used].filter((token) => !declared.has(token) && !NAMED.has(token));
+    expect(unknown).toEqual([]);
+  });
+
+  it("hard-codes no colour: no hex, no rgb(), no hsl(), and no named colour", () => {
+    expect(lab4).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(lab4).not.toMatch(/\b(?:rgb|rgba|hsl|hsla)\(/);
+    for (const match of lab4.matchAll(/(?<![-\w])(?:color|background(?:-color)?|border(?:-(?:top|right|bottom|left))?-color|outline-color|fill|stroke):\s*([^;}]+)[;}]/g)) {
+      expect(match[1].trim(), match[0]).toMatch(/^(var\(--tt-|transparent$|inherit$|none$|currentColor$)/);
+    }
+  });
+
+  it("sets every font size from a token", () => {
+    for (const match of lab4.matchAll(/font-size:\s*([^;}]+)[;}]/g)) {
+      expect(match[1].trim(), match[0]).toMatch(/^(var\(--tt-font-|inherit$|1em$|100%$)/);
+    }
+  });
+
+  it("changes nothing of Lab 2's or Lab 3's tokens: the :root blocks are not redeclared", () => {
+    expect(lab4).not.toMatch(/:root\s*\{[^}]*--tt-(?:green|bg|surface|border|text|error|warning|success|disabled|readonly|font-body|space)/);
+  });
+});
+
+describe("STYLE-04 read-only against disabled (AC-29)", () => {
+  const rootValue = (token: string) => css.match(new RegExp(`${token}:\\s*([^;]+);`))![1].trim();
+
+  it("draws a read-only field in --tt-readonly-bg, and not in the disabled colours", () => {
+    const readonly = rule(".tt-field__control--readonly");
+    expect(readonly).toMatch(/background:\s*var\(--tt-readonly-bg\)/);
+    expect(readonly).not.toMatch(/--tt-disabled/);
+    expect(readonly).not.toMatch(/cursor:\s*not-allowed/);
+  });
+
+  it("draws a disabled control in the disabled colours, with the cursor that says no", () => {
+    const disabled = rule(".tt-btn:disabled");
+    expect(disabled).toMatch(/--tt-disabled-bg/);
+    expect(disabled).toMatch(/--tt-disabled-text/);
+    expect(disabled).toMatch(/cursor:\s*not-allowed/);
+    expect(disabled).not.toMatch(/--tt-readonly-bg/);
+  });
+
+  it("makes the two backgrounds different colours, so the eye can tell a value to read from a control to leave alone", () => {
+    expect(rootValue("--tt-readonly-bg")).not.toBe(rootValue("--tt-disabled-bg"));
+  });
+
+  it("a read-only field is readonly and not disabled: it can be focused, selected, and copied; a disabled button cannot", async () => {
+    mocks = mockApi();
+    mocks.fetchStaffTicket.mockResolvedValue({ ...STAFF_TICKET, currentStatus: "RESOLVED", permittedTransitions: ["CLOSED", "REOPENED"], blockedTransitions: [] });
+    await openApp("IT_STAFF", "/queue/12");
+    const requested = screen.getByLabelText(/^Requested Priority/);
+    expect(requested).toHaveAttribute("readonly");
+    expect(requested).not.toBeDisabled();
+    expect(requested).toHaveClass("tt-field__control--readonly");
+    requested.focus();
+    expect(requested).toHaveFocus();
+
+    // The Ticket is resolved, so Add action is disabled, with the reason beside it.
+    const add = await screen.findByRole("button", { name: "+ Add action" });
+    expect(add).toBeDisabled();
+    expect(add).not.toHaveClass("tt-field__control--readonly");
+    add.focus();
+    expect(add).not.toHaveFocus();
+  });
+
+  it("the Performed by field of a new action is read-only, never editable, and never disabled", async () => {
+    mocks = mockApi();
+    const user = userEvent.setup();
+    await openApp("IT_STAFF", "/queue/12");
+    await user.click(await screen.findByRole("button", { name: "+ Add action" }));
+    const performer = await screen.findByLabelText(/^Performed by/);
+    expect(performer).toHaveAttribute("readonly");
+    expect(performer).not.toBeDisabled();
+    expect(performer).toHaveValue("Nattapong Saelim");
+    await user.type(performer, "x");
+    expect(performer).toHaveValue("Nattapong Saelim");
+  });
+});
+
+describe("STYLE-05 a validation message sits beneath its own field, and a busy button is disabled, labelled, and permits one request (AC-27)", () => {
+  /** The control, and the message that describes it, in one field, the message after the control. */
+  function expectBeneathItsField(control: Element) {
+    const ids = (control.getAttribute("aria-describedby") ?? "").split(/\s+/).filter(Boolean);
+    expect(ids.length, `no message described by ${control.outerHTML.slice(0, 120)}`).toBeGreaterThan(0);
+    const message = ids.map((id) => document.getElementById(id)).find((element) => element?.getAttribute("role") === "alert");
+    expect(message, `no alert for ${control.outerHTML.slice(0, 120)}`).toBeTruthy();
+    // After the control in the page...
+    expect(control.compareDocumentPosition(message!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // ...inside the same field, which holds that one control and no other.
+    const field = message!.closest(".tt-field, fieldset");
+    expect(field, "the message is in a field").not.toBeNull();
+    expect(field!.contains(control)).toBe(true);
+    expect(field!.querySelectorAll(".tt-field__control, input[type=radio]").length).toBeLessThanOrEqual(3);
+  }
+
+  const FORMS_TO_REFUSE: Array<[string, Visitor, string, (u: ReturnType<typeof userEvent.setup>) => Promise<void>, RegExp]> = [
+    ["Create Ticket", "REQUESTER", "/tickets/new", async () => {}, /^(Submit Ticket)$/],
+    ["Login", "SIGNED_OUT", "/login", async () => {}, /^Sign in$/],
+    ["Change Password", "MUST_CHANGE", "/change-password", async () => {}, /^Save password$/],
+    [
+      "Create user",
+      "ADMINISTRATOR",
+      "/users",
+      async (u) => {
+        await u.click(await screen.findByRole("button", { name: "+ Create user" }));
+      },
+      /^Create user$/,
+    ],
+    [
+      "Record an action",
+      "IT_STAFF",
+      "/queue/12",
+      async (u) => {
+        await u.click(await screen.findByRole("button", { name: "+ Add action" }));
+      },
+      /^Save action$/,
+    ],
+  ];
+
+  it.each(FORMS_TO_REFUSE)("%s: every refusal is under the field it is about", async (_name, visitor, path, open, submit) => {
+    mocks = mockApi();
+    const user = userEvent.setup();
+    await openApp(visitor, path);
+    await open(user);
+    if (visitor === "IT_STAFF") await user.clear(await screen.findByLabelText(/^Action Date\/Time/));
+    await user.click(screen.getByRole("button", { name: submit }));
+    await waitFor(() => expect(document.querySelectorAll('[aria-invalid="true"]').length).toBeGreaterThan(0));
+    for (const invalid of Array.from(document.querySelectorAll('[aria-invalid="true"]'))) expectBeneathItsField(invalid);
+  });
+
+  it("a message is one short sentence in the error colour, announced as an alert, and shown as a block under the field", () => {
+    const message = rule(".tt-field__message");
+    expect(message).toMatch(/display:\s*block/);
+    expect(message).toMatch(/color:\s*var\(--tt-error\)/);
+  });
+
+  it("a busy button is disabled, says what it is doing in words, shows a spinner a screen reader skips, and sends nothing", async () => {
+    const press = vi.fn();
+    const user = userEvent.setup();
+    const { container } = render(
+      <Button variant="primary" busy busyLabel="Saving…" onClick={press}>
+        Save
+      </Button>,
+    );
+    const busy = screen.getByRole("button");
+    expect(busy).toBeDisabled();
+    expect(busy).toHaveAttribute("aria-busy", "true");
+    expect(busy).toHaveTextContent("Saving…");
+    expect(busy).not.toHaveTextContent(/^Save$/);
+    expect(container.querySelector(".tt-spinner")).toHaveAttribute("aria-hidden", "true");
+    await user.click(busy);
+    await user.click(busy);
+    expect(press).not.toHaveBeenCalled();
+  });
+
+  it("an idle button is the opposite: enabled, not busy, its own label, no spinner", async () => {
+    const press = vi.fn();
+    const user = userEvent.setup();
+    const { container } = render(<Button onClick={press}>Save</Button>);
+    const idle = screen.getByRole("button", { name: "Save" });
+    expect(idle).toBeEnabled();
+    expect(idle).not.toHaveAttribute("aria-busy");
+    expect(container.querySelector(".tt-spinner")).toBeNull();
+    await user.click(idle);
+    expect(press).toHaveBeenCalledTimes(1);
+  });
+
+  it("the stylesheet gives a busy button its own cursor and stops the spinner for people who ask for less motion", () => {
+    // `:disabled` is what a busy button is, so the rule must be as specific as `.tt-btn:disabled`, or the cursor never shows.
+    expect(css).toMatch(/\.tt-btn--busy(?::disabled|\[disabled\])[^{]*\{[^}]*cursor:\s*progress/);
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{[^}]*\.tt-spinner\s*\{\s*animation:\s*none/);
+  });
+});
+
+describe("The Owner pills (ui-spec §1.6; AC-33)", () => {
+  it("keep their words on one line: a pill that wraps reads as two, and 'No longer IT Staff' is the longest", () => {
+    expect(rule(".tt-owner .tt-badge")).toMatch(/white-space:\s*nowrap/);
+  });
+
+  it("draw Inactive and No longer IT Staff alike: grey outlined on the surface, in words", () => {
+    const grey = rule('.tt-badge[data-badge="owner-not-staff"]');
+    expect(grey).toMatch(/background:\s*var\(--tt-surface\)/);
+    expect(grey).toMatch(/border-color:\s*var\(--tt-border\)/);
+    expect(css).toMatch(/\.tt-badge\[data-badge="owner-inactive"\],\s*\.tt-badge\[data-badge="owner-not-staff"\]/);
   });
 });

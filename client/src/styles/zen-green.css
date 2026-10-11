@@ -213,8 +213,9 @@ textarea.tt-field__control {
   cursor: not-allowed;
 }
 
-/* Busy keeps the disabled appearance and adds a spinner. */
-.tt-btn--busy { cursor: progress; }
+/* Busy keeps the disabled appearance and adds a spinner. A busy button is disabled, so this has to be as specific
+   as `.tt-btn:disabled` above, or its not-allowed cursor wins and the wait looks like a refusal (Lab 4, Issue 9). */
+.tt-btn--busy:disabled { cursor: progress; }
 
 .tt-spinner {
   width: 14px;
@@ -385,38 +386,6 @@ textarea.tt-field__control {
 /* The hamburger is hidden until the mobile breakpoint. */
 .tt-shell__menu-toggle { display: none; color: #fff; font-size: 20px; }
 
-/* Pushed to the right edge; the identity is the last thing on the bar. */
-.tt-shell__requester {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: var(--tt-space-3);
-}
-
-.tt-shell__requester-name { font-weight: 600; }
-.tt-shell__change { color: #fff; text-decoration: underline; }
-
-.tt-shell__notice {
-  margin: 0;
-  padding: var(--tt-space-2) var(--tt-space-6);
-  background: var(--tt-warning-bg);
-  color: var(--tt-warning);
-  font-size: var(--tt-font-help);
-  text-align: center;
-}
-
-/* --- Requester Selection screen (ui-spec.md 8) ---------------------------- */
-
-.tt-selection {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.tt-selection__card { width: 100%; max-width: 440px; }
-.tt-selection__card .tt-btn { width: 100%; }
-
 /* --- List toolbar and pagination (ui-spec.md 10.2) ------------------------ */
 
 .tt-toolbar {
@@ -574,7 +543,6 @@ textarea.tt-field__control {
      wordmark and the toggle, so nothing is pushed off the side. */
   .tt-shell__desktop-nav { display: none; }
   .tt-shell__menu-toggle { display: inline-flex; margin-left: auto; }
-  .tt-shell__requester { width: 100%; order: 3; justify-content: flex-start; }
 
   .tt-shell__header { flex-wrap: wrap; min-height: 56px; padding: var(--tt-space-2) var(--tt-space-4); }
 
@@ -659,8 +627,10 @@ html, body { overflow-x: hidden; }
 /* Owner presentation: a name, or the word Unassigned — never an empty cell. */
 .tt-owner { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--tt-space-1); }
 .tt-owner--unassigned { color: var(--tt-text-muted); font-style: italic; }
-.tt-owner .tt-badge { text-transform: none; letter-spacing: 0; }
-.tt-badge[data-badge="owner-inactive"] { background: var(--tt-surface); border-color: var(--tt-border); }
+/* A pill keeps its words on one line: wrapped, "No longer IT Staff" reads as two labels in a narrow Owner column (Lab 4, Issue 9). */
+.tt-owner .tt-badge { text-transform: none; letter-spacing: 0; white-space: nowrap; }
+.tt-badge[data-badge="owner-inactive"],
+.tt-badge[data-badge="owner-not-staff"] { background: var(--tt-surface); border-color: var(--tt-border); }
 
 .tt-queue__search { flex: 1 1 260px; }
 .tt-queue__search .tt-field__control { width: 100%; }

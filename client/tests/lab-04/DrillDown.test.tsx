@@ -490,7 +490,7 @@ describe("UI-38 the Ticket Queue", () => {
       requestedPriority: "MEDIUM",
       itPriority: "HIGH",
       currentStatus: "IN_PROGRESS",
-      owner: { id: ME, fullName: "Nattapong Saelim", isActive: true },
+      owner: { id: ME, fullName: "Nattapong Saelim", role: "IT_STAFF", isActive: true },
       requesterResolvedAt: null,
       createdAt: "2026-09-28T02:10:00.000Z",
       updatedAt: "2026-09-29T09:14:22.310Z",

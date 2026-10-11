@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { ApiError, PasswordChange } from "../api.js";
-import { Button, Card, SuccessCallout, TextInput, WarningCallout } from "../components/index.js";
+import { Button, Card, ErrorCallout, SuccessCallout, TextInput, WarningCallout } from "../components/index.js";
+import { useSingleFlight } from "../components/useSingleFlight.js";
 
 // Lab 3, Issue 5 — the Change Password screen (ui-spec §4, FR-03, FR-04).
 //
@@ -40,7 +41,7 @@ export function ChangePassword({ email, mandatory, onChange, onDone, onSignOut }
   const [errors, setErrors] = useState<Errors>({});
   const [problem, setProblem] = useState<string | null>(null);
   const [done, setDone] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const { busy, once } = useSingleFlight();
   const [signingOut, setSigningOut] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
 
@@ -76,16 +77,18 @@ export function ChangePassword({ email, mandatory, onChange, onDone, onSignOut }
     return found;
   }
 
-  async function submit(event: FormEvent) {
+  function submit(event: FormEvent) {
     event.preventDefault();
-    if (busy) return;
+    void once(save);
+  }
+
+  async function save() {
     setProblem(null);
     setDone(false);
     const found = validate();
     setErrors(found);
     if (Object.keys(found).length > 0) return;
 
-    setBusy(true);
     try {
       await onChange(values);
       setValues({ currentPassword: "", newPassword: "", confirmPassword: "" });
@@ -101,8 +104,6 @@ export function ChangePassword({ email, mandatory, onChange, onDone, onSignOut }
       } else {
         setProblem("The password could not be changed. Please try again.");
       }
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -113,12 +114,7 @@ export function ChangePassword({ email, mandatory, onChange, onDone, onSignOut }
       </h1>
       {mandatory && <WarningCallout>Set your own password before continuing.</WarningCallout>}
       {done && !mandatory && <SuccessCallout>Password updated.</SuccessCallout>}
-      {problem && (
-        <div className="tt-callout tt-callout--error" role="alert" data-state="error">
-          <span aria-hidden="true">⚠</span>
-          <div>{problem}</div>
-        </div>
-      )}
+      {problem && <ErrorCallout>{problem}</ErrorCallout>}
       {/* The rules are stated before the fields, not tucked under one of them
           where a validation message would hide them (ui-spec §4). */}
       <p className="tt-field__help">{PASSWORD_RULES}</p>

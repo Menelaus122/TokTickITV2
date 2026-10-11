@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ApiError } from "../api.js";
-import { Button, ErrorState } from "../components/index.js";
+import { Button, ErrorState, ForbiddenState } from "../components/index.js";
 
 // Lab 4, Issues 7 and 8 — what every dashboard has in common (ui-spec §3.1, §3.2, §3.5;
 // specification.md FR-20, BR-39, BR-41).
@@ -12,7 +12,6 @@ import { Button, ErrorState } from "../components/index.js";
 // above them, if the refresh fails. Both dashboards behave this way because both use this.
 
 export const LOAD_FAILED = "The dashboard could not be loaded.";
-export const NO_ACCESS = "You do not have access to this dashboard.";
 
 /** "Welcome, Pornchai": the first word of the name, or the whole name when it is one word. */
 export function firstNameOf(fullName: string): string {
@@ -134,7 +133,7 @@ export function DashboardFrame<T>({
   children: (data: T) => ReactNode;
 }) {
   const { state, data, refreshing, refreshFailed, reload } = dashboard;
-  if (state === "forbidden") return <ErrorState message={NO_ACCESS} />;
+  if (state === "forbidden") return <ForbiddenState what="this dashboard" />;
 
   const waiting = state === "loading" || refreshing;
   return (

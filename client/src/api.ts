@@ -465,6 +465,9 @@ export async function changePassword(change: PasswordChange): Promise<void> {
 export interface QueueOwner {
   id: number;
   fullName: string;
+  // Lab 4 (BR-55): every staff shape carries the owner's role beside isActive, so the screen can tell
+  // a deactivated account ("Inactive") from an active one that is no longer IT Staff.
+  role: Role;
   // false marks work held by a deactivated account (BR-26).
   isActive: boolean;
 }
@@ -552,8 +555,7 @@ export interface StaffTicketDetail extends QueueTicket {
   attachments: Attachment[];
   /** Lab 4 (BR-25, BR-26): sent back as `expectedVersion` with every change, so a stale save is refused. */
   version: number;
-  /** Lab 4 (BR-55): the owner's role beside isActive, so "Inactive" and "No longer IT Staff" can differ. */
-  owner: (QueueOwner & { role: Role }) | null;
+  owner: QueueOwner | null;
   /**
    * The moves the ticket can make right now: the matrix's targets less any held back by the
    * owner rule or the resolution gate (api-spec §3.1). The only statuses the screen offers (FR-09).

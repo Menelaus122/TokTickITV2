@@ -35,13 +35,13 @@ const BOARD: Board = {
     { status: "REOPENED", value: 0, href: "/queue?status=REOPENED" },
   ],
   myTickets: [
-    { id: 12, ticketNumber: "TT-2026-00042", summary: "Printer on floor 3 will not print", currentStatus: "IN_PROGRESS", updatedAt: "2026-10-05T03:12:00.000Z", itPriority: "HIGH", owner: { id: ME, fullName: "Nattapong Saelim", isActive: true } },
-    { id: 14, ticketNumber: "TT-2026-00044", summary: "Cannot join the campus VPN", currentStatus: "OPEN", updatedAt: "2026-10-04T08:00:00.000Z", itPriority: "MEDIUM", owner: { id: ME, fullName: "Nattapong Saelim", isActive: true } },
+    { id: 12, ticketNumber: "TT-2026-00042", summary: "Printer on floor 3 will not print", currentStatus: "IN_PROGRESS", updatedAt: "2026-10-05T03:12:00.000Z", itPriority: "HIGH", owner: { id: ME, fullName: "Nattapong Saelim", role: "IT_STAFF", isActive: true } },
+    { id: 14, ticketNumber: "TT-2026-00044", summary: "Cannot join the campus VPN", currentStatus: "OPEN", updatedAt: "2026-10-04T08:00:00.000Z", itPriority: "MEDIUM", owner: { id: ME, fullName: "Nattapong Saelim", role: "IT_STAFF", isActive: true } },
   ],
   urgentTickets: [
-    { id: 20, ticketNumber: "TT-2026-00050", summary: "Grade upload rejects the whole file", currentStatus: "WAITING_FOR_REQUESTER", updatedAt: "2026-10-03T04:00:00.000Z", itPriority: "URGENT", owner: { id: 8, fullName: "Siriporn Kaewmanee", isActive: true } },
+    { id: 20, ticketNumber: "TT-2026-00050", summary: "Grade upload rejects the whole file", currentStatus: "WAITING_FOR_REQUESTER", updatedAt: "2026-10-03T04:00:00.000Z", itPriority: "URGENT", owner: { id: 8, fullName: "Siriporn Kaewmanee", role: "IT_STAFF", isActive: true } },
     { id: 21, ticketNumber: "TT-2026-00051", summary: "Exam server is down", currentStatus: "NEW", updatedAt: "2026-10-04T04:00:00.000Z", itPriority: "URGENT", owner: null },
-    { id: 22, ticketNumber: "TT-2026-00052", summary: "Library gate is stuck", currentStatus: "IN_PROGRESS", updatedAt: "2026-10-04T05:00:00.000Z", itPriority: "URGENT", owner: { id: 10, fullName: "Prasert Chaiyo", isActive: false } },
+    { id: 22, ticketNumber: "TT-2026-00052", summary: "Library gate is stuck", currentStatus: "IN_PROGRESS", updatedAt: "2026-10-04T05:00:00.000Z", itPriority: "URGENT", owner: { id: 10, fullName: "Prasert Chaiyo", role: "IT_STAFF", isActive: false } },
   ],
   myRecentActions: [
     { id: 31, ticketId: 12, ticketNumber: "TT-2026-00042", actionAt: "2026-10-05T03:10:00.000Z", description: "Replaced the toner cartridge and ran a test page.", followUpRequired: true },

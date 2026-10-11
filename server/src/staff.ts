@@ -4,7 +4,7 @@ import { allowedStatuses, buildPageMeta } from "./listQuery.js";
 import { containsText } from "./queryParams.js";
 import { parseQueueQuery, queueOrderBy, type OwnerFilter } from "./queueQuery.js";
 import type { Prisma } from "@prisma/client";
-import { MAX_ID } from "./queryParams.js";
+import { bodyId, nulFailure } from "./bodyGuards.js";
 import { routeId } from "./routeId.js";
 import { REQUESTED_PRIORITIES, type RequestedPriority } from "./validation.js";
 import { TICKET_STATUSES, type TicketStatus } from "./listQuery.js";
@@ -23,6 +23,13 @@ import { lockTicketRow } from "./ticketLock.js";
 
 const SERVER_ERROR = { error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." } } as const;
 
+/**
+ * The owner in every staff shape (Lab 4 BR-55, api-spec §1.4): `isActive` says the account is deactivated
+ * (Lab 3 BR-26), and `role` says it is active but no longer IT Staff or an Administrator, so the screen can
+ * tell "Inactive" from "No longer IT Staff". No email, and nothing of the password or the session.
+ */
+export const OWNER_SELECT = { select: { id: true, fullName: true, role: true, isActive: true } } as const;
+
 const QUEUE_ROW_SELECT = {
   id: true,
   ticketNumber: true,
@@ -31,8 +38,7 @@ const QUEUE_ROW_SELECT = {
   requestedPriority: true,
   itPriority: true,
   currentStatus: true,
-  // isActive lets the screen mark work held by a deactivated account (BR-26).
-  owner: { select: { id: true, fullName: true, isActive: true } },
+  owner: OWNER_SELECT,
   requesterResolvedAt: true,
   createdAt: true,
   updatedAt: true,
@@ -143,9 +149,6 @@ const DETAIL_SELECT = {
   ...QUEUE_ROW_SELECT,
   // BR-25, BR-26 — what the screen sends back as expectedVersion.
   version: true,
-  // Lab 4, BR-55 — the owner carries role beside isActive, so the screen can tell a
-  // deactivated owner from one who is no longer IT Staff.
-  owner: { select: { id: true, fullName: true, role: true, isActive: true } },
   description: true,
   relatedSystem: { select: { name: true } },
   // The permitted user shape (api-spec §1.6), nothing wider.
@@ -211,7 +214,7 @@ function conflict(code: string, message: string): Outcome {
 /** A JSON id: an integer from 1 to MAX_ID, or null; undefined when it is neither. */
 function jsonId(value: unknown): number | null | undefined {
   if (value === null) return null;
-  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= MAX_ID ? value : undefined;
+  return bodyId(value) ?? undefined;
 }
 
 /**
@@ -220,8 +223,7 @@ function jsonId(value: unknown): number | null | undefined {
  */
 function expectedVersionOf(body: { expectedVersion?: unknown }): number | null | undefined {
   if (!("expectedVersion" in body) || body.expectedVersion === undefined) return undefined;
-  const value = body.expectedVersion;
-  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= MAX_ID ? value : null;
+  return bodyId(body.expectedVersion);
 }
 
 const BAD_VERSION = "Send the version of the ticket you are working on.";
@@ -260,6 +262,10 @@ staffRouter.patch("/tickets/:id/owner", async (req: Request, res: Response) => {
   res.set("Cache-Control", "no-store");
   const id = routeId(req.params.id);
   if (id === null) return res.status(400).json(INVALID_ID);
+
+  // Lab 4 (BR-52): a NUL character anywhere in the body is a 400 on its field, before the body is read.
+  const nul = nulFailure(req.body);
+  if (nul) return res.status(400).json(nul);
 
   const raw = (req.body ?? {}) as { ownerId?: unknown; expectedOwnerId?: unknown; expectedVersion?: unknown };
   // Omitting ownerId is a validation error, never an implicit claim.
@@ -350,6 +356,10 @@ staffRouter.patch("/tickets/:id/it-priority", async (req: Request, res: Response
   const id = routeId(req.params.id);
   if (id === null) return res.status(400).json(INVALID_ID);
 
+  // Lab 4 (BR-52): a NUL character anywhere in the body is a 400 on its field, before the body is read.
+  const nul = nulFailure(req.body);
+  if (nul) return res.status(400).json(nul);
+
   const raw = (req.body ?? {}) as { itPriority?: unknown; expectedVersion?: unknown };
   const value = raw.itPriority;
   if (typeof value !== "string" || !REQUESTED_PRIORITIES.includes(value as RequestedPriority)) {
@@ -389,6 +399,10 @@ staffRouter.patch("/tickets/:id/status", async (req: Request, res: Response) => 
   res.set("Cache-Control", "no-store");
   const id = routeId(req.params.id);
   if (id === null) return res.status(400).json(INVALID_ID);
+
+  // Lab 4 (BR-52): a NUL character anywhere in the body is a 400 on its field, before the body is read.
+  const nul = nulFailure(req.body);
+  if (nul) return res.status(400).json(nul);
 
   const raw = (req.body ?? {}) as { currentStatus?: unknown; reason?: unknown; expectedVersion?: unknown };
   if (typeof raw.currentStatus !== "string" || !TICKET_STATUSES.includes(raw.currentStatus as TicketStatus)) {

@@ -6,6 +6,7 @@ import { containsText, parseSearch } from "./queryParams.js";
 import { single, absent } from "./listQuery.js";
 import { routeId } from "./routeId.js";
 import { ROLES, changeRefusal, checkUserFields, type Role } from "./userRules.js";
+import { nulFailure } from "./bodyGuards.js";
 
 // Lab 3, Issue 10 — Administrator User Management (api-spec §6;
 // specification.md §4.8, BR-45 to BR-52).
@@ -98,6 +99,9 @@ adminRouter.get("/users", async (req: Request, res: Response) => {
 // account must change it at first login (api-spec §6.2, BR-46, AC-30).
 adminRouter.post("/users", async (req: Request, res: Response) => {
   res.set("Cache-Control", "no-store");
+  // Lab 4 (BR-52): a NUL character anywhere in the body is a 400 on its field, before the body is read.
+  const nul = nulFailure(req.body);
+  if (nul) return res.status(400).json(nul);
   const checked = checkUserFields(req.body, ["fullName", "email", "role", "isActive"]);
   const fields = checked.ok ? {} : { ...checked.fields };
   const password = (req.body as { initialPassword?: unknown } | undefined)?.initialPassword;
@@ -136,6 +140,8 @@ adminRouter.patch("/users/:id", async (req: Request, res: Response) => {
   res.set("Cache-Control", "no-store");
   const id = routeId(req.params.id);
   if (id === null) return res.status(400).json(INVALID_ID);
+  const nul = nulFailure(req.body);
+  if (nul) return res.status(400).json(nul);
   const checked = checkUserFields(req.body);
   if (!checked.ok) return res.status(400).json(validationFailed(checked.fields));
   const change = checked.value;
@@ -194,6 +200,8 @@ adminRouter.post("/users/:id/initial-password", async (req: Request, res: Respon
       });
     }
 
+    const nul = nulFailure(req.body);
+    if (nul) return res.status(400).json(nul);
     const password = (req.body as { initialPassword?: unknown } | undefined)?.initialPassword;
     const problem = checkNewPassword(password, target.email);
     if (problem) return res.status(400).json(validationFailed({ initialPassword: problem }));
