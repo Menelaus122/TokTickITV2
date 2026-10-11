@@ -208,8 +208,9 @@ app.post("/api/tickets", async (req: Request, res: Response) => {
     ]);
 
     const fields: Record<string, string> = {};
-    if (!category) fields.categoryId = "Category is required.";
-    if (!relatedSystem) fields.relatedSystemId = "Related System is required.";
+    // The id was sent, and names nothing active: it is not missing (review of PR #88).
+    if (!category) fields.categoryId = "Choose a valid category.";
+    if (!relatedSystem) fields.relatedSystemId = "Choose a valid related system.";
     if (Object.keys(fields).length > 0) {
       return res.status(400).json({
         error: { code: "VALIDATION_FAILED", message: "One or more fields are invalid.", fields },

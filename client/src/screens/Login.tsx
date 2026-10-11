@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { ApiError } from "../api.js";
 import { Button, Card, ErrorCallout, ErrorState, TextInput, WarningCallout } from "../components/index.js";
+import { useSingleFlight } from "../components/useSingleFlight.js";
 
 // Lab 3, Issue 5 — the Login screen (ui-spec §3, FR-01).
 //
@@ -21,7 +22,7 @@ export function Login({ onSignIn }: LoginProps) {
   const [password, setPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const [problem, setProblem] = useState<Problem>(null);
-  const [busy, setBusy] = useState(false);
+  const { busy, once } = useSingleFlight();
 
   function validate() {
     const errors: { email?: string; password?: string } = {};
@@ -33,15 +34,17 @@ export function Login({ onSignIn }: LoginProps) {
     return errors;
   }
 
-  async function submit(event?: FormEvent) {
+  function submit(event?: FormEvent) {
     event?.preventDefault();
-    if (busy) return;
+    return once(attempt);
+  }
+
+  async function attempt() {
     setProblem(null);
     const errors = validate();
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
-    setBusy(true);
     try {
       await onSignIn(email.trim(), password);
       // The router moves on from here; nothing more to render.
@@ -62,8 +65,6 @@ export function Login({ onSignIn }: LoginProps) {
       } else {
         setProblem({ tone: "unavailable", message: "Cannot reach TokTickIT right now. Please try again." });
       }
-    } finally {
-      setBusy(false);
     }
   }
 

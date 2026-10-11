@@ -535,8 +535,10 @@ describe("UI-30 every write form sends one request per submission, however often
     await user.click(submit);
     await user.click(submit);
     await user.click(form.submit());
-    // The keyboard and the browser can submit a form without the button: Enter in a field, a script.
-    const element = form.submit().closest("form");
+    // The keyboard and the browser can submit a form without the button: Enter in a field, a script. Each
+    // fireEvent is its own act, so the screen has drawn the busy state between the two: the sequential case.
+    const pressed = form.submit();
+    const element = pressed.getAttribute("type") === "submit" ? pressed.closest("form") : null;
     if (element) {
       fireEvent.submit(element);
       fireEvent.submit(element);
@@ -546,6 +548,77 @@ describe("UI-30 every write form sends one request per submission, however often
     // While it is in flight the control says so, and cannot be pressed.
     expect(form.submit()).toBeDisabled();
     expect(form.submit()).toHaveAttribute("aria-busy", "true");
+  });
+
+  // Review of PR #88: a human double-click arrives as separate tasks, with the screen drawn in between. A second event
+  // dispatched in the SAME task, by a script, a key repeating, or a slow page catching up, arrives before React has drawn
+  // anything, so a guard that reads state still sees "not busy". act() holds the drawing back exactly as a task does.
+  it.each(FORMS.map((form) => [form.name, form] as const))("%s: three presses in one task send one request", async (_name, form) => {
+    form.call(mocks).mockReturnValue(never());
+    const user = await reach(form);
+    await form.fill(user);
+
+    const pressed = form.submit();
+    const element = pressed.getAttribute("type") === "submit" ? pressed.closest("form") : null;
+    act(() => {
+      if (element) {
+        element.requestSubmit(pressed);
+        element.requestSubmit(pressed);
+        element.requestSubmit(pressed);
+      } else {
+        pressed.click();
+        pressed.click();
+        pressed.click();
+      }
+    });
+
+    expect(form.call(mocks)).toHaveBeenCalledTimes(1);
+    expect(form.submit()).toBeDisabled();
+  });
+
+  it("Undo of 'appears resolved' sends one request when it is pressed three times in one task, and can be pressed again after a failure", async () => {
+    mocks.fetchTicketDetail.mockResolvedValue({ ...REQUESTER_TICKET, requesterResolvedAt: "2026-10-05T00:00:00.000Z" });
+    mocks.setAppearsResolved.mockRejectedValueOnce(new TypeError("Failed to fetch")).mockReturnValue(never());
+    await openApp("REQUESTER", "/tickets/42");
+    const undo = await screen.findByRole("button", { name: "Undo" });
+    act(() => {
+      undo.click();
+      undo.click();
+      undo.click();
+    });
+    expect(mocks.setAppearsResolved).toHaveBeenCalledTimes(1);
+    // The first attempt fails, the guard is let go, and the person can try again: one more request, not two.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Undo" })).toBeEnabled());
+    act(() => {
+      screen.getByRole("button", { name: "Undo" }).click();
+      screen.getByRole("button", { name: "Undo" }).click();
+    });
+    expect(mocks.setAppearsResolved).toHaveBeenCalledTimes(2);
+  });
+
+  // Found while writing the test above: the new initial password is typed inside the user panel's own form, so Enter
+  // in that field submitted the PANEL, which saves the person's other edits, and never set the password.
+  it("Enter in the new initial password field does not save the user's other edits, and does not set the password either", async () => {
+    mocks.updateUser.mockReturnValue(never());
+    mocks.issueInitialPassword.mockReturnValue(never());
+    const user = userEvent.setup();
+    await openApp("ADMINISTRATOR", "/users");
+    await user.click((await screen.findAllByRole("button", { name: "Edit Anucha Wongsawat" }))[0]);
+    const name = await screen.findByLabelText(/^Full name/);
+    await user.clear(name);
+    await user.type(name, "Anucha W. Wongsawat");
+    await user.click(screen.getByRole("button", { name: "Set new initial password" }));
+    await user.type(await screen.findByLabelText(/^New initial password/), "Correct-horse-2{Enter}");
+
+    expect(mocks.updateUser).not.toHaveBeenCalled();
+    expect(mocks.issueInitialPassword).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/^Full name/)).toHaveValue("Anucha W. Wongsawat");
+    expect(screen.getByLabelText(/^New initial password/)).toHaveValue("Correct-horse-2");
+
+    // The button is what sets it, and Enter on a button still presses the button.
+    act(() => screen.getByRole("button", { name: "Set password and sign out" }).focus());
+    await user.keyboard("{Enter}");
+    expect(mocks.issueInitialPassword).toHaveBeenCalledTimes(1);
   });
 
   it("an upload is one request, and a second file chosen while it is in flight waits for the person to choose again", async () => {

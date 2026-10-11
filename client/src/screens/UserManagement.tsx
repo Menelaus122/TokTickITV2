@@ -12,6 +12,7 @@ import {
   updateUser,
 } from "../api.js";
 import { useModal } from "../components/useModal.js";
+import { useSingleFlight } from "../components/useSingleFlight.js";
 import {
   Button,
   Card,
@@ -261,7 +262,7 @@ function UserPanel({ panel, currentUserId, onClose, onSaved }: UserPanelProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [refusal, setRefusal] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const { busy, once } = useSingleFlight();
   const [issuing, setIssuing] = useState(false);
 
   // Focus goes in, Tab stays inside, Escape closes it unless a request is in flight, and focus goes back to
@@ -277,15 +278,17 @@ function UserPanel({ panel, currentUserId, onClose, onSaved }: UserPanelProps) {
     });
   }
 
-  async function submit(event: FormEvent) {
+  function submit(event: FormEvent) {
     event.preventDefault();
-    if (busy) return;
+    void once(save);
+  }
+
+  async function save() {
     const problems = draftProblems(draft, creating);
     setRefusal(null);
     setFailure(null);
     if (Object.keys(problems).length > 0) return setErrors(problems);
 
-    setBusy(true);
     try {
       if (creating) {
         const user = await createUser({
@@ -312,8 +315,6 @@ function UserPanel({ panel, currentUserId, onClose, onSaved }: UserPanelProps) {
       if (refused) setRefusal(refused);
       else if (error instanceof ApiError && Object.keys(error.fields).length > 0) setErrors(error.fields);
       else setFailure(error instanceof ApiError && error.status < 500 ? error.message : "That did not work. Please try again.");
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -419,12 +420,11 @@ function UserPanel({ panel, currentUserId, onClose, onSaved }: UserPanelProps) {
 function InitialPasswordConfirm({ user, onCancel, onIssued }: { user: AdminUser; onCancel: () => void; onIssued: () => void }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string>();
-  const [busy, setBusy] = useState(false);
+  const { busy, once } = useSingleFlight();
 
-  async function confirm() {
+  async function issue() {
     const problem = passwordProblem(password);
     if (problem) return setError(problem);
-    setBusy(true);
     setError(undefined);
     try {
       await issueInitialPassword(user.id, password);
@@ -433,13 +433,20 @@ function InitialPasswordConfirm({ user, onCancel, onIssued }: { user: AdminUser;
       setError(
         failure instanceof ApiError ? failure.fields.initialPassword ?? failure.message : "The new initial password could not be set.",
       );
-    } finally {
-      setBusy(false);
     }
   }
 
   return (
-    <div className="tt-users__confirm" role="group" aria-label="Set new initial password">
+    <div
+      className="tt-users__confirm"
+      role="group"
+      aria-label="Set new initial password"
+      // This group sits inside the panel's form, so Enter in its field would save the panel (the person's other edits)
+      // and not set the password. Setting it signs the user out everywhere, so only the button does (Lab 4, Issue 9).
+      onKeyDown={(event) => {
+        if (event.key === "Enter" && (event.target as HTMLElement).tagName === "INPUT") event.preventDefault();
+      }}
+    >
       <p>
         <strong>Set a new initial password for {user.fullName}?</strong> {NEW_PASSWORD_WARNING}
       </p>
@@ -461,7 +468,7 @@ function InitialPasswordConfirm({ user, onCancel, onIssued }: { user: AdminUser;
         <Button variant="secondary" disabled={busy} onClick={onCancel}>
           Cancel
         </Button>
-        <Button variant="destructive" busy={busy} busyLabel="Setting…" onClick={() => void confirm()}>
+        <Button variant="destructive" busy={busy} busyLabel="Setting…" onClick={() => void once(issue)}>
           Set password and sign out
         </Button>
       </div>

@@ -18,5 +18,9 @@ export default defineConfig({
     // timing out (tests.md §7). The budgets are widened; no assertion is touched.
     testTimeout: 30_000,
     hookTimeout: 30_000,
+    // A file's afterEach(vi.restoreAllMocks) used to run BEFORE Testing Library's cleanup (the default is last
+    // registered, first run), so for a moment the previous test's screen was still mounted with its mocks gone, and
+    // a late effect of it called the real API. In order, cleanup unmounts the screen first (tests.md §7).
+    sequence: { hooks: "list" },
   },
 });

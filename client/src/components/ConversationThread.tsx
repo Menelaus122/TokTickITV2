@@ -4,6 +4,7 @@ import { RoleBadge } from "./Badge.js";
 import { Button } from "./Button.js";
 import { TextArea } from "./Inputs.js";
 import { ErrorState, LoadingState } from "./States.js";
+import { useSingleFlight } from "./useSingleFlight.js";
 
 // Lab 3, Issue 7 — one conversation thread (ui-spec §5.2, §7.1, §1.4).
 //
@@ -46,18 +47,20 @@ export function ConversationThread({ variant, status, entries, onRetry, onPost }
   const copy = COPY[variant];
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string>();
-  const [posting, setPosting] = useState(false);
+  const { busy: posting, once } = useSingleFlight();
 
-  async function submit(event: FormEvent) {
+  function submit(event: FormEvent) {
     event.preventDefault();
-    if (posting) return;
+    void once(post);
+  }
+
+  async function post() {
     // Fast local feedback with the server's own limits; the server re-checks.
     const body = draft.trim();
     if (body.length === 0) return setError(`${copy.noun} is required.`);
     if (body.length > COMMENT_MAX) return setError(`${copy.noun} must be at most ${COMMENT_MAX} characters.`);
 
     setError(undefined);
-    setPosting(true);
     try {
       await onPost(body);
       setDraft("");
@@ -68,8 +71,6 @@ export function ConversationThread({ variant, status, entries, onRetry, onPost }
           ? failure.fields.body ?? failure.message
           : `The ${copy.noun.toLowerCase()} could not be posted. Please try again.`,
       );
-    } finally {
-      setPosting(false);
     }
   }
 

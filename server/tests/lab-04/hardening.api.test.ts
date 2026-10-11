@@ -635,6 +635,69 @@ describe("HARD-02 an id in a request body outside 1–2147483647 is a 400 on the
     expect(await counts()).toEqual(before);
   });
 
+  // Review of PR #88: "Category is required." is true only when there is no category in the body. One that is
+  // there and wrong is told to choose a valid one.
+  const MISSING: Array<[string, unknown]> = [["left out", undefined], ["null", null], ["empty text", ""], ["spaces", "   "]];
+  const PRESENT_AND_WRONG: Array<[string, unknown]> = [
+    ["zero", 0],
+    ["a fraction", 1.5],
+    ["one past the column", 2_147_483_648],
+    ["far past the column", 9_999_999_999],
+    ["text that is not a number", "abc"],
+    ["true", true],
+    ["the largest id the column holds, which names nothing", 2_147_483_647],
+  ];
+  const TICKET_FIELDS = [
+    ["categoryId", "Category is required.", "Choose a valid category."],
+    ["relatedSystemId", "Related System is required.", "Choose a valid related system."],
+  ] as const;
+
+  it.each(TICKET_FIELDS.flatMap(([field, required]) => MISSING.map(([label, value]) => [field, label, value, required] as const)))(
+    "POST /api/tickets: %s %s says it is required",
+    async (field, _label, value, required) => {
+      const body: Record<string, unknown> = {
+        categoryId,
+        relatedSystemId,
+        summary: "Hardening suite printer fault",
+        description: "Hardening suite: the printer shows a jam with no paper stuck in it.",
+        requestedPriority: "MEDIUM",
+        [field]: value,
+      };
+      const res = await send("post", "/api/tickets", cookies.requester, body);
+      expect(res.status).toBe(400);
+      expect(res.body.error.fields[field]).toBe(required);
+    },
+  );
+
+  it.each(TICKET_FIELDS.flatMap(([field, , valid]) => PRESENT_AND_WRONG.map(([label, value]) => [field, label, value, valid] as const)))(
+    "POST /api/tickets: %s %s says to choose a valid one",
+    async (field, _label, value, valid) => {
+      const body: Record<string, unknown> = {
+        categoryId,
+        relatedSystemId,
+        summary: "Hardening suite printer fault",
+        description: "Hardening suite: the printer shows a jam with no paper stuck in it.",
+        requestedPriority: "MEDIUM",
+        [field]: value,
+      };
+      const res = await send("post", "/api/tickets", cookies.requester, body);
+      expect(res.status).toBe(400);
+      expect(res.body.error.fields[field]).toBe(valid);
+    },
+  );
+
+  it("POST /api/tickets: a digit string is accepted on purpose, as Lab 2 documented, though bodyId refuses text", async () => {
+    // validation.ts says why: the Create Ticket form's selects hold text, and Lab 2's UNIT tests name this.
+    const res = await send("post", "/api/tickets", cookies.requester, {
+      categoryId: String(categoryId),
+      relatedSystemId: String(relatedSystemId),
+      summary: "Hardening suite digit text again",
+      description: "Hardening suite: ids written as digit text are accepted, and ids that are JSON numbers are the rule elsewhere.",
+      requestedPriority: "LOW",
+    });
+    expect(res.status, JSON.stringify(res.body)).toBe(201);
+  });
+
   it("POST /api/tickets: the largest id the column holds is still a valid id that names nothing, so it is the same 400", async () => {
     const res = await send("post", "/api/tickets", cookies.requester, {
       categoryId: 2_147_483_647,

@@ -101,6 +101,9 @@ export const ADMIN_BOARD: api.StaffDashboard = {
 
 const LIST_META = { page: 1, pageSize: 10, totalItems: 2, totalPages: 1, hasPrev: false, hasNext: false };
 
+/** What a write the test did not arrange does: it fails as if offline, and never calls through to the real API. */
+const OFFLINE = new TypeError("Failed to fetch");
+
 /** Every API call the screens make, answered with plausible data. A test overrides the one it is about. */
 export function mockApi() {
   return {
@@ -116,16 +119,16 @@ export function mockApi() {
     }),
     fetchTicketDetail: vi.spyOn(api, "fetchTicketDetail").mockResolvedValue(REQUESTER_TICKET),
     fetchAttachments: vi.spyOn(api, "fetchAttachments").mockResolvedValue([]),
-    uploadAttachment: vi.spyOn(api, "uploadAttachment"),
-    removeAttachment: vi.spyOn(api, "removeAttachment"),
+    uploadAttachment: vi.spyOn(api, "uploadAttachment").mockRejectedValue(OFFLINE),
+    removeAttachment: vi.spyOn(api, "removeAttachment").mockRejectedValue(OFFLINE),
     fetchComments: vi.spyOn(api, "fetchComments").mockResolvedValue([]),
-    postComment: vi.spyOn(api, "postComment"),
-    setAppearsResolved: vi.spyOn(api, "setAppearsResolved"),
+    postComment: vi.spyOn(api, "postComment").mockRejectedValue(OFFLINE),
+    setAppearsResolved: vi.spyOn(api, "setAppearsResolved").mockRejectedValue(OFFLINE),
     fetchNotes: vi.spyOn(api, "fetchNotes").mockResolvedValue([]),
-    postNote: vi.spyOn(api, "postNote"),
+    postNote: vi.spyOn(api, "postNote").mockRejectedValue(OFFLINE),
     fetchActionsTaken: vi.spyOn(api, "fetchActionsTaken").mockResolvedValue([]),
-    createActionTaken: vi.spyOn(api, "createActionTaken"),
-    editActionTaken: vi.spyOn(api, "editActionTaken"),
+    createActionTaken: vi.spyOn(api, "createActionTaken").mockRejectedValue(OFFLINE),
+    editActionTaken: vi.spyOn(api, "editActionTaken").mockRejectedValue(OFFLINE),
     fetchStatusHistory: vi.spyOn(api, "fetchStatusHistory").mockResolvedValue([]),
     fetchRequesterDashboard: vi.spyOn(api, "fetchRequesterDashboard").mockResolvedValue(REQUESTER_BOARD),
     fetchStaffDashboard: vi.spyOn(api, "fetchStaffDashboard").mockResolvedValue(STAFF_BOARD),
@@ -145,19 +148,19 @@ export function mockApi() {
       { id: 9, fullName: "Malee Sutthiwong", role: "ADMINISTRATOR", isActive: true },
     ]),
     fetchStaffTicket: vi.spyOn(api, "fetchStaffTicket").mockResolvedValue(STAFF_TICKET),
-    setTicketOwner: vi.spyOn(api, "setTicketOwner"),
-    setItPriority: vi.spyOn(api, "setItPriority"),
-    changeTicketStatus: vi.spyOn(api, "changeTicketStatus"),
+    setTicketOwner: vi.spyOn(api, "setTicketOwner").mockRejectedValue(OFFLINE),
+    setItPriority: vi.spyOn(api, "setItPriority").mockRejectedValue(OFFLINE),
+    changeTicketStatus: vi.spyOn(api, "changeTicketStatus").mockRejectedValue(OFFLINE),
     fetchUsers: vi.spyOn(api, "fetchUsers").mockResolvedValue([
       { id: 1, fullName: "Anucha Wongsawat", email: "anucha.wong@kmutt.ac.th", role: "REQUESTER", isActive: true, department: null, mustChangePassword: false, lastLoginAt: null },
       { id: 7, fullName: "Nattapong Saelim", email: "nattapong.it@toktickit.local", role: "IT_STAFF", isActive: true, department: null, mustChangePassword: false, lastLoginAt: null },
     ]),
-    createUser: vi.spyOn(api, "createUser"),
-    updateUser: vi.spyOn(api, "updateUser"),
-    issueInitialPassword: vi.spyOn(api, "issueInitialPassword"),
-    login: vi.spyOn(api, "login"),
+    createUser: vi.spyOn(api, "createUser").mockRejectedValue(OFFLINE),
+    updateUser: vi.spyOn(api, "updateUser").mockRejectedValue(OFFLINE),
+    issueInitialPassword: vi.spyOn(api, "issueInitialPassword").mockRejectedValue(OFFLINE),
+    login: vi.spyOn(api, "login").mockRejectedValue(OFFLINE),
     logout: vi.spyOn(api, "logout").mockResolvedValue(undefined),
-    changePassword: vi.spyOn(api, "changePassword"),
+    changePassword: vi.spyOn(api, "changePassword").mockRejectedValue(OFFLINE),
   };
 }
 
