@@ -1096,3 +1096,37 @@ a.tt-btn { text-decoration: none; }
   .tt-dash__status-row { flex-direction: column; }
   .tt-dash-status { justify-content: space-between; }
 }
+
+/* --- Lab 4, Issue 10: what the visual inspection found (tests.md section 5) ---------------------- */
+
+/* A navigation label or an account action never breaks across two lines. Dashboard, the new first item,
+   made the header too wide for a tablet, and "My Tickets", "Ticket Queue", and "User Management" had
+   been wrapping mid-name, with "Logout" alone on a second line. Each now keeps its own line, and the
+   header wraps as a whole instead: the signed-in user's block moves to a second row of its own. */
+.tt-shell__brand,
+.tt-shell__link,
+.tt-shell__user-name,
+.tt-shell__user .tt-badge,
+.tt-shell__action { white-space: nowrap; }
+
+@media (min-width: 768px) and (max-width: 991px) {
+  .tt-shell__header { flex-wrap: wrap; row-gap: var(--tt-space-1); padding-top: var(--tt-space-2); padding-bottom: var(--tt-space-2); }
+}
+
+/* The Ticket Number and the date in the My Tickets table keep one line each. A long Summary used to
+   squeeze them until "TT-2026-" and "00628" were on separate lines. */
+.tt-table__nowrap,
+.tt-table__nowrap .tt-btn { white-space: nowrap; }
+
+/* On a tablet the Ticket Queue's Ticket Owner column held 115 px, and "No longer IT Staff" (119 px, in a
+   cell with 24 px of padding) was drawn out past the right edge of the card. 150 px holds it; the Summary,
+   which wraps there, gives up the difference. */
+@media (min-width: 768px) and (max-width: 991px) {
+  .tt-queue-table .tt-queue__col-6 { width: 150px; }
+}
+
+/* On a phone an attachment is a column whose items are stretched, so the buttons can be full width, and the
+   ACTIVE badge was stretched with them into a bar across the card. A badge is as wide as its word. */
+@media (max-width: 767px) {
+  .tt-attachment .tt-badge { align-self: flex-start; }
+}
