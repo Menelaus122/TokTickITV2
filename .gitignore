@@ -41,3 +41,9 @@ test-results/
 docs/lab-02/*.docx
 docs/lab-03/*.docx
 ~$*.docx
+
+# Lab 4's submission working documents: the .docx the PDF is made from, and the screenshots
+# captured for it. The PDF is the deliverable. The evidence that belongs to the code is
+# under artifacts/lab-04/, which stays tracked.
+docs/lab-04/*.docx
+docs/lab-04/image/

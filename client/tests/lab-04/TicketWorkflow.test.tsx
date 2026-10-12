@@ -6,6 +6,7 @@ import { OwnerPresentation } from "../../src/components/index.js";
 import { StaffDashboard } from "../../src/screens/StaffDashboard.js";
 import { StaffTicketQueue } from "../../src/screens/StaffTicketQueue.js";
 import { StaffTicketDetail } from "../../src/screens/StaffTicketDetail.js";
+import { StatusHistoryRegion } from "../../src/components/StatusHistoryRegion.js";
 import { RequesterTicketDetail } from "../../src/screens/RequesterTicketDetail.js";
 import * as api from "../../src/api.js";
 import { ApiError, type BlockedTransition, type StaffTicketDetail as Detail, type StatusChange } from "../../src/api.js";
@@ -421,6 +422,67 @@ describe("UI-14 a 409 STALE_UPDATE (AC-14, BR-26, ui-spec §1.5)", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// The API client's own requests. The tests above mock this layer, so a version
+// dropped from a body, or a wrong path, here would pass every one of them (the
+// review of PR #85 asked for the client breaks that found it to be run).
+// ---------------------------------------------------------------------------
+
+describe("UI-13 (continued) the API client puts the version in what it sends and asks for the right path (BR-26, api-spec §3)", () => {
+  const sent = () => vi.mocked(globalThis.fetch).mock.calls[0] as [string, RequestInit];
+
+  function respond(body: unknown) {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } })));
+  }
+
+  // These call the real client, so the spies the other tests share are lifted first.
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("sends the move, the reason, and the version of a status change to PATCH .../status", async () => {
+    respond({ ticket: detail({ version: 5 }), comment: null });
+    await api.changeTicketStatus(12, "RESOLVED", "Replaced the adapter.", 4);
+    const [url, init] = sent();
+    expect(url).toMatch(/\/api\/staff\/tickets\/12\/status$/);
+    expect(init.method).toBe("PATCH");
+    expect(init.credentials).toBe("include");
+    expect(JSON.parse(init.body as string)).toEqual({ currentStatus: "RESOLVED", reason: "Replaced the adapter.", expectedVersion: 4 });
+  });
+
+  it("sends the new owner, the owner it was looking at, and the version of an owner change to PATCH .../owner", async () => {
+    respond({ ticket: detail({ version: 5 }) });
+    await api.setTicketOwner(12, COLLEAGUE, ME, 4);
+    const [url, init] = sent();
+    expect(url).toMatch(/\/api\/staff\/tickets\/12\/owner$/);
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(init.body as string)).toEqual({ ownerId: COLLEAGUE, expectedOwnerId: ME, expectedVersion: 4 });
+  });
+
+  it("sends the IT Priority and the version of a priority change to PATCH .../it-priority", async () => {
+    respond({ ticket: detail({ version: 5 }) });
+    await api.setItPriority(12, "HIGH", 4);
+    const [url, init] = sent();
+    expect(url).toMatch(/\/api\/staff\/tickets\/12\/it-priority$/);
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(init.body as string)).toEqual({ itPriority: "HIGH", expectedVersion: 4 });
+  });
+
+  it("reads the Status History from GET /api/tickets/:id/status-history with the session cookie", async () => {
+    respond({ history: [change(1, "NEW", "OPEN", "2026-09-28T03:00:00.000Z")] });
+    const history = await api.fetchStatusHistory(12);
+    const [url, init] = sent();
+    expect(url).toMatch(/\/api\/tickets\/12\/status-history$/);
+    expect(init.credentials).toBe("include");
+    expect(init.method ?? "GET").toBe("GET");
+    expect(history).toHaveLength(1);
+  });
+});
+
 describe("UI-15 the Status History on the staff and Requester screens (AC-13, FR-13, ui-spec §1.4, §6)", () => {
   const steps = [
     change(1, "NEW", "OPEN", "2026-09-28T03:00:00.000Z"),
@@ -476,6 +538,9 @@ describe("UI-15 the Status History on the staff and Requester screens (AC-13, FR
     const callout = await region.findByRole("alert");
     expect(callout).toHaveTextContent("Cannot load the status history right now.");
     expect(callout).not.toHaveTextContent(/500|INTERNAL_ERROR/);
+    // A failed read draws no timeline at all, not even the first line, which needs no read.
+    expect(region.queryByRole("list")).not.toBeInTheDocument();
+    expect(region.queryByText("Ticket created")).not.toBeInTheDocument();
     // The status control is untouched.
     expect(offered()).toEqual(["WAITING_FOR_REQUESTER", "CANCELLED"]);
 
@@ -489,6 +554,42 @@ describe("UI-15 the Status History on the staff and Requester screens (AC-13, FR
     await ready();
     const region = within(await screen.findByRole("region", { name: "Status History" }));
     expect(region.getByRole("status")).toHaveAttribute("data-state", "loading");
+  });
+
+  it("asks for the history of the ticket it is showing, and of no other", async () => {
+    fetchHistory.mockResolvedValue([]);
+    await ready(detail({ id: 31 }));
+    await screen.findByRole("region", { name: "Status History" });
+    await waitFor(() => expect(fetchHistory).toHaveBeenCalled());
+    expect(fetchHistory.mock.calls.map(([ticketId]) => ticketId)).toEqual([31]);
+  });
+
+  it("dates the first line by the ticket's own creation time, and every line the same way", async () => {
+    fetchHistory.mockResolvedValue(steps);
+    await ready();
+    const items = await within(await screen.findByRole("region", { name: "Status History" })).findAllByRole("listitem");
+    const shown = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+    expect(items[0].querySelector("time")).toHaveTextContent(shown("2026-09-28T02:10:00.000Z"));
+    expect(items[1].querySelector("time")).toHaveTextContent(shown("2026-09-28T03:00:00.000Z"));
+  });
+
+  it("keeps the timeline on screen while it reads again after a change, instead of blanking it with a skeleton", async () => {
+    const created = "2026-09-28T02:10:00.000Z";
+    fetchHistory.mockResolvedValueOnce(steps);
+    const view = render(<StatusHistoryRegion ticketId={12} ticketCreatedAt={created} refreshToken={0} />);
+    expect(await screen.findAllByRole("listitem")).toHaveLength(4);
+
+    let finish!: (rows: StatusChange[]) => void;
+    fetchHistory.mockReturnValueOnce(new Promise<StatusChange[]>((resolve) => { finish = resolve; }));
+    view.rerender(<StatusHistoryRegion ticketId={12} ticketCreatedAt={created} refreshToken={1} />);
+    await waitFor(() => expect(fetchHistory).toHaveBeenCalledTimes(2));
+
+    // The second read is still in flight: the four lines are still there and no skeleton has replaced them.
+    expect(screen.getAllByRole("listitem")).toHaveLength(4);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+
+    finish([...steps, change(4, "WAITING_FOR_REQUESTER", "IN_PROGRESS", "2026-09-30T01:00:00.000Z")]);
+    await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(5));
   });
 
   describe("on the Requester's screen", () => {
@@ -527,6 +628,16 @@ describe("UI-15 the Status History on the staff and Requester screens (AC-13, FR
       expect(names.indexOf("Status History")).toBeLessThan(names.findIndex((n) => /^Attachments/.test(n)));
       // Nothing that hints at an Internal Note (Lab 3 AC-17).
       expect(names.some((n) => /Internal/.test(n))).toBe(false);
+    });
+
+    it("asks for the history of the ticket it is showing, and of no other", async () => {
+      vi.spyOn(api, "fetchTicketDetail").mockResolvedValue({ ...requesterTicket(), id: 31 });
+      fetchHistory.mockResolvedValue([]);
+      render(<RequesterTicketDetail ticketId={31} />);
+      await screen.findByTestId("detail-ticket-number");
+      await screen.findByRole("region", { name: "Status History" });
+      await waitFor(() => expect(fetchHistory).toHaveBeenCalled());
+      expect(fetchHistory.mock.calls.map(([ticketId]) => ticketId)).toEqual([31]);
     });
 
     it("keeps its own empty, failure, and Try again, without touching the rest of the screen", async () => {
