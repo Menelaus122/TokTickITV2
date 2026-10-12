@@ -306,8 +306,8 @@ separately", and offers one ordinary link, **Open User Management**, which opens
 | Width | Presentation |
 | :--- | :--- |
 | ≥ 992 px | four cards in one row; the two staff lists side by side; quick actions in one row |
-| 768–991 px | cards two by two; lists stacked full width; By status wraps to two lines |
-| < 768 px | cards one per row, full width; lists stacked; Refresh below the greeting; quick actions stacked, primary on top. No horizontal scroll at 320 px (FR-32) |
+| 768–991 px | cards two by two; lists stacked full width; By status stays on one line while its five counts fit and wraps to two when they do not (at 820 px that is from two-digit counts up) |
+| < 768 px | cards one per row, full width; lists stacked; By status one count to a row; Refresh below the greeting; quick actions stacked, primary on top. No horizontal scroll at 320 px (FR-32) |
 
 ---
 
@@ -606,7 +606,22 @@ Lab 2's and Lab 3's rules carry over in full (labsheet §8.6). Lab 4 adds:
 | Mobile < 768 px | one card per row, stacked full-width buttons with the primary on top, hamburger navigation, 16 px gutters |
 
 No horizontal page scroll at any width, including every Lab 4 screen at 320 px
-(AC-29).
+(AC-29). The stylesheet hides a sideways scroll (`html, body { overflow-x: hidden }`), so
+"no scroll" is checked by looking at every element, not at the page's scroll width
+(`tests.md` §5.2).
+
+Three rules were added by the visual inspection of Issue 10:
+
+* **The header's labels never break across lines.** The wordmark, each navigation
+  link, and the user's name, role badge, Change Password, and Logout each keep one
+  line. Between 768 and 991 px a role's whole row can be too wide, and the header
+  then wraps as a whole: the wordmark and the links in the first row, the user's
+  block in a second row at the right.
+* **A badge is as wide as its word** at every width (a column that stretches its
+  items does not stretch a badge).
+* **The Ticket Number and the date in the My Tickets table keep one line each**, and
+  on a tablet the Ticket Queue's Ticket Owner column is 150 px, so that "No longer IT
+  Staff" fits inside its cell.
 
 ---
 
@@ -659,6 +674,20 @@ Captured at Desktop 1440×900, Tablet 820×1180, Mobile 390×844, under
 | `actions-taken/` | list with several actions, empty state, create form, follow-up note required, validation errors, edit mode, conflict, ticket-not-active, Requester read-only view |
 | `ticket-workflow/` | status control with a blocked move, gate refusal, success, status history, stale-update conflict, Administrator on Ticket Detail |
 | `regression/` | one screenshot each of the Lab 2 and Lab 3 screens, after Lab 4 (Part 8) |
+
+**The files as captured** (Issue 10, `e2e/lab-04/responsive.spec.ts`), each as `<shot>-<desktop|tablet|mobile>.png`:
+
+| Folder | Files |
+| :--- | :--- |
+| `requester-dashboard/` | `populated`, `zero-data`, `loading`, `failure`, `drill-down-result`, and `navigation`, which is the "mobile layout" shot at every width: the header's links from 768 px, the open menu below it |
+| `staff-dashboard/` | `it-staff-populated`, `it-staff-zero-data`, `administrator-accounts`, `loading`, `failure`, `forbidden`, `drill-down-result` |
+| `actions-taken/` | `list`, `empty-state`, `create-form`, `follow-up-note-required`, `validation-errors`, `edit-mode`, `conflict`, `ticket-not-active`, `requester-read-only-view` (each of the region itself, drawn at its full height) |
+| `ticket-workflow/` | `status-blocked`, `gate-refusal`, `success`, `status-history`, `stale-conflict`, `administrator-ticket-detail`, and `owner-labels` (Inactive and No longer IT Staff, §1.6) |
+| `regression/` | `login`, `change-password`, `my-tickets`, `create-ticket`, `requester-ticket-detail` (with an attachment and a comment), `ticket-queue`, `staff-ticket-detail` (with an Internal Note), `user-management` |
+
+Every state is reached through the screen. Three are the exception, because no honest path reaches them: `loading` holds the
+dashboard's response until the picture is taken, `failure` answers it with a `500`, and `forbidden` answers it with the API's own
+`403` (a role that has a dashboard is never refused it). Each is stated in `tests.md` §5.1.
 
 ---
 

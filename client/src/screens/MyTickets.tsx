@@ -402,7 +402,7 @@ export function MyTickets({ onOpenTicket, onCreateTicket, query, onQueryChange }
             keyOf={(ticket) => ticket.id}
             renderRow={(ticket) => (
               <>
-                <td>
+                <td className="tt-table__nowrap">
                   <button
                     type="button"
                     className="tt-btn tt-btn--tertiary"
@@ -419,7 +419,7 @@ export function MyTickets({ onOpenTicket, onCreateTicket, query, onQueryChange }
                 <td>
                   <StatusBadge value={ticket.currentStatus} />
                 </td>
-                <td>{formatDate(ticket.updatedAt)}</td>
+                <td className="tt-table__nowrap">{formatDate(ticket.updatedAt)}</td>
               </>
             )}
             renderCard={(ticket) => (
