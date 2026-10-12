@@ -8,8 +8,9 @@ The **Final** column reads **Planned** until the owning issue merges, then the
 real runner result. **Partial** means the part of the test that can exist at that
 issue passes, and the rest arrives with the issue §3.1 names; it never means
 that a test fails. Issue 10 (#76) refreshes §8 with the full run from
-`lab4-staging`, Issue 11 (#77) runs it again on the tree of its own Pull Request
-(§8.6) and repeats it from `main`. Counts in §8 are only ever the runner's own output.
+`lab4-staging`, and Issue 11 (#77) runs it again on the tree of its own Pull Request
+(§8.6). The run from `main` (Part 3) is recorded in the submission PDF, because nothing
+can be committed after the release. Counts in §8 are only ever the runner's own output.
 
 ---
 
@@ -393,7 +394,7 @@ component, 7 UI style, 6 responsive, 9 E2E, and 3 regression suites.
 | 8 — IT Staff and Administrator Dashboard (#74) | DASH-10 – DASH-19, UI-22 – UI-26, UI-37 (IT Staff and Administrator), UI-38; completes SEC-05 (the staff dashboard half) and extends SEC-01, SEC-07, and UI-27 |
 | 9 — Final hardening and full regression (#75) | UNIT-12, WF-18, UI-17, HARD-01 – HARD-03, PERF-01 – PERF-03, UI-30 – UI-36, STYLE-01, STYLE-04, STYLE-05 |
 | 10 — Lab 4 E2E suite and visual evidence (#76) | RESP-01 – RESP-06, E2E-01 – E2E-09, STYLE-07, REG-01 – REG-03 |
-| 11 — Staging integration, documentation, and delivery (#77) | nine client tests that close the gaps found by the client breaks the approving review of PR #85 asked for (§8.5), and the final run from `main` |
+| 11 — Staging integration, documentation, and delivery (#77) | nine client tests that close the gaps found by the client breaks the approving review of PR #85 asked for (§8.5) |
 
 Each issue also keeps every earlier test passing, and updates the old tests §6
 names in the issue that changes the behaviour they check.
@@ -664,7 +665,8 @@ is not listed, the issue adds it here with its reason in the same pull request.
 Run in Issue 10 (#76) on branch `feature/10-lab4-e2e-and-evidence`: `lab4-staging` at
 `c89e486` (PR #88 merged) plus this issue and the fixes of the review of PR #89. Every
 figure below is the runner's own output, read from its log; nothing is estimated or
-restated from memory. Issue 11 (#77) repeats the run from `main`.
+restated from memory. The run from `main` (Part 3) is recorded in the submission PDF, because nothing
+can be committed after the release.
 
 **On a fresh database, as the review asked.** The review found three checks that
 passed only on the large development database. The results below therefore come from
@@ -856,7 +858,8 @@ Run in Issue 11 (#77) on branch `feature/11-lab4-delivery`: `lab4-staging` at `6
 plus this issue, on the same kind of **second, empty stack** as §8 (16 Tickets and 14 accounts from the
 seed; API on port 3100, client on 5174), and in the same order: every Playwright suite, then the server
 tests on the database they left, then the client tests. Every figure is the runner's own output, read
-from its log. The run from `main` follows the release.
+from its log. The run from `main` (Part 3) is recorded in the submission PDF, because nothing
+can be committed after the release.
 
 | Suite | Command | Result |
 | :--- | :--- | :--- |
@@ -891,3 +894,15 @@ application. That found:
 The walk also failed three times on mistakes in the script itself (a locator that matched both a card and the By
 status link of the same name, the wrong label for the staff queue's search field, and a click on a summary where
 the ticket opens from its number). They changed the script, not the README.
+
+### 8.8 What the review of PR #90 changed
+
+The review of PR #90 asked for one change before the merge: nothing in the repository may promise a commit
+that has to follow the release Pull Request into `main`, because nothing can follow it. Four places in this
+file did. The opening paragraph, the opening of §8, and the opening of §8.6 now say that the run from `main`
+(Part 3) is recorded in the submission PDF, and the Issue 11 row of §3.1 no longer lists it.
+
+One line the review did not name followed from it. `specification.md` §10.2 said `tests.md` records the
+runner's output from `main`. It now says the output from `lab4-staging` is here and the output from `main` is
+in the PDF. That is a change to the approved specification, made on this review's account. The evidence for
+Part 2 is not affected: the contract is PR #78, merged at 2026-10-05 16:08:34 UTC as `f14ae15`.

@@ -51,6 +51,8 @@ approval. Ten of the twelve are linked to their GitHub Issue ([#67](https://gith
 Development panel; #82 and #84 are small follow-up Pull Requests with no Issue of their own. Every feature branch reached `lab4-staging` through a
 Pull Request: the first-parent history of `lab4-staging` after `main` is these twelve merge commits and nothing else.
 
+The Pull Request for Issue 11 ([#90](https://github.com/Menelaus122/TokTickITV2/pull/90)) and the release Pull Request into `main` are not recorded here: nothing can be committed after the release, so their reviews are in the submission PDF.
+
 ### [#78](https://github.com/Menelaus122/TokTickITV2/pull/78) — Add the Lab 4 engineering contract (Issue 1)
 
 **Verdict:** Changes requested → Approved · **merged** 2026-10-05 by @WirachatTH
