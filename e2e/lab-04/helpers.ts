@@ -1,5 +1,5 @@
-import { APIRequestContext, Browser, BrowserContext, Locator, Page, expect } from "@playwright/test";
-import { BASE_URL } from "../../playwright.config.js";
+import { APIRequestContext, Browser, BrowserContext, Locator, Page, expect, test } from "@playwright/test";
+import { API_URL, BASE_URL } from "../../playwright.config.js";
 import {
   ACCOUNTS as LAB3_ACCOUNTS,
   RUN,
@@ -99,6 +99,26 @@ export interface ActionTakenRow {
   followUpNote: string | null;
   performedBy: { id: number; fullName: string; role: string };
   updatedBy: { id: number; fullName: string } | null;
+  /** When the row was recorded, by the server's clock: what "newest recorded" is decided by (BR-17). */
+  createdAt: string;
+}
+
+/**
+ * `rows` newest first by `stamp`, then by `id`: the order the dashboards sort their newest-first lists in. A test builds
+ * rows a fraction of a second apart, and the development stack's clock steps back about 0.7 s every 33 s (tests.md §7), so
+ * the order they were made in is not always the order they were stamped in. A list is therefore checked against the
+ * stamps the server holds, which is what the rule sorts by; and a run that was stepped over says so in its report
+ * (`madeNewestFirst` is the ids in the order they were made, newest first).
+ */
+export function newestFirst<T extends { id: number }>(rows: T[], stamp: (row: T) => string, madeNewestFirst?: number[]): T[] {
+  const sorted = [...rows].sort((a, b) => Date.parse(stamp(b)) - Date.parse(stamp(a)) || b.id - a.id);
+  if (madeNewestFirst && sorted.some((row, index) => row.id !== madeNewestFirst[index])) {
+    test.info().annotations.push({
+      type: "clock-step",
+      description: `rows made in quick succession were stamped out of the order they were made in: ${sorted.map((row) => row.id).join(", ")}`,
+    });
+  }
+  return sorted;
 }
 
 /** The account a signed-in API context acts as. */
@@ -348,13 +368,62 @@ export async function timelineSteps(page: Page): Promise<{ what: string; who: st
     );
 }
 
+const STATUS_WORDS: Record<string, string> = {
+  NEW: "New",
+  OPEN: "Open",
+  IN_PROGRESS: "In Progress",
+  WAITING_FOR_REQUESTER: "Waiting for Requester",
+  RESOLVED: "Resolved",
+  CLOSED: "Closed",
+  REOPENED: "Reopened",
+  CANCELLED: "Cancelled",
+};
+
+/**
+ * Whether the Status History the screen shows differs from `expected` only because the server's clock stepped backwards
+ * between two moves, and whether the application is right to show it so. The API orders the history by `createdAt`, then
+ * `id` (BR-22). The development stack's Docker VM steps its clock back by about 0.7 s every 33 s (tests.md §7), and two
+ * moves a quarter of a second apart on either side of a step are stored with the second one stamped earlier, so the
+ * list shows them swapped. That is the rule working on the data it was given, not a defect, and it must not fail a test of
+ * something else. It is accepted only when the API's own rows prove all of it: taken in the order they were made (by
+ * `id`) they are exactly the moves expected; their stamps run backwards somewhere; and the screen shows precisely what
+ * the API sorted. A list that is wrong for any other reason, such as an ordering bug or a missing step, is still a failure.
+ */
+async function swappedByAClockStep(page: Page, shown: string[], expected: string[]): Promise<boolean> {
+  const id = /\/(?:queue|tickets)\/(\d+)/.exec(new URL(page.url()).pathname)?.[1];
+  if (!id) return false;
+  const res = await page.request.get(`${API_URL}/api/tickets/${id}/status-history`);
+  if (!res.ok()) return false;
+  const rows = ((await res.json()) as { history: { id: number; fromStatus: string; toStatus: string; createdAt: string }[] }).history;
+  const words = (row: { fromStatus: string; toStatus: string }) => `${STATUS_WORDS[row.fromStatus]} → ${STATUS_WORDS[row.toStatus]}`;
+  const sameList = (a: string[], b: string[]) => a.length === b.length && a.every((item, index) => item === b[index]);
+  const inOrderMade = [...rows].sort((a, b) => a.id - b.id);
+  const stampedBackwards = inOrderMade.some((row, index) => index > 0 && Date.parse(row.createdAt) < Date.parse(inOrderMade[index - 1].createdAt));
+  const explained =
+    stampedBackwards &&
+    sameList(["Ticket created", ...inOrderMade.map(words)], expected) &&
+    sameList(shown, ["Ticket created", ...rows.map(words)]);
+  if (explained) {
+    test.info().annotations.push({ type: "clock-step", description: `the Status History of Ticket ${id} is in the order of its stamps; two moves were stamped backwards` });
+  }
+  return explained;
+}
+
 /**
  * The Status History once it shows exactly `expected`. The screen reads it again after a move, a moment after
  * the message that says the move was made, so a test that reads it at once can see the list one step short.
+ * The one other thing accepted is a pair of moves the server's clock stepped over (see `swappedByAClockStep`).
  */
 export async function settledTimeline(page: Page, expected: string[]): Promise<{ what: string; who: string }[]> {
   await expect
-    .poll(async () => (await timelineSteps(page)).map((step) => step.what), { message: "the Status History", timeout: 10_000 })
+    .poll(
+      async () => {
+        const shown = (await timelineSteps(page)).map((step) => step.what);
+        const same = shown.length === expected.length && shown.every((item, index) => item === expected[index]);
+        return same || (await swappedByAClockStep(page, shown, expected)) ? expected : shown;
+      },
+      { message: "the Status History", timeout: 10_000 },
+    )
     .toEqual(expected);
   return timelineSteps(page);
 }

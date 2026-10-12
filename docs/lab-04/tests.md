@@ -149,7 +149,7 @@ first, then the rule or requirement where it adds precision.
 | DASH-06 | Dashboard | AC-02, BR-37 | a `requesterId` query parameter and an `X-Requester-Id` header | both ignored | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
 | DASH-07 | Dashboard | AC-21, BR-40 | follow each Requester `href` against `GET /api/tickets` | `totalItems` equals the card's `value` for every card | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
 | DASH-08 | Dashboard | AC-21, BR-31 | `group=open` on My Tickets, alone, with `status`, repeated, and unknown | the open group; AND with `status`; `400 INVALID_QUERY` for the last two | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
-| DASH-09 | Dashboard | AC-18, FR-19 | the exact key set of the response and the size of the lists | only the documented keys; no `description`; lists bounded at 5 | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
+| DASH-09 | Dashboard | AC-18, FR-19 | the exact key set of the response and the size of the lists | only the documented keys; no `description`; lists bounded at 5, also for the seeded Requester with the most Tickets | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
 | DASH-10 | Dashboard | AC-19, BR-34 | the four staff cards against independent queries | every `value` equals its independent query | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
 | DASH-11 | Dashboard | AC-19, BR-35 | `byStatus` | exactly five rows in the documented order, each equal to an independent count | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
 | DASH-12 | Dashboard | AC-19, BR-37 | two different IT Staff members, and a `me` parameter | "me" figures differ per user and ignore the parameter | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
@@ -304,7 +304,7 @@ route's query string unchanged). DASH-07 and DASH-17 follow every link and compa
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | RESP-01 | Responsive | AC-29, AC-34 | the Requester dashboard at ≥ 992, 768–991, and < 768 px | cards four across, two by two, then one per row, and the lists and quick actions one column; the quick actions in one row, then stacked with the primary on top; the header's links, then the menu; and the dashboard's loading, failure, zero-data, and drill-down states; no sideways scroll | `e2e/lab-04/responsive.spec.ts` | Pass |
-| RESP-02 | Responsive | AC-29, AC-34 | the staff and Administrator dashboards at all three widths | cards four across, two by two, one per row; the two lists side by side, then stacked; By status in one line, then wrapped to two, then stacked; the accounts region wrapping the same way; and the loading, failure, forbidden, zero-data, and drill-down states; no sideways scroll | `e2e/lab-04/responsive.spec.ts` | Pass |
+| RESP-02 | Responsive | AC-29, AC-34 | the staff and Administrator dashboards at all three widths | cards four across, two by two, one per row; the two lists side by side, then stacked; **By status** one count to a row on a phone and, from 768 px, on one line exactly when its five counts fit and wrapped when they do not, asserted on the database's own figures, whatever their width, and on two sets of figures the test makes (four-digit counts, which wrap to two rows at 820 px, and one-digit counts, which fit on one) with nothing sticking out of the card; the accounts region wrapping the same way; and the loading, failure, forbidden, zero-data, and drill-down states; no sideways scroll | `e2e/lab-04/responsive.spec.ts` | Pass |
 | RESP-03 | Responsive | AC-29 | the Actions Taken region and its create form on the staff Ticket Detail at all three widths | one column of cards; labels beside values in a 180 px column at ≥ 992 px and above them below; the create form with Cancel and Save side by side, then stacked full width with Save on top; the empty, create, follow-up, validation, edit, conflict, and not-active states | `e2e/lab-04/responsive.spec.ts` | Pass |
 | RESP-04 | Responsive | AC-29 | the Requester Ticket Detail with Actions Taken and Status History at all three widths | both regions read-only (no button, no field), in order, one column, and unclipped | `e2e/lab-04/responsive.spec.ts` | Pass |
 | RESP-05 | Responsive | AC-25, AC-29 | the Lab 2 and Lab 3 screens after Lab 4: Login, Change Password, My Tickets, Create Ticket, the Requester Ticket Detail with an attachment and a comment, the Queue, the IT Staff Ticket Detail with an Internal Note, and User Management, at all three widths; and every role's header from 768 to 991 px | still as Labs 2 and 3 specified (a table from 768 px and cards below; the Queue's seven columns, then folded, then cards), with the Dashboard first in the header or the menu; in the header **every label on one line** from 768 to 991 px for the three roles; and a Ticket Number and a date on one line each in the My Tickets table, and an attachment's badge as wide as its word on a phone | `e2e/lab-04/responsive.spec.ts` | Pass |
@@ -328,9 +328,9 @@ route's query string unchanged). DASH-07 and DASH-17 follow every link and compa
 
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Final |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| REG-01 | Regression | AC-25, BR-50 | the full server suites of Labs 1, 2, and 3 on `lab4-staging` | all pass, with only the changes §6 lists | `server/tests/lab-01`, `server/tests/lab-02`, `server/tests/lab-03` | Pass: 388 of the 1092 tests of the whole run (38 files, 120 s), none skipped |
-| REG-02 | Regression | AC-25, BR-50 | the full client suites of Labs 1, 2, and 3 | all pass, with only the changes §6 lists | `client/tests/lab-01`, `client/tests/lab-02`, `client/tests/lab-03` | Pass: 349 of the 1019 tests of the whole run (26 files, 52 s), none skipped |
-| REG-03 | Regression | AC-25, BR-50 | the Playwright suites of Labs 2 and 3 | all pass, with only the changes §6 lists | `e2e/lab-02`, `e2e/lab-03` | Pass: 46 of 46 (21 in Lab 2, 25 in Lab 3), in the one run of §8; and the same 46 passed on `lab4-staging` before Issue 10 changed anything |
+| REG-01 | Regression | AC-25, BR-50 | the full server suites of Labs 1, 2, and 3 on `lab4-staging` | all pass, with only the changes §6 lists | `server/tests/lab-01`, `server/tests/lab-02`, `server/tests/lab-03` | Pass: 388 of the 1092 tests of the whole run (38 files, 81 s), none skipped, on a fresh database after the Playwright suites |
+| REG-02 | Regression | AC-25, BR-50 | the full client suites of Labs 1, 2, and 3 | all pass, with only the changes §6 lists | `client/tests/lab-01`, `client/tests/lab-02`, `client/tests/lab-03` | Pass: 349 of the 1019 tests of the whole run (26 files, 34 s), none skipped |
+| REG-03 | Regression | AC-25, BR-50 | the Playwright suites of Labs 2 and 3 | all pass, with only the changes §6 lists | `e2e/lab-02`, `e2e/lab-03` | Pass: 46 of 46 (21 in Lab 2, 25 in Lab 3), in the one run of §8, on a fresh database; and the same 46 passed on `lab4-staging` before Issue 10 changed anything |
 
 ---
 
@@ -545,9 +545,13 @@ files:** 37 shots at three sizes, 6 in `requester-dashboard/`, 7 in
   screen's own search for `toktickit.local`: the list is not paginated, by design
   (Lab 3 FR-39), and this database holds every account the suites have made.
 * The hover state is cleared before each picture, and nothing in them is edited.
-* They are rewritten by every run of the responsive suite, and carry the time of
-  the run and the numbers of the database it ran on; a commit of them is the
-  evidence of the run it came from, which §8 gives.
+* They are rewritten by every run of the responsive suite and carry the numbers
+  of the database it ran on, so a re-run on another database changes the counts
+  on the dashboards and, on a tablet, whether By status wraps, and shows 111
+  differing files that are not a regression. **The committed set is from the run
+  on a freshly migrated and seeded database that §8 describes** (the review of
+  PR #89 asked for that); a database that many runs have added to draws wider
+  counts, and RESP-02 holds both cases (§2.10).
 
 ### 5.2 What the inspection found
 
@@ -614,10 +618,12 @@ forces it, and the **Status** column records it when it is done.
 | `server/tests/lab-04/staff-dashboard.api.test.ts` — DASH-14 (two cases) and `client/tests/lab-04/StaffDashboard.test.tsx`, `client/tests/lab-04/DrillDown.test.tsx` (the owner mocks) | the owner of a dashboard row has the keys `fullName`, `id`, `isActive`, and equals `{ id, fullName, isActive }` | it has `role` too | BR-55. Tests of Lab 4's own, written in Issue 8 knowing api-spec §1.4 said "no `role` until Issue 9" | 9 | Done |
 | `e2e/lab-02/requester-ticket-flow.spec.ts` — E2E-03 "add, download, and soft-remove an attachment" | after pressing Remove attachment it reads the page at once, as if the dialog had closed | it first waits for the dialog to be gone, and then reads the page; no assertion changes | **not foreseen; found by running the suite.** BR-53, BR-54: the removal dialog now stays open, busy, until the server has answered, so a failure can show its message beside the reason. Read at once, the page held the file name twice (the row and the dialog) and Playwright's strict mode refused | 9 | Done |
 | `client/tests/lab-04/ActionsTaken.test.tsx` — UI-07 "is what the Requester's Ticket Detail screen shows, between the ticket and its attachments, with no write call ever made" | the test mocks the ticket, the comments, and the actions | it also mocks `fetchStatusHistory` (an empty list); no assertion changes | **not foreseen; found by the offline guard of the review of PR #88.** The screen has loaded the Status History since Issue 6, so this test had been sending a real request to `localhost:3000` (tests.md §7) | 9 | Done |
+| `server/tests/lab-04/requester-dashboard.api.test.ts` — DASH-09 "bounds both lists at five, even for the Requester with the most Tickets" | the Requester with the most Tickets was sought among every account in the database | it is sought among the four seeded Requesters (`SEEDED_REQUESTER_EMAILS`, already in the file); the assertions are untouched | **not foreseen; found by the review of PR #89, on a freshly seeded database.** `signInAs` signs in with the seed password, so it can only sign in as a seeded account. `responsive.spec.ts` makes a Requester that ends with 24 Tickets, changes its password, and is deactivated afterwards (BR-50); on a fresh seed that is more Tickets than any seeded Requester has, so DASH-09 chose it and could not sign in (`401`). On the development database the seeded Requesters have far more, so it was never seen there | 10 | Done |
 
-No Lab 1 test changes. **Issue 10 changed no old test**: its four fixes to the
+No Lab 1 test changes. **Issue 10 changed no Lab 1–3 test**: its four fixes to the
 stylesheet and the class names in `MyTickets.tsx` left every Lab 1–3 test passing as
-written (REG-01 to REG-03, §8). A change not in this table is a defect to be fixed in the
+written (REG-01 to REG-03, §8). Its review changed one Lab 4 test, DASH-09 (the last
+row above), and the server's test time budget (§7). A change not in this table is a defect to be fixed in the
 code, not in the test. If implementation finds a Lab 3 test that must change and
 is not listed, the issue adds it here with its reason in the same pull request.
 
@@ -644,7 +650,8 @@ is not listed, the issue adds it here with its reason in the same pull request.
 | Stand-in responses in three pictures | The dashboards' `loading`, `failure`, and `forbidden` screenshots hold or replace the API's response for one shot (§5.1). RESP-01 and RESP-02 also assert what each screen says; UI-18 to UI-26 prove the states in jsdom with a real mock. |
 | The browser's own 401 line | The signed-out Login screen asks `/api/auth/me` who is signed in, and the answer, `401`, is the contract (Lab 3). The browser writes it to the console as "Failed to load resource". RESP-06's sweep ignores exactly that line and nothing else. |
 | User Management is not paginated | By design (Lab 3 FR-39). On a database that every suite has added accounts to, the list is hundreds of rows, so its picture is of the seeded accounts, found by search (§5.1). |
-| Clock skew in the development stack | Docker Desktop's clock ran four seconds ahead of the host's and stepped now and then, so an action dated "now" by the host's clock, a few calls after its Ticket was created, was refused with "cannot be before the ticket was created" (BR-06), three times in Issue 10's own runs. The suites date an action from the server's clock and never earlier than a second after the Ticket's own creation (`actionTime` in `e2e/lab-04/helpers.ts`). The application is right in refusing it. |
+| Clock skew in the development stack | Docker Desktop's clock ran four seconds ahead of the host's and stepped now and then, so an action dated "now" by the host's clock, a few calls after its Ticket was created, was refused with "cannot be before the ticket was created" (BR-06), three times in Issue 10's own runs. The suites date an action from the server's clock and never earlier than a second after the Ticket's own creation (`actionTime` in `e2e/lab-04/helpers.ts`). The application is right in refusing it. **It also steps backwards, which the review of PR #89 caught.** A probe in the server container against the host (7 minutes, a sample every 100 ms) showed the VM's clock, on the machine that ran Issue 10, reading about 3.4 s ahead, drifting down to about 0.7 s ahead over 32.7 s, stepping back by 0.69 to 0.71 s (13 times, 32.76 s apart), and 0.2 s later jumping forward 3.4 s again. Two moves made a quarter of a second apart on either side of a backward step are stored with the second stamped earlier, and the Status History, which is ordered by `createdAt` and then `id` (api-spec, BR-22), shows them swapped: that is the rule working on the data it was given, not a defect. In 62 runs of E2E-08 on a fresh seed it happened twice (the Resolve and Reopen rows, 0.25 s apart, stamped 0.40 s the wrong way round). `settledTimeline` accepts a swapped list only when the API's own rows prove it, and only then: taken in the order they were made (`id`) they are exactly the moves expected, their stamps run backwards somewhere, and the screen shows precisely what the API sorted. A list that is wrong for any other reason still fails (§8.3, R05). |
+| Server test time budget | Lab 3's MIG-06 and Lab 4's MIG-06 run the whole seed twice, and the seed has grown across the labs: they took 4.2 and 4.7 s on the reviewer's machine against vitest's default of 5 s for a test, and MIG-06 failed by timing out in 3 of 5 of the review's server runs. **The approving review of PR #88 asked for this as a small thing and I missed it;** the review of PR #89 raised it again. `server/vitest.config.ts` now sets `testTimeout` and `hookTimeout` to 30 s, as `client/vite.config.ts` has since PR #88. No assertion is touched. |
 | The development database grows | A full Playwright run of every suite added 108 Tickets and 18 accounts in Issue 10 (the accounts deactivated afterwards, BR-50). Nothing deletes them; `docker exec toktickit-server npx prisma migrate reset --force` starts again from the seed. The dashboards' tests state their expectations from Tickets and accounts they make, or tally the whole queue themselves, so they hold at any size. |
 
 ---
@@ -652,44 +659,75 @@ is not listed, the issue adds it here with its reason in the same pull request.
 ## 8. Final results
 
 Run in Issue 10 (#76) on branch `feature/10-lab4-e2e-and-evidence`: `lab4-staging` at
-`c89e486` (PR #88 merged) plus this issue, against the Docker stack and the
-seeded database. Every figure below is the runner's own output, read from its log;
-nothing is estimated or restated from memory. Issue 11 (#77) repeats the run from
-`main`.
+`c89e486` (PR #88 merged) plus this issue and the fixes of the review of PR #89. Every
+figure below is the runner's own output, read from its log; nothing is estimated or
+restated from memory. Issue 11 (#77) repeats the run from `main`.
+
+**On a fresh database, as the review asked.** The review found three checks that
+passed only on the large development database. The results below therefore come from
+a **second, empty stack**: its own PostgreSQL, migrated and seeded from nothing
+(16 Tickets and 14 accounts), its API on port 3100 and its client on 5174, so that
+the development database was never touched. The suites ran in the order Part 3 uses:
+every Playwright suite first, then the server tests on the same database.
 
 | Suite | Command | Result |
 | :--- | :--- | :--- |
-| Server, Labs 1–4: unit, API, authorization, workflow, dashboards, migration, hardening, performance smoke | `docker exec toktickit-server npx vitest run` | **38 files, 1092 tests, all passed** (120 s) |
-| Client, Labs 1–4: UI component and UI style | `docker exec toktickit-client npx vitest run` | **26 files, 1019 tests, all passed** (52 s) |
+| Playwright, every suite, on the fresh seed | `E2E_BASE_URL=http://localhost:5174 E2E_API_URL=http://localhost:3100 npx playwright test` | **85 passed** in 6.6 min: 21 of Lab 2, 25 of Lab 3 (REG-03), and 39 of Lab 4 (RESP-01 to RESP-06, E2E-01 to E2E-09, STYLE-07), none failed, skipped, or flaky; the database went from 16 to 124 Tickets and 14 to 32 accounts |
+| Server, Labs 1–4: unit, API, authorization, workflow, dashboards, migration, hardening, performance smoke, **on that same database** | `docker exec -e CLIENT_ORIGINS=http://localhost:5173 toktickit-fresh-server npx vitest run` | **38 files, 1092 tests, all passed** (81 s) |
+| Client, Labs 1–4: UI component and UI style | `docker exec toktickit-client npx vitest run` | **26 files, 1019 tests, all passed** (34 s) |
 | Type check | `npx tsc --noEmit` in each container | **exit 0 and no output**, server and client |
 | Production build | `npx vite build` | built |
-| Playwright, every suite | `npx playwright test` | **85 passed** in 8.5 min: 21 of Lab 2, 25 of Lab 3 (REG-03), and 39 of Lab 4 (RESP-01 to RESP-06, E2E-01 to E2E-09, STYLE-07), none failed, skipped, or flaky |
+| The Lab 4 folder alone, on two more fresh seeds | `npx playwright test e2e/lab-04` | **39 passed** (6.9 min) and **39 passed** (6.3 min) |
+| E2E-08 alone, twenty times in a row, on a fresh seed | `npx playwright test e2e/lab-04/ticket-resolution.spec.ts -g E2E-08` | **20 passed, 0 failed** |
+| The Lab 4 folder, on the large development database | `npx playwright test e2e/lab-04` | **39 passed** (4.9 min), from 1688 to 1771 Tickets and 295 to 308 accounts |
+
+The second stack's API names its own client's origin (`CLIENT_ORIGINS`,
+`server/src/app.ts`), so that the browser's requests from port 5174 are allowed. The
+server tests send the default origin, `http://localhost:5173`, so they are run with
+that value, as the table shows. The first server run, without it, failed exactly five
+tests that check the Origin header (SEC-09 in two files, SEC-11, and one more case of
+Lab 3's authorization suite) and nothing else; on a stack with the default
+configuration, as the review ran it, no override is needed.
 
 The server and client suites are the whole of every lab's tests, so they contain
 the Lab 1 to Lab 3 regression (REG-01, REG-02) and every earlier Lab 4 issue's
-tests, and the Final column of §2 reads **Pass** for all of them. Before the last
-two fixes and the guards written for them, the Lab 4 Playwright folder was also run
-on its own three times in a row: 39 passed, 39 passed, 39 passed. The 85 above is
-the run after them. One last run of the Lab 4 folder alone, after dead code was
-removed from the helpers, passed 39 of 39 (5.8 min) and wrote the screenshots that
-are committed.
+tests, and the Final column of §2 reads **Pass** for all of them. No client file
+changed in the review's round, so the client figures are those of a run on the same
+sources.
 
-**Is anything flaky?** One test failed once across the full runs of the Lab 4
-folder made while it was being finished: E2E-08 read the Status History at the
-instant the message of success appeared, before the screen had read the history
-again. That was the test's, not the application's, so the five reads of the
-timeline now wait for the list they expect (`settledTimeline`), and every run
-above came after it. The other early failures were the stack's,
-not the application's, and are explained where they belong: the clock skew in §7,
-and, in the sweep's own comment, the signed-out Login screen that never reports an
-idle network.
+**Is anything flaky?** The first fresh-seed runs found what the large database had
+hidden, and each was fixed in the test, not hidden:
+
+* **RESP-02 on a tablet** passed only where the counts were three digits wide: five
+  one-digit pills fit on one line at 820 px, which is correct. The test now holds the
+  layout to what it must do with *any* figures, and makes the wide and the narrow
+  case itself (§2.10, RESP-02).
+* **E2E-08** read the status control before the screen had read the Ticket again, as
+  the review said (1 failure in 4 runs of the review's; reproduced here
+  deterministically with a slow read, §8.3). It now waits, as E2E-02 does.
+* **DASH-09** (a Lab 4 server test) looked for the Requester with the most Tickets
+  among everyone, and the Requester that `responsive.spec.ts` makes and deactivates
+  can win that on a fresh seed (§6).
+* **The development stack's clock steps backwards** (§7). Run alone, E2E-08 failed 2
+  times in 62 because two history rows 0.25 s apart were stamped the wrong way round,
+  and the first fresh-seed run of the folder failed E2E-05 for the same reason (two
+  Tickets 0.4 s apart). `settledTimeline` and four order checks now read the
+  server's own stamps, and a run that was stepped over says so in its report.
+
+After the fixes, the Lab 4 folder passed on three fresh seeds, on the large database,
+and E2E-08 passed twenty times in a row, as the table shows. The earlier flake of
+Issue 10 (E2E-08 reading the Status History before the screen had read it again) was
+fixed before the review, in `settledTimeline`.
 
 ### 8.1 Do the new tests fail when the application is wrong?
 
 Twenty deliberate breaks of the application, one at a time: the file changed, its
 container restarted, the specs that should notice run, the file restored byte for
 byte (SHA-256 checked before and after), and the container restarted again.
-**All twenty were caught**, each by the specs named; none survived.
+**All twenty were caught**, each by the specs named; none survived. After the review
+changed E2E-05, E2E-06, E2E-08, RESP-02, and RESP-03, the six breaks that those
+tests catch (E03, E04, E07, E09, E11, E15) were run again against the changed tests:
+**all six caught**, with the files restored byte for byte.
 
 | Break | What was broken | Caught by |
 | :--- | :--- | :--- |
@@ -720,4 +758,23 @@ the owner pill's spill, the stretched badge, and the audit's five injected defec
 
 ### 8.2 What the runs left behind
 
-The full run added 108 Tickets and 18 accounts to the development database (1497 to 1605 Tickets, 264 to 282 accounts); the accounts it made are deactivated, and nothing can delete them (BR-50). §7 says how to reset.
+The full run on the fresh seed added 108 Tickets and 18 accounts (16 to 124 Tickets, 14 to 32
+accounts); the Lab 4 folder on the large development database added 83 Tickets and 13 accounts. The accounts they made are deactivated, and nothing can delete
+them (BR-50). §7 says how to reset. **The committed screenshots (§5.1) are from the fresh-seed run
+above**, so a reader who re-runs the suite on another database will see 111 files differ
+in their numbers and, on a tablet, in whether By status wraps; that is not a regression.
+
+### 8.3 What the review of PR #89 found, and the check made for each
+
+The review ran the branch on a fresh seed. Each finding was reproduced first on the
+second stack, then fixed, then shown to turn from red to green by breaking the
+application (or putting the old test back) and running the new test against it. The
+driver restores every file byte for byte and checks the SHA-256.
+
+| # | Finding | Reproduced | The check, and its result |
+| :--- | :--- | :--- | :--- |
+| 1 | RESP-02 on a tablet passed only on a database with wide counts | on the fresh seed, RESP-02 alone: the tablet failed, desktop and phone passed (`By status wraps`, expected ≥ 2, received 1) | R01 By status never wraps (`flex-wrap: nowrap`): **RESP-02 fails**. R02 each pill at least 300 px wide: **fails**. The fixed test passes on the fresh seed at all three widths |
+| 2 | E2E-08 read the status control before the refresh | R06: the Ticket read made to take 1.5 s, the test as it was: **fails** with the review's own message (`Resolved` missing from the options) | R07 the same slow read, the fixed test: **passes**. 20 of 20 runs on a fresh seed |
+| 3 | DASH-09 chose a Requester that cannot sign in | on the database a fresh seed leaves after the Lab 4 folder, the old test: `Signing in as e2e.responsive.… answered 401` (the Requester has 29 Tickets, Anucha 20) | the fixed test: **51 of 51**. With that account made *active* again, as after a killed run, a lookup restricted to `isActive` still fails with the same 401 and the seeded-only lookup passes; that is why DASH-09 looks among the seeded Requesters |
+| 4 | the server's `testTimeout` | `server/vitest.config.ts` had only `fileParallelism` | `testTimeout` and `hookTimeout` are 30 s; the whole server suite passes on the fresh database (1092 of 1092) |
+| 5 | not in the review: **the stack's clock steps backwards** | the DB: two E2E-08 tickets whose Resolve row is stamped 0.40 s *after* the Reopen row that came after it; a probe: 13 steps back of 0.69–0.71 s in 7 minutes, every 32.76 s (§7) | R03 a Reopen stamped 0.7 s early, the test as it was: **fails**; R04 the same, the fixed test: **passes**. R05 the history returned newest first (a real ordering fault), the fixed test: **still fails**, so the tolerance hides nothing. R08 the second and third action of a Ticket stamped 0.7 s early, E2E-06 and RESP-03 as they were: **2 fail**; R09 the same, the fixed tests: **2 pass** |

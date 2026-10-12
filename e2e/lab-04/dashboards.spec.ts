@@ -19,6 +19,7 @@ import {
   listTotal,
   logOut,
   makeRequester,
+  newestFirst,
   operationalRegion,
   recordAction,
   recordActionOnScreen,
@@ -110,9 +111,11 @@ test("E2E-05 a Requester lands on their Dashboard, the figures are their own, an
 
   // --- the two lists hold the right Tickets in the right order (BR-33) ----------------------------------------
   expect(await numbersIn(page, "Needs your attention")).toEqual([made.WAITING_FOR_REQUESTER.ticketNumber]);
-  // Newest change first, five at most: the seventh Ticket (the oldest) is the one left out.
+  // Newest change first, five at most: the two oldest Tickets are left out. "Newest" is by the stamp the server holds (BR-33), read
+  // from the Requester's own list, because Tickets made a fraction of a second apart are not always stamped in the order they were made.
+  const madeNewestFirst = [made.CANCELLED, made.CLOSED, made.RESOLVED, made.REOPENED, made.WAITING_FOR_REQUESTER, made.IN_PROGRESS, made.NEW].map((ticket) => ticket.id);
   expect(await numbersIn(page, "Recently updated")).toEqual(
-    [made.CANCELLED, made.CLOSED, made.RESOLVED, made.REOPENED, made.WAITING_FOR_REQUESTER].map((ticket) => ticket.ticketNumber),
+    newestFirst(mine, (row) => row.updatedAt, madeNewestFirst).slice(0, 5).map((row) => row.ticketNumber),
   );
   await expect(page.getByRole("region", { name: "Recently updated" }).getByRole("link", { name: new RegExp(made.CANCELLED.ticketNumber) })).toContainText("Cancelled");
 
@@ -229,8 +232,8 @@ async function checkStaffDashboard(page: Page, who: { email: string; name: strin
   await requester.dispose();
   await claimTicket(api, work.id);
   const when = await actionTime(api, work.id);
-  await recordAction(api, work.id, { description: "First thing done on the Ticket.", result: "Nothing changed yet.", actionAt: when.toISOString() });
-  await recordAction(api, work.id, {
+  const first = await recordAction(api, work.id, { description: "First thing done on the Ticket.", result: "Nothing changed yet.", actionAt: when.toISOString() });
+  const second = await recordAction(api, work.id, {
     description: "Second thing done on the Ticket, which still needs a look tomorrow.",
     result: "Partly fixed.",
     followUpRequired: true,
@@ -261,13 +264,14 @@ async function checkStaffDashboard(page: Page, who: { email: string; name: strin
   // --- the lists hold the right Tickets in the right order ------------------------------------------------------
   expect(await numbersIn(page, "My Tickets")).toEqual(expected.myTickets);
   expect(await numbersIn(page, "Urgent Tickets")).toEqual(expected.urgentTickets);
-  // My Recent Actions: newest recorded first, with the follow-up pill telling the two apart.
+  // My Recent Actions: newest recorded first (by the stamp the server holds, BR-36), with the follow-up pill telling the two apart.
   const recent = page.getByRole("region", { name: "My Recent Actions" }).locator("a.tt-dash-row");
-  await expect(recent.first()).toContainText(work.ticketNumber);
-  await expect(recent.first()).toContainText("Second thing done on the Ticket");
-  await expect(recent.first()).toContainText("Follow-up needed");
-  await expect(recent.nth(1)).toContainText("First thing done on the Ticket.");
-  await expect(recent.nth(1)).toContainText("No follow-up");
+  const recorded = newestFirst([first, second], (action) => action.createdAt, [second.id, first.id]);
+  for (const [index, action] of recorded.entries()) {
+    await expect(recent.nth(index)).toContainText(work.ticketNumber);
+    await expect(recent.nth(index)).toContainText(action.description.slice(0, 31));
+    await expect(recent.nth(index)).toContainText(action.followUpRequired ? "Follow-up needed" : "No follow-up");
+  }
   expect(await recent.count(), "at most five").toBeLessThanOrEqual(5);
 
   // --- each link opens the Ticket Queue, filtered, with the card's number as its total (AC-21) -----------------

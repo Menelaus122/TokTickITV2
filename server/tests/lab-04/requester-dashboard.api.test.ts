@@ -536,7 +536,16 @@ describe("DASH-09 the response is short, and has exactly the documented keys (AC
   });
 
   it("bounds both lists at five, even for the Requester with the most Tickets", async () => {
-    const heaviest = await prisma.ticket.groupBy({ by: ["requesterId"], _count: { _all: true }, orderBy: { _count: { requesterId: "desc" } }, take: 1 });
+    // Among the seeded Requesters: signInAs signs in with the seed password, so it can only be one of them. An account a
+    // Playwright run made has changed its password and been deactivated (BR-50), and with many Tickets it would win a
+    // search over everyone and then refuse to sign in (the review of PR #89).
+    const heaviest = await prisma.ticket.groupBy({
+      by: ["requesterId"],
+      where: { requester: { email: { in: SEEDED_REQUESTER_EMAILS } } },
+      _count: { _all: true },
+      orderBy: { _count: { requesterId: "desc" } },
+      take: 1,
+    });
     const user = await prisma.user.findUniqueOrThrow({ where: { id: heaviest[0].requesterId }, select: { id: true, role: true } });
     expect(user.role).toBe("REQUESTER");
     expect(heaviest[0]._count._all).toBeGreaterThan(5);

@@ -19,6 +19,8 @@ import {
   recordAction,
   recordActionOnScreen,
   actionTime,
+  actionsOf,
+  newestFirst,
   shoot,
   signIn,
   staffTicket,
@@ -67,6 +69,47 @@ async function answerWith(page: Page, pattern: string | RegExp, status: number, 
     route.fulfill({ status, contentType: "application/json", body: JSON.stringify({ error: { code, message } }) }),
   );
 }
+
+/**
+ * Answers the staff dashboard with the real response, except that every By status count is `value`: the figures a database of
+ * another size would give. Whether five pills fit on one line depends on how wide their numbers are, which is the database's
+ * doing, so the test makes the wide case and the narrow case itself (the review of PR #89).
+ */
+async function answerWithStatusCounts(page: Page, value: number) {
+  await page.route("**/api/staff/dashboard", async (route) => {
+    const response = await route.fetch();
+    const body = (await response.json()) as { byStatus: { value: number }[] };
+    body.byStatus = body.byStatus.map((row) => ({ ...row, value }));
+    await route.fulfill({ response, json: body });
+  });
+}
+
+/** Where the By status pills sit: how many rows they fall into, and whether their widths and gaps add up to no more than the row they are in. */
+async function statusRow(page: Page) {
+  return page.locator(".tt-dash__status-row").evaluate((list) => {
+    const gap = parseFloat(getComputedStyle(list).columnGap) || 0;
+    const boxes = [...list.children].map((item) => item.getBoundingClientRect());
+    const needed = boxes.reduce((sum, box) => sum + box.width, 0) + gap * (boxes.length - 1);
+    return { pills: boxes.length, rows: new Set(boxes.map((box) => Math.round(box.y))).size, fits: needed <= list.clientWidth + 0.5 };
+  });
+}
+
+/**
+ * What the layout must do with any figures (ui-spec §3.6): one pill to a row on a phone; from 768 px on one line exactly when
+ * the five fit, and a wrap onto more than one when they do not. It states no number of rows the data might not give.
+ */
+function expectStatusLayout(row: Awaited<ReturnType<typeof statusRow>>, width: number, what: string) {
+  expect(row.pills, `${what}: five counts`).toBe(5);
+  if (width <= MOBILE_MAX) expect(row.rows, `${what}: stacked, one to a row`).toBe(5);
+  else if (row.fits) expect(row.rows, `${what}: they fit, so one line`).toBe(1);
+  else expect(row.rows, `${what}: they do not fit, so they wrap`).toBeGreaterThanOrEqual(2);
+}
+
+/** The rows By status falls into for the two stand-in figures: four digits each, and one digit each (measured at 1440, 820, and 390 px). */
+const BY_STATUS_ROWS: Record<"wide" | "narrow", Record<ViewportName, number>> = {
+  wide: { desktop: 1, tablet: 2, mobile: 5 },
+  narrow: { desktop: 1, tablet: 1, mobile: 5 },
+};
 
 /** Where the boxes of `locator` sit: the distinct rows and columns they fall into, to the pixel. */
 async function grid(locator: Locator) {
@@ -229,14 +272,27 @@ for (const viewport of VIEWPORT_NAMES) {
       if (width >= DESKTOP_MIN) expect([pair.rows, pair.columns], "the two lists side by side").toEqual([1, 2]);
       else expect([pair.rows, pair.columns], "the two lists stacked").toEqual([2, 1]);
 
-      // The status counts: five in a row on a desktop, wrapped to two lines on a tablet, still inside the card on a phone.
-      const counts = await grid(page.locator(".tt-dash-status"));
-      expect(counts.boxes).toHaveLength(5);
-      if (width >= DESKTOP_MIN) expect(counts.rows, "By status in one line").toBe(1);
-      else expect(counts.rows, "By status wraps").toBeGreaterThanOrEqual(2);
-      if (width >= TABLET_MIN && width < DESKTOP_MIN) expect(counts.rows, "By status wraps to two lines").toBe(2);
+      // The status counts, as this database has them. Whether the five fit on one line depends on how wide their numbers are (one
+      // digit in a fresh seed, three in a database that many runs have added to), so they are held to what the layout must do with
+      // any figures, not to a number of rows.
+      expectStatusLayout(await statusRow(page), width, "By status, with this database's figures");
       await expect(page.getByRole("region", { name: "Accounts" })).toHaveCount(0); // IT Staff are not given the accounts (BR-38)
       await capture(page, "staff-dashboard", "it-staff-populated", viewport);
+
+      // The two cases a database may not happen to show, made here: the same dashboard with four-digit counts (on a tablet they do
+      // not fit, and wrap to two lines) and with one-digit counts (they fit on one). Nothing sticks out of the card in either.
+      for (const [kind, value] of [["wide", 1000], ["narrow", 5]] as const) {
+        await answerWithStatusCounts(page, value);
+        await page.reload();
+        await expect(page.getByLabel("Your queue at a glance")).toBeVisible();
+        const row = await statusRow(page);
+        expectStatusLayout(row, width, `By status, ${kind} counts`);
+        expect(row.rows, `By status, ${kind} counts, at ${viewport}`).toBe(BY_STATUS_ROWS[kind][viewport]);
+        await expectSound(page, `By status with ${kind} counts at ${viewport}`);
+        await page.unroute("**/api/staff/dashboard");
+      }
+      await page.reload();
+      await expect(page.getByLabel("Your queue at a glance")).toBeVisible();
 
       // A card, followed: the Ticket Queue, filtered, with the open group as a chip.
       await page.getByRole("link", { name: /^Unassigned: \d+\. View all$/ }).first().click();
@@ -289,7 +345,8 @@ for (const viewport of VIEWPORT_NAMES) {
       if (width >= DESKTOP_MIN) expect([numbers.rows, numbers.columns], "the four counts in one row").toEqual([1, 4]);
       else if (width >= TABLET_MIN) expect([numbers.rows, numbers.columns], "two by two").toEqual([2, 2]);
       else expect([numbers.rows, numbers.columns], "one per row").toEqual([4, 1]);
-      await expect(page.getByRole("region", { name: "My Recent Actions" }).locator("a.tt-dash-row").first()).toContainText("Follow-up needed");
+      // The two actions were recorded a tenth of a second apart, so which is first is E2E-06's to check, by their stamps; here, both are listed.
+      await expect(page.getByRole("region", { name: "My Recent Actions" }).locator("a.tt-dash-row").filter({ hasText: "Follow-up needed" })).not.toHaveCount(0);
       await capture(page, "staff-dashboard", "administrator-accounts", viewport);
     });
 
@@ -311,7 +368,12 @@ for (const viewport of VIEWPORT_NAMES) {
       const stack = await grid(cards);
       expect(stack.columns, "one column of cards").toBe(1);
       await expect(region.getByText("Latest recorded")).toHaveCount(1);
-      await expect(cards.first().getByText("Latest recorded")).toBeVisible();
+      // The tag is on the action the server stamped last, which is the third made: the first card, as they are dated 3, 2, 1. The three were
+      // recorded a fraction of a second apart, so the stamps are read from the API (BR-17).
+      const staffApi = await apiAs(ACCOUNTS.staff.email);
+      const [latest] = newestFirst(await actionsOf(staffApi, rich.id), (action) => action.createdAt);
+      await staffApi.dispose();
+      await expect(cards.filter({ hasText: latest.description }).getByText("Latest recorded")).toBeVisible();
       await expect(cards.last().getByText("Latest recorded")).toHaveCount(0);
       await expect(cards.last()).toContainText("Attachment Notes");
       await expect(cards.first()).toContainText("Edited by"); // the third action was recorded by Nattapong and edited by Siriporn

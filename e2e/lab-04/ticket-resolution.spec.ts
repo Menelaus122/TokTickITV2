@@ -241,6 +241,9 @@ test("E2E-08 a Requester's appears-resolved signal changes nothing; IT Staff res
   expect((await historyOf(staff, ticket.id)).length, "a refused move writes no history row").toBe(rows);
 
   await recordActionOnScreen(page, { description: "Replaced the failing network adapter.", result: "The service has stayed up since." });
+  // "Action recorded." appears before the screen has read the Ticket again, so the status control is still the old one for a
+  // moment. E2E-02 waits for the gate's list to go; so does this (the review of PR #89).
+  await expect(operational.getByRole("list", { name: "Not available now" })).toHaveCount(0);
   expect(await moveOptions(page)).toContain("Resolved");
   await moveTo(page, "RESOLVED", "Replaced the adapter; stable since.");
   await expect(page.getByText("Status changed to Resolved.")).toBeVisible();

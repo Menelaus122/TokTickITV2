@@ -306,8 +306,8 @@ separately", and offers one ordinary link, **Open User Management**, which opens
 | Width | Presentation |
 | :--- | :--- |
 | ≥ 992 px | four cards in one row; the two staff lists side by side; quick actions in one row |
-| 768–991 px | cards two by two; lists stacked full width; By status wraps to two lines |
-| < 768 px | cards one per row, full width; lists stacked; Refresh below the greeting; quick actions stacked, primary on top. No horizontal scroll at 320 px (FR-32) |
+| 768–991 px | cards two by two; lists stacked full width; By status stays on one line while its five counts fit and wraps to two when they do not (at 820 px that is from two-digit counts up) |
+| < 768 px | cards one per row, full width; lists stacked; By status one count to a row; Refresh below the greeting; quick actions stacked, primary on top. No horizontal scroll at 320 px (FR-32) |
 
 ---
 
