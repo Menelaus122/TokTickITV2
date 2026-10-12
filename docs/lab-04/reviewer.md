@@ -51,7 +51,7 @@ approval. Ten of the twelve are linked to their GitHub Issue ([#67](https://gith
 Development panel; #82 and #84 are small follow-up Pull Requests with no Issue of their own. Every feature branch reached `lab4-staging` through a
 Pull Request: the first-parent history of `lab4-staging` after `main` is these twelve merge commits and nothing else.
 
-The Pull Request for Issue 11 ([#90](https://github.com/Menelaus122/TokTickITV2/pull/90)) and the release Pull Request into `main` are not recorded here: nothing can be committed after the release, so their reviews are in the submission PDF.
+The Pull Request for Issue 11 ([#90](https://github.com/Menelaus122/TokTickITV2/pull/90)) was still open when this record was written, so it is recorded at the end of this section only up to my reply of 2026-10-12 18:40 UTC. Its later reviews, its merge, and the release Pull Request into `main` are not recorded here; their reviews are in the submission PDF.
 
 ### [#78](https://github.com/Menelaus122/TokTickITV2/pull/78) — Add the Lab 4 engineering contract (Issue 1)
 
@@ -1066,6 +1066,90 @@ The Pull Request for Issue 11 ([#90](https://github.com/Menelaus122/TokTickITV2/
 **Author's response** (2026-10-12 10:31 UTC, @Menelaus122)
 
 > Thx kub
+
+### [#90](https://github.com/Menelaus122/TokTickITV2/pull/90) — Add the Lab 4 delivery documents and close the review follow-ups (Issue 11)
+
+**Status:** still open when this record was written, so it is recorded only up to my reply of 2026-10-12 18:40 UTC. On GitHub the review below is marked Approved, but its text asks for a change before the merge.
+
+**Review — Approved** (2026-10-12 16:48 UTC, @WirachatTH)
+
+> Request changes. This is the most checkable delivery PR so far, and I could not find a wrong number in it. One thing needs changing before it merges, and it is only text, but it has to be changed *here*, because nothing can follow the release:
+> - `reviewer.md` is exactly what GitHub holds (below), and you wrote the check separately from the script that built it.
+> - The follow-ups are all there, including the one I asked for, and each was reproduced before it was fixed.
+> - The API-70 write-up says what you did not observe, and the reasoning holds when I read the code.
+> - The README's demonstration path works as written. I walked it.
+>
+> I cloned `feature/11-lab4-delivery` at `67f22da` (still the head, no reviews yet) and ran it on its own ports against a fresh migrated and seeded `postgres:16-alpine` database, in your order.
+>
+> ### What I verified
+> - **The suites, on one database, in your order:**
+>
+>   ```text
+>   Playwright, every suite     85 passed   (Lab 2 + 3: 46; Lab 4: 39)
+>   server npx vitest run       38 files, 1092 passed  (first run; API-70 did not fail for me)
+>   client npx vitest run       26 files, 1028 passed
+>   tsc --noEmit                server 0, client 0
+>   ```
+>
+>   The diff is 8 files: five documents, two client test files, and `helpers.ts`. No `server/src` or `client/src` file, and no Lab 1–3 test or document (`git diff` of `docs/lab-01..03` against both `main` and `lab4-staging` is empty). No `.skip`, `.only`, or `xit` anywhere.
+> - **`reviewer.md` against GitHub, with my own script:** I fetched every review, issue comment, and inline comment of the 12 PRs in `Menelaus122/TokTickITV2` (#78–#89) and the 12 in `WirachatTH/toktickit` (#74–#85) and checked each non-empty body against the file (CRLF → LF, quote markers ignored):
+>
+>   ```text
+>   non-empty bodies     65 of 65 found, 0 missing
+>   merge times          all 12 rows of the Part 2 table match to the minute; merged by @WirachatTH (yours) and @Menelaus122 (mine)
+>   review rounds        match (#78, #81, #87, #88, #89 have Changes requested → Approved)
+>   Part 2               #78 approved 16:08:17, merged 16:08:34 as f14ae15; #79 merged 17.3 h later
+>   first-parent log     origin/main..lab4-staging is exactly the 12 merge commits
+>   Issue links          10 of 12 closing #67–#76; #82 and #84 have none (as you say)
+>   ```
+>
+>   The blank approval on your #85 (2026-10-10 05:15) is recorded, too. I expected to flag it and found it already there.
+> - **The follow-ups:**
+>   - **`settledTimeline`:** with a correct server and stamps pulled back by up to 2 s, E2E-02 passes 3 of 3 (a clock step is still tolerated); with `statusHistory.ts` ordering newest first and the same jitter, it fails 3 of 3. That is the pair I asked for.
+>   - **The nine client tests:** I ran three of your breaks, each restored byte for byte. D16 (the status change drops `expectedVersion`), D48 (the first line shows the current time), and D52 (a failed read still draws the timeline) are each caught by exactly one of the new tests.
+> - **The README, claim by claim, on a fresh seed:**
+>   - **The 11 steps, walked through the real screens as written** (Dashboard cards and their totals, the empty Requester, Claim → Confirm claim, the gate's "Resolved — Record at least one action before resolving this ticket.", Latest recorded, "Edited by Siriporn Kaewmanee", four Status History lines, Resolved +1, read-only for the Requester, the Administrator's navigation). Everything matched the text.
+>   - **The API section with live calls:** the dashboards `200`/`403`; the staff routes `200` for an Administrator and `403` for a Requester; `409 ACTION_REQUIRED` with exactly the message printed; `409 FOLLOW_UP_PENDING`; then `200` after a colleague's action; `409 STALE_UPDATE` with `error.current`; `409 TICKET_NOT_ACTIVE`; `404` for another Requester's ticket, its actions, and its history (the same answer as a ticket that doesn't exist); `400` for a NUL and for `categoryId: 2147483648`.
+>   - **The seed:** with every sample Ticket's Last Updated set to 2020, the first seed put all 16 back to the seeded values and the second changed none; a changed status, priority, owner, and password were restored.
+> - **`ai-use.md`:** 9 prompts, and the reflection covers both agents. Three commits (`a8adf5a`, `042f5cf`, `02bf77d`) carry the trailer, and no others between `main` and this branch. The "17 more breaks, one survived" sentence is in your #88 comment.
+> - **API-70:** `loginThrottle.ts` sets `lockedUntil = now + LOCK_MS` and `auth.ts` rounds the minutes up, so "16 minutes" does need the clock to go back, as you say. Good that you wrote down what you didn't see.
+> - **The board:** #67–#76 are Done and closed.
+>
+> ### 🔴 Must fix: the PR promises work after the release, and nothing can follow it
+> The lab allows exactly one release PR into `main`, and nothing after it (your own note 3 quotes my release PR saying so). The PR and the documents then plan for three things after it:
+>
+> - **The description:** the unchecked release item says the run from `main` "goes into `tests.md` §8 after it"; note 3 says "I expect to record the last two reviews in a small documents-only PR after the release, as Lab 3 did"; note 7 says "then every suite from `main`, recorded in `tests.md` §8".
+> - **`docs/lab-04/tests.md`:** line 12 ("…and repeats it from `main`"), line 396 ("…and the final run from `main`"), line 667 ("Issue 11 (#77) repeats the run from `main`"), and line 859 ("The run from `main` follows the release").
+>
+> Any of those would need a second commit to `main`, and the repository would then say something that the rules don't let it do. The evidence that exists only after the merge (the run from `main`, the reviews of this PR and of the release PR) is Part 3 and Part 1 of the PDF, not the repository.
+>
+> → Text only:
+> 1. In `tests.md`, say where it will be: "The run from `main` (Part 3) is recorded in the submission PDF, because nothing can be committed after the release." Replace the four lines above with that, or delete the sentence.
+> 2. In `reviewer.md`, one line under "Pull Requests I authored": "#90 (Issue 11) and the release PR are not recorded here; their reviews are in the PDF." Today only the PR description says so, and the file is what the PDF links to.
+> 3. In the description, drop the post-release PR from notes 3 and 7 and the "after it" from the unchecked release item.
+>
+> Please push those with nothing else; I'll check the three places and re-approve.
+>
+> ### 🟡 Minor (not blocking)
+> - **The description says #77's card is at PR Review;** the board shows **Started** (checked at 14:48 UTC). Move it, or change the sentence.
+> - **The README's progress list marks Issue 11 `[x]`** while the description leaves the release unchecked. That's right for the file that goes into `main`, just say in the release PR that the box means "delivered at release".
+>
+> Fix the three places, and I'm happy to approve. Everything else here is solid. 🙏
+> Wirachat 67070501041
+
+**Author's response** (2026-10-12 18:40 UTC, @Menelaus122)
+
+> Thanks for walking the whole thing. Your numbers match mine (85, 1092, 1028).
+>
+> The review is marked Approved on GitHub, but its text asks for a change before the merge, so I treated the text as the request. Please don't merge until you've checked the fix.
+>
+> Pushed in `1b1849c` (three documents, no code):
+> 1. Nothing promises a commit after the release now. `tests.md`: the opening paragraph and the openings of §8 and §8.6 say the run from `main` (Part 3) is in the submission PDF, and the Issue 11 row of §3.1 no longer lists it. `reviewer.md`: one line under "Pull Requests I authored" says #90 and the release PR are not recorded there. The description says the same in the release item and notes 3 and 7.
+> 2. One place you did not name: `specification.md` §10.2 said `tests.md` records the output from `main`. I reworded that item and recorded the change in `tests.md` §8.8. It changes the approved specification, so please look at it too.
+> 3. The card was at Started when you checked; it was at Fixing while I fixed this and is at PR Review again.
+> 4. The README's `[x]` for Issue 11: the release PR will say it means "delivered at release".
+>
+> Could you re-check those places and re-approve?
 
 ## Pull Requests I reviewed for my partner
 
