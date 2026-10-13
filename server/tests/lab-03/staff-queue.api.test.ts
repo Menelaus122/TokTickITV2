@@ -153,7 +153,8 @@ describe("the queue", () => {
         "updatedAt",
       ].sort(),
     );
-    expect(row.owner).toEqual({ id: ids.me, fullName: expect.any(String), isActive: true });
+    // Lab 4 (BR-55): the owner carries role beside isActive, so the screen can tell "Inactive" from "No longer IT Staff".
+    expect(row.owner).toEqual({ id: ids.me, fullName: expect.any(String), role: "IT_STAFF", isActive: true });
   });
 
   it("API-31 orders by IT Priority descending, oldest first within a priority, by default", async () => {
@@ -161,13 +162,20 @@ describe("the queue", () => {
     expect(rows.map((r) => r.id)).toEqual(expectedOrder(fixtures, "itPriority", "desc"));
   });
 
-  it("is refused to a Requester and an Administrator (BR-19)", async () => {
-    for (const cookie of [cookies.requester, cookies.admin]) {
-      const res = await queue({}, cookie);
-      expect(res.status).toBe(403);
-      expect(res.body.error.code).toBe("FORBIDDEN");
-      expect(res.body.tickets).toBeUndefined();
-    }
+  it("is refused to a Requester", async () => {
+    const res = await queue({}, cookies.requester);
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe("FORBIDDEN");
+    expect(res.body.tickets).toBeUndefined();
+  });
+
+  // Changed in Lab 4 (Issue 2, D-08, BR-42): the queue is open to an
+  // Administrator, which supersedes Lab 3 BR-19. docs/lab-04/tests.md §6.
+  it("is open to an Administrator, with the same tickets IT Staff see (Lab 4 D-08)", async () => {
+    const res = await queue({}, cookies.admin);
+    expect(res.status).toBe(200);
+    expect(res.body.tickets).toBeDefined();
+    expect(res.body.totalItems).toBe((await queue({}, cookies.staff)).body.totalItems);
   });
 });
 
@@ -217,7 +225,7 @@ describe("search and filters", () => {
   it("API-39 still shows the owner of a deactivated account, marked inactive (BR-26)", async () => {
     const rows = await mine({ owner: ids.inactiveStaff });
     expect(rows.length).toBe(fixtures.filter((f) => f.ownerId === ids.inactiveStaff).length);
-    for (const row of rows) expect(row.owner).toEqual({ id: ids.inactiveStaff, fullName: expect.any(String), isActive: false });
+    for (const row of rows) expect(row.owner).toEqual({ id: ids.inactiveStaff, fullName: expect.any(String), role: "IT_STAFF", isActive: false });
   });
 });
 
@@ -326,9 +334,12 @@ describe("assignable users — the Owner filter's options (api-spec §5.6)", () 
     }
   });
 
-  it("is refused to a Requester and an Administrator", async () => {
-    for (const cookie of [cookies.requester, cookies.admin]) {
-      expect((await request(app).get("/api/staff/assignable-users").set("Cookie", cookie)).status).toBe(403);
-    }
+  it("is refused to a Requester", async () => {
+    expect((await request(app).get("/api/staff/assignable-users").set("Cookie", cookies.requester)).status).toBe(403);
+  });
+
+  // Changed in Lab 4 (Issue 2, D-08, BR-42). docs/lab-04/tests.md §6.
+  it("is open to an Administrator (Lab 4 D-08)", async () => {
+    expect((await request(app).get("/api/staff/assignable-users").set("Cookie", cookies.admin)).status).toBe(200);
   });
 });

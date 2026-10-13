@@ -119,6 +119,8 @@ for (const viewport of VIEWPORT_NAMES) {
 
     test(`RESP-03 the queue (${viewport})`, async ({ page }) => {
       await signIn(page, ACCOUNTS.staff.email, ACCOUNTS.staff.name);
+      // Changed in Lab 4 (Issue 8, D-09): signing in lands on the Dashboard, so open the queue.
+      await page.goto("/queue");
       await expect(page.getByRole("link", { name: /^TT-/ }).filter({ visible: true }).first()).toBeVisible();
       await fitsAndShowsFocus(page, "queue");
 
@@ -236,6 +238,8 @@ for (const viewport of VIEWPORT_NAMES) {
 
     test(`RESP-05 User Management (${viewport})`, async ({ page }) => {
       await signIn(page, ACCOUNTS.admin.email, ACCOUNTS.admin.name);
+      // Changed in Lab 4 (Issue 8, D-09): signing in lands on the Dashboard, so open User Management.
+      await page.goto("/users");
       await expect(page.getByText(ACCOUNTS.staff.email).filter({ visible: true }).first()).toBeVisible();
       await fitsAndShowsFocus(page, "user management");
 

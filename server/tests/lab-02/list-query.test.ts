@@ -23,6 +23,8 @@ describe("defaults", () => {
       relatedSystemId: null,
       requestedPriority: null,
       currentStatus: null,
+      // Lab 4 (D-12): the optional `group` filter, none by default.
+      group: null,
       sortBy: "createdAt",
       sortDir: "desc",
       page: DEFAULT_PAGE,

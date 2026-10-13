@@ -15,13 +15,15 @@ import { RequesterProvider } from "./context/RequesterContext.js";
 import { Login } from "./screens/Login.js";
 import { ChangePassword } from "./screens/ChangePassword.js";
 import { CreateTicket } from "./screens/CreateTicket.js";
-import { MyTickets } from "./screens/MyTickets.js";
+import { RequesterDashboard } from "./screens/RequesterDashboard.js";
+import { StaffDashboard } from "./screens/StaffDashboard.js";
+import { MyTicketsWithUrl } from "./screens/MyTickets.js";
 import { RequesterTicketDetail } from "./screens/RequesterTicketDetail.js";
-import { StaffTicketQueue } from "./screens/StaffTicketQueue.js";
+import { StaffTicketQueueWithUrl } from "./screens/StaffTicketQueue.js";
 import { StaffTicketDetail } from "./screens/StaffTicketDetail.js";
 import { UserManagement } from "./screens/UserManagement.js";
 import { AppShell } from "./components/AppShell.js";
-import { ErrorState, LoadingState, Page } from "./components/index.js";
+import { ErrorState, ForbiddenState, LoadingState, Page } from "./components/index.js";
 import { ROUTES } from "./routes.js";
 
 export { ROUTES };
@@ -30,8 +32,9 @@ export { ROUTES };
 //
 //   /login              Login, outside the shell
 //   /change-password    mandatory (no shell) or voluntary (in the shell)
+//   /dashboard          every role, each its own (Lab 4, Issues 7 and 8)
 //   /tickets, /tickets/new, /tickets/:id    Requester
-//   /queue              IT Staff
+//   /queue, /queue/:id  IT Staff and Administrator
 //   /users              Administrator
 //
 // Every application route passes one guard, in this order: session loaded →
@@ -39,13 +42,16 @@ export { ROUTES };
 // this page (FR-09). The API enforces the same rules; the guard exists so a
 // person is never shown a page the server would refuse.
 
-// Which role owns a path, so a deep link is honoured after sign-in only when
-// it belongs to the role that signed in.
-function roleForPath(path: string): Role | null {
-  if (path.startsWith(ROUTES.list)) return "REQUESTER";
-  if (path.startsWith(ROUTES.queue)) return "IT_STAFF";
-  if (path.startsWith(ROUTES.users)) return "ADMINISTRATOR";
-  return null;
+// Which roles may open a path, so a deep link is honoured after sign-in only
+// when it belongs to the role that signed in. The queue is shared by IT Staff
+// and Administrators (Lab 4 D-08); every other page has one owner.
+function rolesForPath(path: string): Role[] {
+  // Lab 4: the Dashboard is every role's, and shows that role's own (Issues 7 and 8).
+  if (path.startsWith(ROUTES.dashboard)) return ["REQUESTER", "IT_STAFF", "ADMINISTRATOR"];
+  if (path.startsWith(ROUTES.list)) return ["REQUESTER"];
+  if (path.startsWith(ROUTES.queue)) return ["IT_STAFF", "ADMINISTRATOR"];
+  if (path.startsWith(ROUTES.users)) return ["ADMINISTRATOR"];
+  return [];
 }
 
 function Loading() {
@@ -86,10 +92,7 @@ function RequireAuth({ roles, children }: { roles: Role[]; children: ReactNode }
     <AppShell>
       {forbidden && (
         <Page>
-          <div className="tt-callout tt-callout--error" role="alert" data-state="forbidden">
-            <span aria-hidden="true">⚠</span>
-            <div>You do not have access to that page.</div>
-          </div>
+          <ForbiddenState what="that page" />
         </Page>
       )}
       {children}
@@ -126,7 +129,7 @@ function LoginRoute() {
   if (user) {
     if (user.mustChangePassword) return <Navigate to={ROUTES.password} replace />;
     const from = (location.state as { from?: string } | null)?.from;
-    const destination = from && roleForPath(from) === user.role ? from : LANDING[user.role];
+    const destination = from && rolesForPath(from).includes(user.role) ? from : LANDING[user.role];
     return <Navigate to={destination} replace />;
   }
   return <Login onSignIn={signIn} />;
@@ -169,11 +172,27 @@ function CatchAll() {
   return <Navigate to={user ? LANDING[user.role] : ROUTES.login} replace />;
 }
 
+// One address, the Dashboard of whoever is signed in: a Requester's is theirs alone (Issue 7), IT Staff
+// and an Administrator share one, the Administrator's with the account counts the server adds (Issue 8).
+function DashboardRoute() {
+  const { user } = useAuth();
+  if (!user) return null;
+  return (
+    <Page>
+      {user.role === "REQUESTER" ? (
+        <RequesterDashboard fullName={user.fullName} />
+      ) : (
+        <StaffDashboard fullName={user.fullName} currentUserId={user.id} />
+      )}
+    </Page>
+  );
+}
+
 function MyTicketsRoute() {
   const navigate = useNavigate();
   return (
     <Page>
-      <MyTickets onOpenTicket={(ticket) => navigate(ROUTES.detail(ticket.id))} onCreateTicket={() => navigate(ROUTES.create)} />
+      <MyTicketsWithUrl onOpenTicket={(ticket) => navigate(ROUTES.detail(ticket.id))} onCreateTicket={() => navigate(ROUTES.create)} />
     </Page>
   );
 }
@@ -209,7 +228,7 @@ function QueueRoute() {
   if (!user) return null;
   return (
     <Page>
-      <StaffTicketQueue currentUserId={user.id} />
+      <StaffTicketQueueWithUrl currentUserId={user.id} />
     </Page>
   );
 }
@@ -237,6 +256,7 @@ function StaffDetailRoute() {
         key={`staff-detail-${ticketId}`}
         ticketId={ticketId}
         currentUserId={user.id}
+        currentUser={{ fullName: user.fullName, role: user.role }}
         onBack={() => navigate(ROUTES.queue)}
       />
     </Page>
@@ -249,6 +269,14 @@ function AppRoutes() {
       <Route path={ROUTES.login} element={<LoginRoute />} />
       <Route path={ROUTES.password} element={<PasswordRoute />} />
 
+      <Route
+        path={ROUTES.dashboard}
+        element={
+          <RequireAuth roles={["REQUESTER", "IT_STAFF", "ADMINISTRATOR"]}>
+            <DashboardRoute />
+          </RequireAuth>
+        }
+      />
       <Route path={ROUTES.list} element={<RequesterRoute><MyTicketsRoute /></RequesterRoute>} />
       <Route path={ROUTES.create} element={<RequesterRoute><CreateTicketRoute /></RequesterRoute>} />
       <Route path="/tickets/:id" element={<RequesterRoute><TicketDetailRoute /></RequesterRoute>} />
@@ -256,7 +284,7 @@ function AppRoutes() {
       <Route
         path={ROUTES.queue}
         element={
-          <RequireAuth roles={["IT_STAFF"]}>
+          <RequireAuth roles={["IT_STAFF", "ADMINISTRATOR"]}>
             <QueueRoute />
           </RequireAuth>
         }
@@ -264,7 +292,7 @@ function AppRoutes() {
       <Route
         path="/queue/:id"
         element={
-          <RequireAuth roles={["IT_STAFF"]}>
+          <RequireAuth roles={["IT_STAFF", "ADMINISTRATOR"]}>
             <StaffDetailRoute />
           </RequireAuth>
         }
@@ -283,6 +311,13 @@ function AppRoutes() {
   );
 }
 
+// React Router 6.30 warns in the console, once per flag, that v7 changes two behaviours unless they
+// are opted into. Both are opted into here, so the console stays clean (Lab 4 AC-31) and the upgrade
+// holds no surprise: state updates of a navigation run in a transition, and a relative link inside a
+// splat route resolves against the route, not the URL. This application has no relative link in a
+// splat route, and its catch-all navigates to absolute paths.
+const ROUTER_FUTURE = { v7_startTransition: true, v7_relativeSplatPath: true } as const;
+
 export function TokTickITApp({
   /** Tests mount with MemoryRouter; the browser gets real URLs. */
   initialEntries,
@@ -295,9 +330,11 @@ export function TokTickITApp({
     </AuthProvider>
   );
   return initialEntries ? (
-    <MemoryRouter initialEntries={initialEntries}>{routes}</MemoryRouter>
+    <MemoryRouter initialEntries={initialEntries} future={ROUTER_FUTURE}>
+      {routes}
+    </MemoryRouter>
   ) : (
-    <BrowserRouter>{routes}</BrowserRouter>
+    <BrowserRouter future={ROUTER_FUTURE}>{routes}</BrowserRouter>
   );
 }
 

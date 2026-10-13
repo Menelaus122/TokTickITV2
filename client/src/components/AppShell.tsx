@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext.js";
 import type { Role } from "../api.js";
 import { ROUTES } from "../routes.js";
 import { RoleBadge } from "./Badge.js";
+import { ErrorCallout } from "./States.js";
 
 // Application shell (ui-spec §2; Lab 2 ui-spec §7).
 //
@@ -13,12 +14,24 @@ import { RoleBadge } from "./Badge.js";
 // hiding a link is not authorization.
 
 export const NAV_BY_ROLE: Record<Role, { to: string; label: string }[]> = {
+  // Lab 4 (D-09): the Dashboard is every role's first item, and the wordmark links to it.
+  // The Requester's arrived with Issue 7, IT Staff's and the Administrator's with Issue 8.
   REQUESTER: [
+    { to: ROUTES.dashboard, label: "Dashboard" },
     { to: ROUTES.list, label: "My Tickets" },
     { to: ROUTES.create, label: "Create Ticket" },
   ],
-  IT_STAFF: [{ to: ROUTES.queue, label: "Ticket Queue" }],
-  ADMINISTRATOR: [{ to: ROUTES.users, label: "User Management" }],
+  IT_STAFF: [
+    { to: ROUTES.dashboard, label: "Dashboard" },
+    { to: ROUTES.queue, label: "Ticket Queue" },
+  ],
+  // Lab 4 D-08: an Administrator performs IT Staff ticket operations, so the
+  // queue is theirs too.
+  ADMINISTRATOR: [
+    { to: ROUTES.dashboard, label: "Dashboard" },
+    { to: ROUTES.queue, label: "Ticket Queue" },
+    { to: ROUTES.users, label: "User Management" },
+  ],
 };
 
 /** The Requester's navigation, kept under its Lab 2 name for the Lab 2 tests. */
@@ -48,7 +61,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           key={item.to}
           to={item.to}
           // "end" keeps My Tickets from matching /tickets/new as well.
-          end={item.to === ROUTES.list}
+          end={item.to === ROUTES.list || item.to === ROUTES.dashboard}
           className={({ isActive }) => `tt-shell__link${isActive ? " tt-shell__link--active" : ""}`}
         >
           {item.label}
@@ -116,12 +129,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </button>
       </header>
 
-      {signOutError && (
-        <div className="tt-callout tt-callout--error tt-shell__alert" role="alert">
-          <span aria-hidden="true">⚠</span>
-          <div>{signOutError}</div>
-        </div>
-      )}
+      {signOutError && <ErrorCallout className="tt-shell__alert">{signOutError}</ErrorCallout>}
 
       {menuOpen && (
         <div className="tt-shell__mobile-nav" id={menuId}>

@@ -20,7 +20,7 @@ function ticket(overrides: Partial<QueueTicket> = {}): QueueTicket {
     requestedPriority: "MEDIUM",
     itPriority: "HIGH",
     currentStatus: "IN_PROGRESS",
-    owner: { id: ME, fullName: "Nattapong Saelim", isActive: true },
+    owner: { id: ME, fullName: "Nattapong Saelim", role: "IT_STAFF", isActive: true },
     requesterResolvedAt: null,
     createdAt: "2026-09-28T02:10:00.000Z",
     updatedAt: "2026-09-29T09:14:22.310Z",
@@ -249,7 +249,7 @@ describe("UI-13 the seven columns and each row", () => {
     fetchSpy.mockResolvedValue(
       page([
         ticket({ id: 1, ticketNumber: "TT-2026-00001", owner: null }),
-        ticket({ id: 2, ticketNumber: "TT-2026-00002", owner: { id: 30, fullName: "Prasert Chaiyo", isActive: false } }),
+        ticket({ id: 2, ticketNumber: "TT-2026-00002", owner: { id: 30, fullName: "Prasert Chaiyo", role: "IT_STAFF", isActive: false } }),
         ticket({ id: 3, ticketNumber: "TT-2026-00003", requesterResolvedAt: "2026-09-30T00:00:00.000Z" }),
       ]),
     );

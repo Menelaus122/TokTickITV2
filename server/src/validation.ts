@@ -4,6 +4,8 @@
 // authority (BR-29). Everything here is pure so it can be unit-tested at its
 // boundaries without a database or an HTTP request.
 
+import { MAX_ID } from "./queryParams.js";
+
 export const SUMMARY_MIN = 5;
 export const SUMMARY_MAX = 120;
 export const DESCRIPTION_MIN = 20;
@@ -30,15 +32,27 @@ function asRecord(body: unknown): Record<string, unknown> {
   return body && typeof body === "object" ? (body as Record<string, unknown>) : {};
 }
 
+/** Nothing was sent for it: absent, null, or blank text. Anything else that is not an id is there and wrong. */
+function isMissing(value: unknown): boolean {
+  return value === undefined || value === null || (typeof value === "string" && value.trim() === "");
+}
+
 /** Trims a value if it is a string; anything else becomes null. */
 function trimmed(value: unknown): string | null {
   return typeof value === "string" ? value.trim() : null;
 }
 
-/** Accepts a positive integer, or a string that is exactly one. */
+/**
+ * Accepts a positive integer, or a string that is exactly one, no larger than the column holds
+ * (Lab 4 BR-52: past that, PostgreSQL throws, and the answer was a 500).
+ *
+ * Digit text is accepted on purpose: the Create Ticket form's selects hold text, and Lab 2's own tests name
+ * it. That is not a disagreement with `bodyId` (bodyGuards.ts), which is for the ids that Lab 3 and Lab 4 take
+ * from JSON, where a string is never an id; this is the one body in which Lab 2 said it is.
+ */
 function positiveInteger(value: unknown): number | null {
   const parsed = typeof value === "string" && value.trim() !== "" ? Number(value) : value;
-  return typeof parsed === "number" && Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  return typeof parsed === "number" && Number.isInteger(parsed) && parsed > 0 && parsed <= MAX_ID ? parsed : null;
 }
 
 export function validateTicketInput(body: unknown): ValidationResult {
@@ -61,10 +75,10 @@ export function validateTicketInput(body: unknown): ValidationResult {
   }
 
   const categoryId = positiveInteger(raw.categoryId);
-  if (categoryId === null) fields.categoryId = "Category is required.";
+  if (categoryId === null) fields.categoryId = isMissing(raw.categoryId) ? "Category is required." : "Choose a valid category.";
 
   const relatedSystemId = positiveInteger(raw.relatedSystemId);
-  if (relatedSystemId === null) fields.relatedSystemId = "Related System is required.";
+  if (relatedSystemId === null) fields.relatedSystemId = isMissing(raw.relatedSystemId) ? "Related System is required." : "Choose a valid related system.";
 
   // BR-07 — an explicit choice, with no default to fall back on.
   const priority = trimmed(raw.requestedPriority);

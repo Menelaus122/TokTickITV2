@@ -28,6 +28,8 @@ test.beforeAll(async () => {
 const operational = (page: Page) => page.getByRole("region", { name: "Operational" });
 
 async function openFromQueue(page: Page, number: string) {
+  // Changed in Lab 4 (Issue 8, D-09): signing in lands on the Dashboard, so open the queue first.
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Ticket Queue" }).click();
   await page.getByLabel("Search number or summary").fill(number);
   // The queue shows a table from 768px and cards below; either way the
   // Ticket Number is the link to the detail screen.
@@ -37,9 +39,13 @@ async function openFromQueue(page: Page, number: string) {
 
 test("E2E-04 IT Staff find the new ticket among the unassigned ones, claim it, and it becomes Open", async ({ page }) => {
   await signIn(page, ACCOUNTS.staff.email, ACCOUNTS.staff.name);
-  await expect(page).toHaveURL(/\/queue$/);
-
-  await page.getByLabel("Owner").selectOption("unassigned");
+  // Changed in Lab 4 (Issue 8, D-09): IT Staff land on the Dashboard, and the way to the
+  // unassigned work is its quick action, which opens the queue already filtered.
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await page.getByRole("link", { name: "Unassigned Tickets" }).click();
+  await expect(page).toHaveURL(/\/queue\?owner=unassigned&group=open$/);
+  await expect(page.getByLabel("Owner")).toHaveValue("unassigned");
+  await expect(page.getByText("Open tickets", { exact: true })).toBeVisible();
   await page.getByLabel("Search number or summary").fill(ticket.ticketNumber);
   const row = page.getByRole("row").filter({ hasText: ticket.ticketNumber });
   await expect(row).toBeVisible();
@@ -75,7 +81,22 @@ test("E2E-05 raise IT Priority, then move to Resolved with a reason that appears
 
   await operational(page).getByLabel("Move to").selectOption("IN_PROGRESS");
   await operational(page).getByRole("button", { name: "Apply" }).click();
-  await expect(page.getByText(`${ticket.ticketNumber} moved to In Progress.`)).toBeVisible();
+  await expect(page.getByText("Status changed to In Progress.")).toBeVisible();
+
+  // Lab 4 (BR-17, tests.md §6): Resolved is held back until an action has been recorded. The screen
+  // says so, takes the person to the region, and offers Resolved once the action is saved.
+  await expect(operational(page).getByRole("list", { name: "Not available now" })).toContainText(
+    "Resolved — Record at least one action before resolving this ticket.",
+  );
+  expect(await operational(page).getByLabel("Move to").locator("option").allTextContents()).not.toContain("Resolved");
+  await operational(page).getByRole("button", { name: "Go to Actions Taken" }).click();
+  const actions = page.getByRole("region", { name: /^Actions Taken/ });
+  await expect(actions.getByRole("heading", { level: 2 })).toBeFocused();
+  await actions.getByRole("button", { name: "+ Add action" }).click();
+  await actions.getByLabel(/^Action Description/).fill("Replaced the toner cartridge and ran a test page.");
+  await actions.getByLabel(/^Result/).fill("The test page printed cleanly.");
+  await actions.getByRole("button", { name: "Save action" }).click();
+  await expect(page.getByText("Action recorded.")).toBeVisible();
 
   await operational(page).getByLabel("Move to").selectOption("RESOLVED");
   const apply = operational(page).getByRole("button", { name: "Apply" });
@@ -83,7 +104,7 @@ test("E2E-05 raise IT Priority, then move to Resolved with a reason that appears
   await operational(page).getByLabel(/^Reason/).fill(REASON);
   await apply.click();
 
-  await expect(page.getByText(/moved to Resolved, and the reason was posted as a Public Comment/)).toBeVisible();
+  await expect(page.getByText("Status changed to Resolved.")).toBeVisible();
   await expect(page.getByRole("region", { name: "Public Comments" }).getByText(REASON)).toBeVisible();
   // Resolved offers only Closed and Reopened next (BR-33).
   const options = await operational(page).getByLabel("Move to").locator("option").allTextContents();
@@ -128,6 +149,8 @@ test("E2E-07 the Requester marks a problem as appearing resolved, and IT Staff s
   await logOut(page);
 
   await signIn(page, ACCOUNTS.staff.email, ACCOUNTS.staff.name);
+  // Changed in Lab 4 (Issue 8, D-09): signing in lands on the Dashboard, so open the queue first.
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Ticket Queue" }).click();
   await page.getByLabel("Search number or summary").fill(flagged.ticketNumber);
   const row = page.getByRole("row").filter({ hasText: flagged.ticketNumber });
   await expect(row.getByText("Requester says resolved")).toBeVisible();

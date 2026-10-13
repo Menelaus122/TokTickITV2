@@ -104,6 +104,8 @@ test.describe("E2E-02 cross-requester isolation", () => {
 
     await switchRequester(page, REQUESTER_B);
 
+    // Changed in Lab 4, Issue 7 (D-09): signing in lands on the Dashboard, so open the list.
+    await page.getByRole("link", { name: "My Tickets" }).first().click();
     await expect(page.getByLabel("Search tickets")).toBeVisible();
     await page.getByLabel("Search tickets").fill(summary);
 
@@ -142,6 +144,10 @@ test.describe("E2E-03 attachment lifecycle", () => {
     await page.getByLabel(/Removal reason/).fill("Uploaded the wrong evidence");
     await expect(confirm).toBeEnabled();
     await confirm.click();
+
+    // Lab 4 (BR-53, BR-54): the dialog stays open, busy, until the server has answered, so a failure can show its
+    // message beside the reason. Wait for the answer before reading the page behind it.
+    await expect(page.getByRole("dialog")).toHaveCount(0);
 
     // Metadata is retained, and every route to the bytes is gone (BR-40).
     await expect(page.getByText("evidence.pdf")).toBeVisible();

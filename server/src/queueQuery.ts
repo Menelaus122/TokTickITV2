@@ -1,6 +1,6 @@
 import { REQUESTED_PRIORITIES, type RequestedPriority } from "./validation.js";
-import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE, PERMITTED_PAGE_SIZES, SORT_DIRECTIONS, TICKET_STATUSES, absent, single } from "./listQuery.js";
-import type { SortDirection, TicketStatus } from "./listQuery.js";
+import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE, PERMITTED_PAGE_SIZES, SORT_DIRECTIONS, TICKET_STATUSES, absent, parseGroup, single } from "./listQuery.js";
+import type { SortDirection, StatusGroup, TicketStatus } from "./listQuery.js";
 import { parseSearch, positiveId } from "./queryParams.js";
 
 // Lab 3, Issue 8 — query contract for GET /api/staff/tickets (api-spec §5.1;
@@ -19,6 +19,8 @@ export type OwnerFilter = { kind: "any" } | { kind: "unassigned" } | { kind: "me
 export interface QueueQuery {
   q: string | null;
   status: TicketStatus | null;
+  /** Lab 4 (D-12): the open group, which combines with `status` by AND. Parsed by the same function as the Requester's list. */
+  group: StatusGroup | null;
   itPriority: RequestedPriority | null;
   categoryId: number | null;
   owner: OwnerFilter;
@@ -52,6 +54,9 @@ export function parseQueueQuery(raw: Record<string, unknown>): QueueParseResult 
 
   const status = oneOf("status", raw.status, TICKET_STATUSES);
   if (isError(status)) return { ok: false, message: status.error };
+
+  const group = parseGroup(raw.group);
+  if (!group.ok) return group;
 
   const itPriority = oneOf("itPriority", raw.itPriority, REQUESTED_PRIORITIES);
   if (isError(itPriority)) return { ok: false, message: itPriority.error };
@@ -101,6 +106,7 @@ export function parseQueueQuery(raw: Record<string, unknown>): QueueParseResult 
     value: {
       q,
       status,
+      group: group.value,
       itPriority,
       categoryId,
       owner,

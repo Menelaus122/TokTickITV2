@@ -1,0 +1,908 @@
+# Lab 4 — Test Plan and Results
+
+Companion to [`specification.md`](./specification.md). Written **before**
+implementation, as the Test DD deliverable requires: every test below was planned
+from an acceptance criterion, not reconstructed from code an agent produced.
+
+The **Final** column reads **Planned** until the owning issue merges, then the
+real runner result. **Partial** means the part of the test that can exist at that
+issue passes, and the rest arrives with the issue §3.1 names; it never means
+that a test fails. Issue 10 (#76) refreshes §8 with the full run from
+`lab4-staging`, and Issue 11 (#77) runs it again on the tree of its own Pull Request
+(§8.6). The run from `main` (Part 3) is recorded in the submission PDF, because nothing
+can be committed after the release. Counts in §8 are only ever the runner's own output.
+
+---
+
+## 1. Test strategy
+
+| Layer | Tool | Scope |
+| :--- | :--- | :--- |
+| Unit | Vitest | pure logic — Action Taken validation, the resolution gate, transition options, `group` and body-guard parsing |
+| API / integration | Vitest + Supertest | every endpoint against a real PostgreSQL database, driven through real login requests |
+| Authorization | Vitest + Supertest | the BR-42 matrix, hit directly with the wrong role and with no session |
+| Workflow | Vitest + Supertest | the transition matrix, the gate, the status history, and stale and simultaneous changes |
+| Dashboard calculation | Vitest + Supertest | every metric against an **independent** query on the seed data, and every drill-down total |
+| Migration / regression | Vitest | Lab 1–3 data survives, the rollback restores Lab 3, the seed is idempotent |
+| Performance smoke | Vitest + Supertest | three endpoints, 20 requests each, none over 1000 ms |
+| UI component | Vitest + Testing Library | screen behaviour, validation, modes, states, keyboard and focus |
+| UI style | Vitest + Testing Library | tokens, badges, read-only styling, validation placement, busy and disabled states |
+| Responsive | Playwright | Desktop ≥ 992 px, Tablet 768–991 px, Mobile < 768 px |
+| End-to-end | Playwright | the three journeys in labsheet §12 |
+
+Principles carried over from Labs 2 and 3:
+
+* **Authorization is proven at the API, not the screen.** Every forbidden case is
+  a direct request (AC-17).
+* **Tests log in like a user.** No test fabricates a session or stubs a guard.
+* **Seeded passwords only.** No test invents a credential outside the
+  specification's §7.5.
+* **The suite leaves the database as it found it.** What a test creates, it
+  removes in `afterAll`.
+* **Fixtures are chosen in `id` order and never depend on physical row order.**
+  Lab 3's final run found a latent failure that way.
+* **Each issue ships its own tests.** Issue 10 adds E2E, responsive, and
+  screenshots, not the unit and API tests that belong to earlier issues.
+
+Two principles are new:
+
+* **A dashboard number is checked against a second query.** A test never asserts a
+  literal count that the seed happens to produce; it computes the expected value
+  with its own query and compares (AC-18, AC-19).
+* **A drill-down is checked by following it.** The test calls the list endpoint
+  with the card's `href` query and compares `totalItems` with `value`
+  (AC-21).
+
+---
+
+## 2. Planned tests
+
+Columns follow labsheet §10. **Requirement / AC** cites the acceptance criterion
+first, then the rule or requirement where it adds precision.
+
+### 2.1 Unit — `server/tests/lab-04/`
+
+| Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Final |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| UNIT-01 | Unit | AC-04, BR-03 | description, result, follow-up note, and attachment-notes lengths at each boundary: description 4/5 and 2000/2001, result 1/2 and 1000/1001, note 4/5 and 1000/1001, attachment notes 500/501 | the inner values accepted, the outer rejected, one message per field | `server/tests/lab-04/action-taken-rules.test.ts` | Pass |
+| UNIT-02 | Unit | AC-04, BR-04, D-18 | Follow-up Note against Follow-Up Required?, including an edit that merges onto the stored record | required for Yes; ignored and cleared for No; an edit that sets Yes onto a record with no note is rejected without a note in the same request | `server/tests/lab-04/action-taken-rules.test.ts` | Pass |
+| UNIT-03 | Unit | AC-04, BR-06 | Action Date/Time bounds against an explicit clock: now + 5 min, + 5 min 1 s; the Ticket's `createdAt`, 1 ms before it; a non-ISO value; a day that does not exist (31 February, 29 February in 2023 and 1900, the day after the end of every month) and `24:00`, each on a Ticket old enough that no other rule could refuse them | the two inner values accepted, the three outer rejected; 29 February accepted in 2024 and 2000; a date that does not exist is refused, never moved to one that does | `server/tests/lab-04/action-taken-rules.test.ts` | Pass |
+| UNIT-04 | Unit | AC-04, AC-26, BR-12 | a NUL character and whitespace-only text in every text field | rejected, never passed on to the database | `server/tests/lab-04/action-taken-rules.test.ts` | Pass |
+| UNIT-05 | Unit | AC-10, BR-08 | the reading-order comparator | oldest `actionAt` first, ties by `id`; the order says nothing about which action is the gate's "latest" (UNIT-08) | `server/tests/lab-04/action-taken-rules.test.ts` | Pass |
+| UNIT-06 | Unit | AC-07, BR-28 | `requestKey` validation at 7/8 and 64/65 characters and over the allowed character set | 8–64 of `A–Z a–z 0–9 - _` accepted; the rest rejected | `server/tests/lab-04/action-taken-rules.test.ts` | Pass |
+| UNIT-07 | Unit | AC-03, BR-17 | the gate with no actions | `ACTION_REQUIRED` | `server/tests/lab-04/resolution-gate.test.ts` | Pass |
+| UNIT-08 | Unit | AC-03, BR-17, D-07 | the gate against the most recently **recorded** action | a most-recently-recorded Yes is `FOLLOW_UP_PENDING`; a No passes; an earlier-recorded Yes followed by a No passes; "latest" is `createdAt` then `id`, never `actionAt`, so a Yes recorded last but dated earliest still blocks, and changing any `actionAt` cannot change the outcome | `server/tests/lab-04/resolution-gate.test.ts` | Pass |
+| UNIT-09 | Unit | AC-12, BR-17, D-07 | the gate across a reopen | actions created before the latest reopen are ignored, those after count, a second reopen takes back what counted after the first, and a Ticket with no history row is treated as never reopened | `server/tests/lab-04/resolution-gate.test.ts` | Pass |
+| UNIT-10 | Unit | AC-11, AC-16, BR-15 | transition options for all 8 statuses, with and without an owner, with each gate result | permitted and blocked together are exactly the matrix row, and each blocked entry carries `OWNER_REQUIRED`, `ACTION_REQUIRED`, or `FOLLOW_UP_PENDING` | `server/tests/lab-04/resolution-gate.test.ts` | Pass |
+| UNIT-11 | Unit | AC-21, BR-31 | `group` query parsing | `open` accepted; an unknown or repeated value rejected; combines with `status` by AND | `server/tests/lab-04/group-filter.test.ts` | Pass |
+| UNIT-12 | Unit | AC-26, BR-52 | the body guards | a NUL in any nested string found, in an object, an array, and a key, however deep (50 000 levels do not overflow the stack); ids accepted from 1 to 2147483647 and rejected at 0, 2147483648, `1.5`, and `"1"` | `server/tests/lab-04/body-guards.test.ts` | Pass |
+
+### 2.2 API — Actions Taken, `server/tests/lab-04/actions-taken.api.test.ts`
+
+| Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Final |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| API-01 | API | AC-10, AC-23, FR-08 | list the Actions Taken of a Ticket that has none, including a legacy one | `200` with `"actions": []` | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-02 | API | AC-10, BR-08 | list a Ticket with several actions, two of them sharing a time | ordered by `actionAt` then `id`, identical on every read | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-03 | API | AC-01, BR-01, BR-05 | Create a valid Actions Taken as a permitted IT Staff user | `201`, created under the correct Ticket with the authenticated user as Performed by, `version` 1, and the Ticket's `updatedAt` moved | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-04 | API | AC-01, AC-05, BR-02 | create as the Ticket Owner, as a different IT Staff member, and as an Administrator | each `201`, each `performedBy` the caller, ownership unchanged | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-05 | API | AC-05, BR-09 | a different user edits an action | `200`, `performedBy` unchanged, `updatedBy` is the editor, `version` + 1 | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-06 | API | AC-01, BR-05 | a body carrying `performedBy`, `ticketId`, `createdAt`, and `version` | all ignored; the session user and the path's Ticket win | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-07 | API | AC-04, BR-03 | missing, blank, too-short, and too-long required fields | `400 VALIDATION_FAILED` with `fields`, one message per offending field | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-08 | API | AC-04, BR-04 | follow-up rules on create and edit | Yes without a note is `400`; No stores `null` for a note that was sent; an edit to No clears the stored note | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-09 | API | AC-04, BR-06 | `actionAt` in the future, before the Ticket existed, and not ISO; then a date that does not exist, on create and on edit, using a Ticket old enough that the rolled-over date would be allowed | `400` on `actionAt` | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-10 | API | AC-06, BR-11, BR-27 | a successful edit | action `version` + 1; the Ticket's `updatedAt` moved; the Ticket's own `version` unchanged | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-11 | API | AC-06, BR-27 | an edit with no `expectedVersion`, then with a stale one | `400` on `expectedVersion`; then `409 STALE_UPDATE` whose `error.current` is the latest action, with the stored row unchanged | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-12 | API | AC-06, BR-29 | two simultaneous edits with the same `expectedVersion`, sent with `Promise.all` | exactly one `200` and one `409`, and the stored row holds the winner's values | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-13 | API | AC-07, BR-28, D-04 | the same `requestKey` sent twice, in sequence and with `Promise.all`; then the same key from another user | one row for the first pair, the second answer `200` with the same body; the other user's key makes a separate row; the same key sent again **after the Ticket was resolved** is `200` with the existing action, not `TICKET_NOT_ACTIVE` | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-14 | API | AC-09, BR-10 | create and edit on `RESOLVED`, `CLOSED`, and `CANCELLED` Tickets, then on the other five statuses | `409 TICKET_NOT_ACTIVE` and nothing written; the other five succeed | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-15 | API | AC-08, BR-13, BR-44 | a Requester on their own Ticket, then writing, then another Requester's Ticket | the list returns every field of every action; `POST` and `PATCH` are `403`; the other Ticket is `404`, byte-identical to a nonexistent id | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-16 | API | AC-05, BR-01, BR-09 | `DELETE` on an action, and an `actionId` belonging to a different Ticket | the unknown-route `404`; and `404` for the other Ticket's action | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-17 | API | AC-26, BR-52 | a NUL character in each text field, and an out-of-range id in the path | `400`, never `500` | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+
+### 2.3 API — authorization, `server/tests/lab-04/authorization.api.test.ts`
+
+| Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Final |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| SEC-01 | Authorization | AC-17 | every Lab 4 endpoint with no cookie | `401 AUTH_REQUIRED`, never `403` | `server/tests/lab-04/authorization.api.test.ts` | Pass |
+| SEC-02 | Authorization | AC-08, AC-17, BR-43 | a Requester calls every `/api/staff/*` route, new and old | `403 FORBIDDEN` with no ticket data in the body | `server/tests/lab-04/authorization.api.test.ts` | Pass |
+| SEC-03 | Authorization | AC-17, BR-42, D-08 | IT Staff and an Administrator call every `/api/staff/*` route, read and write | both succeed on every route; the Administrator's queue, detail, owner, IT Priority, status, and Actions Taken calls all work | `server/tests/lab-04/authorization.api.test.ts` | Pass |
+| SEC-04 | Authorization | AC-17, BR-43 | IT Staff and a Requester call every `/api/admin/*` route | `403 FORBIDDEN` | `server/tests/lab-04/authorization.api.test.ts` | Pass |
+| SEC-05 | Authorization | AC-20, BR-42 | IT Staff and an Administrator call the Requester dashboard; a Requester calls the staff dashboard | `403 FORBIDDEN` each way | `server/tests/lab-04/authorization.api.test.ts` | Pass |
+| SEC-06 | Authorization | AC-17, BR-44 | guard order: no session and wrong role together; a Requester posting to a missing Ticket on a staff route | `401` wins over `403`; `403` wins over `404` | `server/tests/lab-04/authorization.api.test.ts` | Pass |
+| SEC-07 | Authorization | AC-02, AC-19, BR-37 | `requesterId`, `userId`, and `me` in query, body, and header on both dashboards and the Actions Taken endpoints | all ignored; the session identity is used and no other user's data appears | `server/tests/lab-04/authorization.api.test.ts` | Pass |
+| SEC-08 | Authorization | AC-17, BR-45 | an Administrator records an action, changes a status, and posts a comment | `performedBy`, `changedBy`, and the author are the Administrator | `server/tests/lab-04/authorization.api.test.ts` | Pass |
+| SEC-09 | Authorization | AC-17, Lab 3 BR-65 | `POST` and `PATCH` to the new endpoints with a foreign `Origin` | `403` before the handler runs; the configured origin succeeds; a `GET` with a foreign origin succeeds | `server/tests/lab-04/authorization.api.test.ts` | Pass |
+
+### 2.4 API — Ticket workflow, `server/tests/lab-04/ticket-workflow.api.test.ts`
+
+| Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Final |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| WF-01 | Workflow | AC-11, BR-15, BR-16 | every permitted transition, as IT Staff and as an Administrator, with the owner, reason, and gate satisfied | `200` for all 15 pairs | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| WF-02 | Workflow | AC-11, BR-15 | every non-permitted pair, and a transition to the current status | `409 INVALID_TRANSITION`, status unchanged | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| WF-03 | Workflow | AC-11, AC-15, BR-16, BR-20 | a Requester calls each status route; a Requester marks "appears resolved" | `403`; the signal is recorded and `currentStatus` is unchanged | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| WF-04 | Workflow | AC-03, BR-17, BR-18 | `RESOLVED` on an owned Ticket with no Action Taken | `409 ACTION_REQUIRED`, status unchanged, no history row | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| WF-05 | Workflow | AC-03, BR-17, BR-18 | `RESOLVED` when the most recently recorded action requires follow-up, then after a closing action | `409 FOLLOW_UP_PENDING`; then `200` | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| WF-06 | Workflow | AC-03, FR-10 | the gate on a direct API call that never opened the screen, as IT Staff and as an Administrator | the same refusal as WF-04 and WF-05 | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| WF-07 | Workflow | AC-12, BR-17, D-07 | resolve, reopen, then resolve again with no new action, then with one; and a Ticket reopened **twice**, with an action (a Yes in one case) recorded between the two reopens | the second resolve is `409 ACTION_REQUIRED`; with a post-reopen action it is `200`; after the second reopen the action between the two no longer counts, so the next resolve is `409 ACTION_REQUIRED` again, in the API and in the detail (the gate dates itself from the **last** reopen) | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| WF-08 | Workflow | AC-15, BR-20, FR-11 | "appears resolved" on a Ticket with no relevant action | status unchanged; the gate still answers `ACTION_REQUIRED` | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| WF-09 | Workflow | AC-13, BR-21 | a transition, a claim that moves `NEW` to `OPEN`, and a refused transition | one history row each for the first two, with from, to, actor, and time; none for the refusal | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| WF-10 | Workflow | AC-13, BR-22, BR-23 | read the history as the Requester, another Requester, IT Staff, and an Administrator; `PATCH` and `DELETE` a row | oldest first; own Ticket `200`; another's `404`; staff `200`; no update or delete route | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| WF-11 | Workflow | AC-14, BR-25 | `version` after owner, IT Priority, status, and "appears resolved" changes; after a no-op; after an action and a comment | + 1 for each real change; unchanged for the no-op, the action, and the comment | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| WF-12 | Workflow | AC-14, BR-26, FR-12 | a stale `expectedVersion` on each of owner, IT Priority, and status, including one made stale only by a Requester's "appears resolved"; and a stale `expectedOwnerId` | `409 STALE_UPDATE` whose `error.current` is the Ticket, the other change intact; `TICKET_ALREADY_OWNED` for the owner id, checked first | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| WF-13 | Workflow | AC-14, BR-29 | two simultaneous status changes with the same `expectedVersion`, sent with `Promise.all` | exactly one `200` and one `409`, and one history row | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| WF-14 | Workflow | AC-11, BR-24 | a request that is stale and invalid; one that is unowned and ungated | `STALE_UPDATE` first; `OWNER_REQUIRED` before the gate | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| WF-15 | Workflow | AC-11, BR-19 | reasons for `RESOLVED`, `CANCELLED`, and `REOPENED` (Lab 3 BR-36, BR-37 carried) | `400` without a 5–2000 character reason; a Public Comment is created in the same transaction | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| WF-16 | Workflow | AC-16, BR-17 | `GET /api/staff/tickets/:id` for each status, then after an action is recorded | `permittedTransitions` and `blockedTransitions` together are the matrix row; each blocked entry has its code and message; recording an action moves `RESOLVED` into `permittedTransitions` | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| WF-17 | Workflow | AC-14, BR-25, BR-29 | IT Priority change with a stale version; resending the same value | `409 STALE_UPDATE`; the resend is `200` with `version` unchanged; `requestedPriority` never changes | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| WF-18 | Workflow | AC-33, BR-55 | the owner object in the staff detail, the queue, and the dashboard's Urgent list, for an active IT Staff member, an Administrator, an inactive owner, an owner whose role was changed to Requester, and an inactive Requester | `role` and `isActive` present and correct in all three, and nothing more (no email); `null` when unassigned; the shape follows the account when its role changes afterwards | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| WF-19 | Workflow | AC-03, AC-10, BR-08, BR-17 | the gate with a backdated action: action #1 recorded first, `actionAt` 10:00, No; action #2 recorded after it, `actionAt` 09:00, Yes; then edit #1's `actionAt` earlier and later; then record a closing action | `RESOLVED` is `409 FOLLOW_UP_PENDING` although #2 sorts first in the list; no edit to any `actionAt` changes the answer; the closing action makes it `200`; the list stays in `actionAt` order throughout | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| WF-20 | Workflow | AC-14, BR-24, BR-29 | an assignment racing the deactivation of the proposed owner: a second transaction holds the user row's lock, the owner `PATCH` is sent, then the deactivation commits | the assignment waits for the lock and, once the deactivation has committed, answers `409 OWNER_NOT_ASSIGNABLE` with the Ticket's owner unchanged; in the other order the assignment succeeds and the owner stays (Lab 3 BR-26) | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+
+### 2.5 API — dashboards
+
+| Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Final |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| DASH-01 | Dashboard | AC-02, BR-32 | a Requester's dashboard on seed data with other Requesters' Tickets present | counts and lists contain only that Requester's Tickets | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
+| DASH-02 | Dashboard | AC-18, BR-32 | each of the four cards against an independent count of that Requester's Tickets | every `value` equals its independent query | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
+| DASH-03 | Dashboard | AC-18, BR-39 | `no.tickets@toktickit.local` | four `0` values and two empty lists | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
+| DASH-04 | Dashboard | AC-18, BR-33 | both lists for a Requester with more than five Tickets | at most 5; *Needs your attention* longest-waiting first; *Recently updated* newest first; ties by `id` | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
+| DASH-05 | Dashboard | AC-20, BR-43 | IT Staff, an Administrator, and no session call the Requester dashboard | `403`, `403`, `401` | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
+| DASH-06 | Dashboard | AC-02, BR-37 | a `requesterId` query parameter and an `X-Requester-Id` header | both ignored | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
+| DASH-07 | Dashboard | AC-21, BR-40 | follow each Requester `href` against `GET /api/tickets` | `totalItems` equals the card's `value` for every card | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
+| DASH-08 | Dashboard | AC-21, BR-31 | `group=open` on My Tickets, alone, with `status`, repeated, and unknown | the open group; AND with `status`; `400 INVALID_QUERY` for the last two | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
+| DASH-09 | Dashboard | AC-18, FR-19 | the exact key set of the response and the size of the lists | only the documented keys; no `description`; lists bounded at 5, also for the seeded Requester with the most Tickets | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
+| DASH-10 | Dashboard | AC-19, BR-34 | the four staff cards against independent queries | every `value` equals its independent query | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-11 | Dashboard | AC-19, BR-35 | `byStatus` | exactly five rows in the documented order, each equal to an independent count | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-12 | Dashboard | AC-19, BR-37 | two different IT Staff members, and a `me` parameter | "me" figures differ per user and ignore the parameter | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-13 | Dashboard | AC-19, BR-39 | `idle.it@toktickit.local` | `assignedToMe` is `0`; `myTickets` and `myRecentActions` are empty | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-14 | Dashboard | AC-19, BR-36 | the three lists, with a description over 120 characters | order and limit per BR-36; the description cut at 120 characters with an ellipsis | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-15 | Dashboard | AC-19, BR-31 | a `CANCELLED` Ticket with no owner and a `CANCELLED` urgent Ticket | counted in no open metric | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-16 | Dashboard | AC-20, BR-38 | an Administrator and an IT Staff member read the dashboard | the Administrator's `userCounts` (active per role, and inactive) equal the user table and no entry has an `href`; IT Staff have no `userCounts` key | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-17 | Dashboard | AC-21, BR-40 | follow each staff `href` against `GET /api/staff/tickets` | `totalItems` equals `value` for every card and status row; the account counts carry no `href`, so nothing is followed for them | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-18 | Dashboard | AC-21, BR-31 | `group=open` on the queue, alone, with `status`, `owner`, and `itPriority`, repeated, and unknown | AND with every filter; `400 INVALID_QUERY` for the last two | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| DASH-19 | Dashboard | AC-20, BR-43 | a Requester and no session call the staff dashboard | `403` and `401` | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+
+#### 2.5.1 The query behind every number (labsheet Part 5)
+
+Each figure a dashboard shows is a count or a short list, and each can be reproduced with the SQL
+below. The tests of §2.5 ask the database these same questions, in raw SQL of their own, and compare
+the answer with the endpoint's; the live check of Issues 7 and 8 did the same against the development
+database in a real browser. To run one by hand:
+
+```sh
+docker exec toktickit-db psql -U toktickit -d toktickit -c "<the query>"
+```
+
+`:me` is the signed-in user's id. "Open" is `"currentStatus"::text IN ('NEW', 'OPEN', 'IN_PROGRESS',
+'WAITING_FOR_REQUESTER', 'REOPENED')` (BR-31). None of these has a date, so none depends on a time zone (BR-41).
+
+**Requester dashboard** (`GET /api/dashboard/requester`)
+
+```sql
+-- openTickets
+SELECT count(*) FROM "Ticket" WHERE "requesterId" = :me AND "currentStatus"::text IN ('NEW','OPEN','IN_PROGRESS','WAITING_FOR_REQUESTER','REOPENED');
+-- waitingForYou, resolved, closed (one status each)
+SELECT count(*) FROM "Ticket" WHERE "requesterId" = :me AND "currentStatus" = 'WAITING_FOR_REQUESTER';
+SELECT count(*) FROM "Ticket" WHERE "requesterId" = :me AND "currentStatus" = 'RESOLVED';
+SELECT count(*) FROM "Ticket" WHERE "requesterId" = :me AND "currentStatus" = 'CLOSED';
+-- needsAttention: the longest-waiting first
+SELECT id FROM "Ticket" WHERE "requesterId" = :me AND "currentStatus" = 'WAITING_FOR_REQUESTER' ORDER BY "updatedAt" ASC, id ASC LIMIT 5;
+-- recentTickets: the newest change first, any status
+SELECT id FROM "Ticket" WHERE "requesterId" = :me ORDER BY "updatedAt" DESC, id DESC LIMIT 5;
+```
+
+**IT Staff and Administrator dashboard** (`GET /api/staff/dashboard`)
+
+```sql
+-- unassigned
+SELECT count(*) FROM "Ticket" WHERE "ownerId" IS NULL AND "currentStatus"::text IN ('NEW','OPEN','IN_PROGRESS','WAITING_FOR_REQUESTER','REOPENED');
+-- assignedToMe
+SELECT count(*) FROM "Ticket" WHERE "ownerId" = :me AND "currentStatus"::text IN ('NEW','OPEN','IN_PROGRESS','WAITING_FOR_REQUESTER','REOPENED');
+-- waitingForRequester: any owner
+SELECT count(*) FROM "Ticket" WHERE "currentStatus" = 'WAITING_FOR_REQUESTER';
+-- urgent
+SELECT count(*) FROM "Ticket" WHERE "itPriority" = 'URGENT' AND "currentStatus"::text IN ('NEW','OPEN','IN_PROGRESS','WAITING_FOR_REQUESTER','REOPENED');
+-- byStatus: one count per open status, over every Ticket (0 where none)
+SELECT "currentStatus", count(*) FROM "Ticket" WHERE "currentStatus"::text IN ('NEW','OPEN','IN_PROGRESS','WAITING_FOR_REQUESTER','REOPENED') GROUP BY 1;
+-- myTickets: the newest change first
+SELECT id FROM "Ticket" WHERE "ownerId" = :me AND "currentStatus"::text IN ('NEW','OPEN','IN_PROGRESS','WAITING_FOR_REQUESTER','REOPENED') ORDER BY "updatedAt" DESC, id DESC LIMIT 5;
+-- urgentTickets: the one that has waited longest first
+SELECT id FROM "Ticket" WHERE "itPriority" = 'URGENT' AND "currentStatus"::text IN ('NEW','OPEN','IN_PROGRESS','WAITING_FOR_REQUESTER','REOPENED') ORDER BY "createdAt" ASC, id ASC LIMIT 5;
+-- myRecentActions: in the order they were recorded, not the order of the dates typed on them
+SELECT id FROM "ActionTaken" WHERE "performedById" = :me ORDER BY "createdAt" DESC, id DESC LIMIT 5;
+-- userCounts (Administrator only)
+SELECT count(*) FROM "User" WHERE "isActive" AND role::text = 'REQUESTER';
+SELECT count(*) FROM "User" WHERE "isActive" AND role::text = 'IT_STAFF';
+SELECT count(*) FROM "User" WHERE "isActive" AND role::text = 'ADMINISTRATOR';
+SELECT count(*) FROM "User" WHERE NOT "isActive";
+```
+
+Every card's link opens a list whose total is the card's value: `GET /api/tickets` for the Requester's
+(the route's `status` is sent as `currentStatus`) and `GET /api/staff/tickets` for the staff's (the
+route's query string unchanged). DASH-07 and DASH-17 follow every link and compare.
+
+### 2.6 Migration and regression — `server/tests/lab-04/migration.regression.test.ts`
+
+| Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Final |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| MIG-01 | Migration | AC-23, BR-46 | row counts of User, Ticket, Attachment, PublicComment, and InternalNote before and after the migration | identical | `server/tests/lab-04/migration.regression.test.ts` | Pass |
+| MIG-02 | Migration | AC-23, BR-46 | requester bindings, owners, and ticket numbers; every `Ticket.version` | unchanged; every `version` is 1 | `server/tests/lab-04/migration.regression.test.ts` | Pass |
+| MIG-03 | Migration | AC-23, BR-47 | open a legacy Ticket: its detail, actions, and history | the detail loads; actions and history are `[]`; no error | `server/tests/lab-04/migration.regression.test.ts` | Pass |
+| MIG-04 | Migration | AC-23, BR-48 | a legacy `RESOLVED` and `CLOSED` Ticket, and a legacy `IN_PROGRESS` one | the first two are not re-gated and can be reopened; the third is gated | `server/tests/lab-04/migration.regression.test.ts` | Pass |
+| MIG-05 | Migration | AC-23, BR-49 | snapshot the Lab 3 tables of a scratch database **in the Lab 3 state**, apply the Lab 4 migration, then run the rollback script **without** the Lab 4 seed in between | the Lab 3 tables equal the snapshot row for row; the two new tables and `version` are gone; the single-column `ownerId` index is back | `server/tests/lab-04/migration.regression.test.ts` | Pass |
+| MIG-06 | Migration | AC-24, BR-46 | run the seed twice | identical row counts after each; no duplicate account, action, or history row | `server/tests/lab-04/migration.regression.test.ts` | Pass |
+| MIG-07 | Migration | AC-24, specification §7.5 | the seeded spread | all 8 statuses, owned and unowned, zero / one / several actions, an action by a non-owner, follow-up Yes and No, both reopened cases, and the two zero-data accounts | `server/tests/lab-04/migration.regression.test.ts` | Pass |
+| MIG-08 | Migration | AC-23, BR-28, D-01, D-04, D-05 | the migrated schema: the two new tables with their columns, lengths, and nullability, `Ticket.version`, the unique `(ticketId, performedById, requestKey)` key, every index §7.3 names, the dropped single-column owner index, and each foreign key; then the constraints in use: a duplicate key is refused, two keyless rows are not, a user who is only a performer, only an editor, or only a status-changer cannot be deleted until that row is gone, and deleting a Ticket removes its actions and history | all as §7.1 – §7.3 specify; each author foreign key is `RESTRICT` and each Ticket foreign key `CASCADE` | `server/tests/lab-04/migration.regression.test.ts` | Pass |
+
+### 2.7 Hardening and performance smoke
+
+| Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Final |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| HARD-01 | Hardening | AC-26, BR-52 | a NUL character in each text field of every write endpoint: tickets, removal reason, comments, notes, appears-resolved, status reason, user management, login, password, Actions Taken; and in a field the endpoint does not read, deep inside an array or an object, and in the file name of an upload | `400 VALIDATION_FAILED` on the field, named by its path; never `500`; nothing written; a clean request to the same endpoint succeeds (so the `400` is never another mistake); a refused sign-in is not counted as a wrong guess; 401, 403, and 404 still come before it; every write route the server registers is in the table | `server/tests/lab-04/hardening.api.test.ts` | Pass |
+| HARD-02 | Hardening | AC-26, BR-52 | `categoryId` and `relatedSystemId` outside `1`–`2147483647` in `POST /api/tickets`; the same for `ownerId` and `expectedOwnerId`, and `expectedVersion` on the three staff operations | `400 VALIDATION_FAILED` on the field, for zero, a negative, a fraction, one past the column, far past it, `1e21`, text, `true`, an array, and an object; an id that is missing says "Category is required." and one that is there and wrong says "Choose a valid category." (and the same for the related system); the largest id the column holds is a valid id that names nothing, so the same `400`; Lab 2's digit text is still accepted | `server/tests/lab-04/hardening.api.test.ts` | Pass |
+| HARD-03 | Hardening | AC-28, BR-51 | an unknown `/api` route, malformed JSON, an oversized body, an unsupported character set, a body nested far deeper than the call stack, and a forced server error (fifteen endpoints, each with a driver's SQL, host, and path in the failure) | the standard envelope with `404`, `400`, `413`, `415`, and `500`; no stack, SQL, path, or driver code in any body; the server keeps serving | `server/tests/lab-04/hardening.api.test.ts` | Pass |
+| PERF-01 | Performance-smoke | AC-32, BR-56 | 20 consecutive requests to the Requester dashboard on seed data | no response over 1000 ms; every one a `200` (a refusal is fast and proves nothing) | `server/tests/lab-04/performance.smoke.test.ts` | Pass |
+| PERF-02 | Performance-smoke | AC-32, BR-56 | 20 consecutive requests to the staff dashboard, as IT Staff and as an Administrator | no response over 1000 ms | `server/tests/lab-04/performance.smoke.test.ts` | Pass |
+| PERF-03 | Performance-smoke | AC-32, BR-56 | 20 consecutive requests to the queue's first page, and to each drill-down filter the dashboard links to | no response over 1000 ms; PERF-00 shows the measure itself notices a slow answer | `server/tests/lab-04/performance.smoke.test.ts` | Pass |
+
+### 2.8 UI component — `client/tests/lab-04/`
+
+| Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Final |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| UI-01 | UI | AC-10, AC-23, FR-01, FR-08 | the Actions Taken list, and a Ticket with none | entries in BR-08 reading order showing all seven fields, empty ones omitted; the **Latest recorded** tag on exactly one entry, the most recently recorded, including when it is not the last card; the explicit empty state | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-02 | UI | AC-04, FR-02 | create mode | every field present, Performed by read-only, red asterisks, Follow-up Note shown and required only for Yes | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-03 | UI | AC-04, AC-27, BR-54 | validation and a failed save | messages beneath their own fields, focus on the first invalid field, every typed value kept | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-04 | UI | AC-07, AC-27, BR-28 | repeated clicks on Save, then a network failure and a retry | one request per submission, Save busy and disabled; the retry reuses the same `requestKey` | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-05 | UI | AC-05, AC-06, FR-03 | edit mode | the form opens in place with the stored values; Performed by read-only; the save sends `expectedVersion`; the card returns to view mode with "Edited by"; an edit that changes Action Date/Time moves the card, announces "Moved to its new position by date.", and keeps focus on it | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-06 | UI | AC-06, AC-27, FR-07 | a `409 STALE_UPDATE` on an edit | the conflict callout inside the card, the user's edits kept, **Show latest** asks before replacing them | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-07 | UI | AC-08, FR-04 | the Requester's view | every action read-only; no **Add action**, no **Edit**, no hint of either | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-08 | UI | AC-09, BR-10 | a `RESOLVED`, `CLOSED`, or `CANCELLED` Ticket | **Add action** and **Edit** disabled with the explanation; the entries stay readable; a `409 TICKET_NOT_ACTIVE` shows its own message | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-09 | UI | AC-28 | the region's loading, API-failure, and forbidden states | skeleton cards; a callout with **Try again** that leaves the other regions alone; the forbidden callout | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-10 | UI | AC-16, FR-09 | the status select and the "Not available now" list | the select offers only `permittedTransitions`; each `blockedTransitions` entry is listed with its message | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
+| UI-11 | UI | AC-16, BR-19 | reasons for Resolved, Cancelled, and Reopened | the reason textarea is required before **Apply** is enabled | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
+| UI-12 | UI | AC-03, AC-16 | a gate refusal that reaches the server | the `ACTION_REQUIRED` and `FOLLOW_UP_PENDING` messages as their own callout, with **Go to Actions Taken** focusing the region | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
+| UI-13 | UI | AC-16, FR-14 | a successful change | the summary, badge, select options, blocked list, and timeline refresh from the response, without a reload; the API client puts `expectedVersion` in the body of a status, an owner, and an IT Priority change, and asks for `/api/tickets/:id/status-history` (§8.5) | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
+| UI-14 | UI | AC-14, BR-26 | a `409 STALE_UPDATE` on a status change | the conflict callout naming the current status and owner; **Show latest** reloads and keeps the typed reason | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
+| UI-15 | UI | AC-13, FR-13 | the Status History on the staff and Requester screens | an ordered list starting with "Ticket created", dated by the Ticket's own creation time; badges spelled out; actor and time on each step; the region asks for its own Ticket's history, on both screens; a refresh keeps the list on screen while it reads again; a failed read draws no list at all (§8.5) | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
+| UI-16 | UI | AC-15, BR-20 | the Requester's appears-resolved panel | helper text says only IT Staff can resolve; no status control exists on the Requester screen | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
+| UI-17 | UI | AC-33, BR-55 | an Owner who is inactive, and one who is no longer IT Staff | "Inactive" for the first; "No longer IT Staff" for the second, on the Ticket Detail (and in its owner picker), in the Ticket Queue, and in the Dashboard's Urgent list; "Inactive" alone when both are true | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
+| UI-18 | UI | AC-18, AC-21, FR-15 | the four Requester cards | each shows its label and value; each is one link with an accessible name that includes the destination | `client/tests/lab-04/RequesterDashboard.test.tsx` | Pass |
+| UI-19 | UI | AC-18, FR-15 | the two Requester lists | rows link to the Ticket Detail; empty lists show their explicit message | `client/tests/lab-04/RequesterDashboard.test.tsx` | Pass |
+| UI-20 | UI | AC-18, BR-39 | all-zero data | every card shows `0` and keeps its link; both lists show their empty message; the quick actions remain | `client/tests/lab-04/RequesterDashboard.test.tsx` | Pass |
+| UI-21 | UI | AC-22, FR-20 | loading, forbidden, failure, and Refresh | skeletons; the forbidden callout; a failure callout with **Try again**; Refresh disables itself, keeps the old numbers until the new ones arrive, and keeps them if the refresh fails | `client/tests/lab-04/RequesterDashboard.test.tsx` | Pass |
+| UI-22 | UI | AC-19, AC-21, FR-16 | the four staff cards and the status row | values and links per BR-34 and BR-35; every `href` followed unchanged | `client/tests/lab-04/StaffDashboard.test.tsx` | Pass |
+| UI-23 | UI | AC-19, FR-16 | the three staff lists | rows link to the Ticket; the follow-up pill carries text; descriptions are cut | `client/tests/lab-04/StaffDashboard.test.tsx` | Pass |
+| UI-24 | UI | AC-20, FR-17 | an Administrator, then IT Staff | the Administrator sees the accounts region with all four counts as plain numbers and only **Open User Management** as a link; IT Staff do not | `client/tests/lab-04/StaffDashboard.test.tsx` | Pass |
+| UI-25 | UI | AC-22, FR-20 | loading, zero data, forbidden, failure, and Refresh | as UI-21; zero data keeps the cards and shows the staff empty messages | `client/tests/lab-04/StaffDashboard.test.tsx` | Pass |
+| UI-26 | UI | AC-19, D-11 | the quick actions | **Open Ticket Queue**, **Unassigned Tickets**, and **My Queue** only; no Create Ticket, no Profile, no "from yesterday" | `client/tests/lab-04/StaffDashboard.test.tsx` | Pass |
+| UI-27 | UI | AC-17, FR-23, FR-24 | the Administrator's navigation and routes | **Ticket Queue** is offered and opens; a Requester typing `/queue` or `/users` lands on their Dashboard with the forbidden callout | `client/tests/lab-04/RoleNavigation.test.tsx` | Pass |
+| UI-28 | UI | AC-17, BR-45 | an Administrator on the Ticket Detail | the owner, IT Priority, status, and Actions Taken controls are present and send requests under the session | `client/tests/lab-04/RoleNavigation.test.tsx` | Pass |
+| UI-29 | UI | AC-21, FR-21 | My Tickets opened with `?group=open&status=…` | the request carries both; the filter chip shows; Clear Filters removes it; an unknown parameter is ignored | `client/tests/lab-04/DrillDown.test.tsx` | Pass |
+| UI-30 | UI | AC-27, BR-53 | every write form, through the whole application: create ticket, comment, note, appears resolved, attachment upload and removal, claim, owner, IT Priority, status, user create, edit, and new initial password, Action Taken record and edit, sign-in, and Change Password | one request per submission under repeated clicks, under repeated form submits, and **under three presses in one task** (inside one `act()`, so the screen has drawn nothing between them, as a script or a key that repeats can arrive); the control disabled, busy, and labelled while it is in flight; Enter in the new initial password field neither saves the panel's other edits nor sets the password | `client/tests/lab-04/FinalRegression.test.tsx` | Pass |
+| UI-31 | UI | AC-27, BR-54 | a recoverable failure on the same forms: a `400` on a field, a conflict (stale or not), a network error, and a `500` | the typed values are still in the form, the person is told, and one more press sends exactly one more request; the one field the specification clears is the current password after a wrong one (Lab 3 ui-spec §4.1) | `client/tests/lab-04/FinalRegression.test.tsx` | Pass |
+| UI-32 | UI | AC-28, FR-26 | the loading, empty, no-results, forbidden, not-found, conflict, success, and failure states of every screen and region | each uses the shared component and wording (found by `data-state` and role); no raw code or stack is shown; Try again asks again; no source file draws a callout of its own | `client/tests/lab-04/FinalRegression.test.tsx` | Pass |
+| UI-33 | UI | AC-31, FR-30 | render every screen with `console.error` and `console.warn` spied | no call | `client/tests/lab-04/FinalRegression.test.tsx` | Pass |
+| UI-34 | UI | AC-31, FR-30 | search every screen for placeholder text, the old `RoleHome` page, and any Development Requester control; and the source for a leftover file | none found; `RoleHome.tsx` is gone; no retired header or stored selection; every source file but Lab 1's Check System page is imported by something | `client/tests/lab-04/FinalRegression.test.tsx` | Pass |
+| UI-35 | UI | AC-30, FR-31 | keyboard: tab order, visible focus, labels, the focus moves after create, edit, and **Go to Actions Taken**, and the two dialogs | every control reachable and named; the stylesheet never removes focus; focus lands where `ui-spec.md` §9 says; a dialog takes focus in, keeps Tab inside, closes with Escape (not in flight), and gives focus back | `client/tests/lab-04/FinalRegression.test.tsx` | Pass |
+| UI-36 | UI | AC-30, FR-31 | status, priority, role, account, follow-up, attachment, and owner badges, on every screen | each carries text, not colour alone; different values read as different words; no colour is set by hand on an element | `client/tests/lab-04/FinalRegression.test.tsx` | Pass |
+| UI-37 | UI | AC-34, FR-22, D-09 | each role's navigation and landing page | **Dashboard** first and marked `aria-current="page"` on `/dashboard`; the wordmark links to it; each role lands on its own dashboard | `client/tests/lab-04/RoleNavigation.test.tsx` | Pass |
+| UI-38 | UI | AC-21, FR-21 | the Ticket Queue with `?owner=unassigned&group=open` | the filters read from the URL and written back; the chip shows; Clear Filters works | `client/tests/lab-04/DrillDown.test.tsx` | Pass |
+
+### 2.9 UI style — `client/tests/lab-04/ZenGreenLab4.test.tsx`
+
+| Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Final |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| STYLE-01 | UI style | AC-29, FR-26 | every Lab 4 screen's styles | only Lab 2 and Lab 3 tokens (plus the two named sizes of the metric card); no hard-coded colour; every font size a token | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Pass |
+| STYLE-02 | UI style | AC-29, `ui-spec.md` §1.1 | the metric card | label, value, and "View all" in the specified sizes and tokens; the focus outline present | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Pass |
+| STYLE-03 | UI style | AC-30, AC-04 | the follow-up pill and the Follow-up Note's asterisk | the pill carries text; the red asterisk appears with the note's `required` for Yes only | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Pass |
+| STYLE-04 | UI style | AC-29 | read-only against disabled | `readonly` fields use `--tt-readonly-bg`, distinct from a disabled **Add action**, which uses the disabled tokens and the cursor that says no; a read-only field can be focused, a disabled button cannot | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Pass |
+| STYLE-05 | UI style | AC-27 | validation placement and busy buttons | messages sit beneath their own field on five forms; a busy button is disabled, labelled, shows a spinner a screen reader skips, permits one request, and shows the progress cursor | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Pass |
+| STYLE-06 | UI style | AC-29, `ui-spec.md` §1.2, §1.4 | the Action Taken card and the timeline | the card's definition-list structure and the timeline's `<ol>` with its tokens; a step's time at the right edge, and on its own line on a phone (§8.5) | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Pass |
+| STYLE-07 | UI style | AC-27, AC-29, AC-30, FR-26, FR-31 | **in a real browser, with nothing read from the stylesheet:** the metric card, every status badge, the type scale, the Action Taken card and its follow-up pills, the red asterisk, a validation message and its field, a read-only field against a disabled button, and a busy button | each is drawn with the token's own value: the card on `--tt-surface` with a 1 px `--tt-border` and the `--tt-radius`; its 12 px muted uppercase label and 32 px green value; seven statuses in their six tones; the pill in `--tt-warning` or `--tt-disabled-bg` with its words; a red asterisk on four required fields and not on Attachment Notes, a fifth arriving with the Follow-up Note; the message beneath its field in `--tt-error`, tied by `aria-describedby`; `--tt-readonly-bg` against `--tt-disabled-bg`, the first focusable and the second not; and a busy button disabled, labelled "Saving…", with a spinner a screen reader skips and the `progress` cursor | `e2e/lab-04/ui-style.spec.ts` | Pass |
+
+### 2.10 Responsive — `e2e/lab-04/responsive.spec.ts`
+
+| Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Final |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| RESP-01 | Responsive | AC-29, AC-34 | the Requester dashboard at ≥ 992, 768–991, and < 768 px | cards four across, two by two, then one per row, and the lists and quick actions one column; the quick actions in one row, then stacked with the primary on top; the header's links, then the menu; and the dashboard's loading, failure, zero-data, and drill-down states; no sideways scroll | `e2e/lab-04/responsive.spec.ts` | Pass |
+| RESP-02 | Responsive | AC-29, AC-34 | the staff and Administrator dashboards at all three widths | cards four across, two by two, one per row; the two lists side by side, then stacked; **By status** one count to a row on a phone and, from 768 px, on one line exactly when its five counts fit and wrapped when they do not, asserted on the database's own figures, whatever their width, and on two sets of figures the test makes (four-digit counts, which wrap to two rows at 820 px, and one-digit counts, which fit on one) with nothing sticking out of the card; the accounts region wrapping the same way; and the loading, failure, forbidden, zero-data, and drill-down states; no sideways scroll | `e2e/lab-04/responsive.spec.ts` | Pass |
+| RESP-03 | Responsive | AC-29 | the Actions Taken region and its create form on the staff Ticket Detail at all three widths | one column of cards; labels beside values in a 180 px column at ≥ 992 px and above them below; the create form with Cancel and Save side by side, then stacked full width with Save on top; the empty, create, follow-up, validation, edit, conflict, and not-active states | `e2e/lab-04/responsive.spec.ts` | Pass |
+| RESP-04 | Responsive | AC-29 | the Requester Ticket Detail with Actions Taken and Status History at all three widths | both regions read-only (no button, no field), in order, one column, and unclipped | `e2e/lab-04/responsive.spec.ts` | Pass |
+| RESP-05 | Responsive | AC-25, AC-29 | the Lab 2 and Lab 3 screens after Lab 4: Login, Change Password, My Tickets, Create Ticket, the Requester Ticket Detail with an attachment and a comment, the Queue, the IT Staff Ticket Detail with an Internal Note, and User Management, at all three widths; and every role's header from 768 to 991 px | still as Labs 2 and 3 specified (a table from 768 px and cards below; the Queue's seven columns, then folded, then cards), with the Dashboard first in the header or the menu; in the header **every label on one line** from 768 to 991 px for the three roles; and a Ticket Number and a date on one line each in the My Tickets table, and an attachment's badge as wide as its word on a phone | `e2e/lab-04/responsive.spec.ts` | Pass |
+| RESP-06 | Responsive | AC-30, AC-31, AC-33 | every Lab 4 screen at all three widths, and at 320 px | after each of the 111 screenshots: no sideways scroll, nothing sticking out of the window or hidden behind an edge, no two controls overlapping, and an outline on every control that takes focus (an audit whose five findings were each proved by injecting the defect); focus going to the region heading, the new card, and back to Edit; the Owner label reading Inactive and No longer IT Staff; status, priority, role, and follow-up as words, also with the colour taken out; and a sweep of every screen for console errors, placeholder text, failed requests, and links that do not land where they say | `e2e/lab-04/responsive.spec.ts` | Pass |
+
+### 2.11 End-to-end — `e2e/lab-04/`
+
+| Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Final |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| E2E-01 | E2E | AC-01, AC-05, AC-08 | an IT Staff Owner records an action; a different IT Staff member records another and edits the first; the Requester opens the Ticket | both actions listed with the right Performed by; the edit shows "Edited by"; focus follows the new card and returns to Edit; exactly one "Latest recorded"; the Requester sees them read-only, and the API refuses a Requester's write with `403` and another Requester's read with `404` | `e2e/lab-04/actions-taken-flow.spec.ts` | Pass |
+| E2E-02 | E2E | AC-03 | an IT Staff member tries to resolve a Ticket with no action, records an action that needs follow-up, then a closing action, resolves, then closes | blocked with `ACTION_REQUIRED` and the link to the region (and the API refuses the same move, changing nothing); still blocked with `FOLLOW_UP_PENDING`; then `RESOLVED`; then `CLOSED`; the timeline shows each step and there is one history row per change and none for the refusals | `e2e/lab-04/ticket-resolution.spec.ts` | Pass |
+| E2E-03 | E2E | AC-14 | two browser contexts load the same Ticket; one changes the status; the other saves a different change | the second sees the conflict message with the current status and owner; the first change survives and the second was not applied; Show latest recovers, and the same save then succeeds; the other context's stale save is refused in turn, and Show latest keeps its reason and chosen move | `e2e/lab-04/ticket-resolution.spec.ts` | Pass |
+| E2E-04 | E2E | AC-04, AC-07, AC-27 | submit the create form empty, then too short, then with Yes and no note, then with a date in the future and one before the Ticket existed, then over a lost connection, then with valid data double-clicked | a message beneath each offending field with the typed values kept and focus on the first; the lost connection says so and keeps everything; one request and one action after the double click, with a note typed under Yes and then hidden not stored | `e2e/lab-04/actions-taken-flow.spec.ts` | Pass |
+| E2E-05 | E2E | AC-02, AC-18, AC-21, AC-34 | a Requester signs in, lands on the dashboard, and follows each card | the four numbers are exactly what the seven Tickets made for the run say (and a second query of the Requester's own list agrees); the two lists hold the right Tickets in the right order (the order of the server's own `updatedAt` stamps, read from the API, and not the order the test made the Tickets in, because of the stepping clock of §7: the check is "the dashboard equals the API's sort"); each card opens My Tickets with the same total; another Requester's Ticket is nowhere; and a Requester with no Tickets sees zeros and empty lists | `e2e/lab-04/dashboards.spec.ts` | Pass |
+| E2E-06 | E2E | AC-19, AC-20, AC-21 | an IT Staff member and an Administrator open the dashboard and follow the cards | every card, status row, and list equals a tally of the whole queue made by the test; each link opens the queue with that total; IT Staff have no accounts region and are not sent the counts; the Administrator's accounts equal the user list and are plain numbers beside one link; an idle member sees zeros and the "me" figures differ between two members | `e2e/lab-04/dashboards.spec.ts` | Pass |
+| E2E-07 | E2E | AC-17 | an Administrator opens the queue and a Ticket and claims it, records an action, changes IT Priority, and moves the status; a Requester types `/queue` | each works under the Administrator's name (owner, action, and history); the Requester is sent to their Dashboard with the callout for `/queue`, `/queue/:id`, and `/users`, and the API refuses a Requester with `403`, IT Staff on an Administrator route with `403`, and no session with `401` | `e2e/lab-04/dashboards.spec.ts` | Pass |
+| E2E-08 | E2E | AC-12, AC-13, AC-15 | a Requester marks "appears resolved"; IT Staff resolve, reopen, and try to resolve again | the status is unchanged by the signal; a Reopened Ticket goes back to In Progress first (the matrix), and then resolving is blocked until a new action, also against a direct API call, which writes no history row; the timeline shows every step, and the Requester reads the same one | `e2e/lab-04/ticket-resolution.spec.ts` | Pass |
+| E2E-09 | E2E | AC-09, AC-11 | IT Staff cancel a Ticket; they and the API try to change it and to record an action | the control says "This ticket is cancelled and cannot change." and offers no move; **+ Add action** is disabled with a sentence that stops after "recorded"; the API answers `409 TICKET_NOT_ACTIVE` and `409 INVALID_TRANSITION`; the Requester sees the Cancelled step and the reason | `e2e/lab-04/ticket-resolution.spec.ts` | Pass |
+
+### 2.12 Regression suites
+
+| Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Final |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| REG-01 | Regression | AC-25, BR-50 | the full server suites of Labs 1, 2, and 3 on `lab4-staging` | all pass, with only the changes §6 lists | `server/tests/lab-01`, `server/tests/lab-02`, `server/tests/lab-03` | Pass: 388 of the 1092 tests of the whole run (38 files, 81 s), none skipped, on a fresh database after the Playwright suites |
+| REG-02 | Regression | AC-25, BR-50 | the full client suites of Labs 1, 2, and 3 | all pass, with only the changes §6 lists | `client/tests/lab-01`, `client/tests/lab-02`, `client/tests/lab-03` | Pass: 349 of the 1019 tests of the whole run (26 files, 34 s), none skipped |
+| REG-03 | Regression | AC-25, BR-50 | the Playwright suites of Labs 2 and 3 | all pass, with only the changes §6 lists | `e2e/lab-02`, `e2e/lab-03` | Pass: 46 of 46 (21 in Lab 2, 25 in Lab 3), in the one run of §8, on a fresh database; and the same 46 passed on `lab4-staging` before Issue 10 changed anything |
+
+---
+
+## 3. Acceptance-criterion traceability
+
+Every criterion has at least one test, and nothing is left to manual inspection
+alone.
+
+| AC | Tests |
+| :--- | :--- |
+| AC-01 | API-03, API-04, API-06, E2E-01 |
+| AC-02 | DASH-01, DASH-06, SEC-07, E2E-05 |
+| AC-03 | UNIT-07, UNIT-08, WF-04, WF-05, WF-06, WF-19, UI-12, E2E-02 |
+| AC-04 | UNIT-01 – UNIT-04, API-07, API-08, API-09, UI-02, UI-03, STYLE-03, E2E-04 |
+| AC-05 | API-04, API-05, API-16, UI-05, E2E-01 |
+| AC-06 | API-10, API-11, API-12, UI-05, UI-06 |
+| AC-07 | UNIT-06, API-13, UI-04, E2E-04 |
+| AC-08 | API-15, SEC-02, UI-07, E2E-01 |
+| AC-09 | API-14, UI-08, E2E-09 |
+| AC-10 | UNIT-05, API-01, API-02, WF-19, UI-01 |
+| AC-11 | UNIT-10, WF-01, WF-02, WF-03, WF-14, WF-15, E2E-09 |
+| AC-12 | UNIT-09, WF-07, E2E-08 |
+| AC-13 | WF-09, WF-10, UI-15, E2E-08 |
+| AC-14 | WF-11, WF-12, WF-13, WF-17, WF-20, UI-14, E2E-03 |
+| AC-15 | WF-03, WF-08, UI-16, E2E-08 |
+| AC-16 | UNIT-10, WF-16, UI-10, UI-11, UI-12, UI-13 |
+| AC-17 | SEC-01 – SEC-04, SEC-06, SEC-08, SEC-09, UI-27, UI-28, E2E-07 |
+| AC-18 | DASH-02, DASH-03, DASH-04, DASH-09, UI-18, UI-19, UI-20, E2E-05 |
+| AC-19 | SEC-07, DASH-10 – DASH-15, UI-22, UI-23, UI-26, E2E-06 |
+| AC-20 | SEC-05, DASH-05, DASH-16, DASH-19, UI-24, E2E-06 |
+| AC-21 | UNIT-11, DASH-07, DASH-08, DASH-17, DASH-18, UI-18, UI-22, UI-29, UI-38, E2E-05, E2E-06 |
+| AC-22 | UI-21, UI-25 |
+| AC-23 | MIG-01 – MIG-05, MIG-08, API-01, UI-01 |
+| AC-24 | MIG-06, MIG-07 |
+| AC-25 | REG-01, REG-02, REG-03, RESP-05 |
+| AC-26 | UNIT-04, UNIT-12, API-17, HARD-01, HARD-02 |
+| AC-27 | UI-03, UI-04, UI-06, UI-30, UI-31, STYLE-05, STYLE-07, E2E-04 |
+| AC-28 | UI-09, UI-32, HARD-03 |
+| AC-29 | RESP-01 – RESP-06, STYLE-01, STYLE-02, STYLE-04, STYLE-06, STYLE-07 |
+| AC-30 | UI-35, UI-36, RESP-06, STYLE-03, STYLE-07 |
+| AC-31 | UI-33, UI-34, RESP-06 |
+| AC-32 | PERF-01, PERF-02, PERF-03 |
+| AC-33 | UI-17, WF-18, RESP-06 |
+| AC-34 | UI-37, RESP-01, RESP-02, E2E-05 |
+
+### 3.1 Planned test distribution by issue
+
+154 tests are planned: 12 unit, 17 Actions Taken API, 9 authorization, 20
+workflow, 19 dashboard, 8 migration, 3 hardening, 3 performance smoke, 38 UI
+component, 7 UI style, 6 responsive, 9 E2E, and 3 regression suites.
+
+| Issue | Tests |
+| :--- | :--- |
+| 2 — Administrator access to IT Staff ticket operations (#68) | SEC-01 – SEC-04, SEC-06, SEC-08, SEC-09, UI-27, UI-28, each for the endpoints and screens that exist at Issue 2 (see below) |
+| 3 — Actions Taken data model, migration, and seed (#69) | MIG-01 – MIG-08 (MIG-03 and MIG-04 for the data only, see below) |
+| 4 — Actions Taken API (#70) | UNIT-01 – UNIT-06, API-01 – API-17; extends SEC-01, SEC-07, SEC-08 (`performedBy`), and SEC-09 for the Actions Taken routes |
+| 5 — Actions Taken UI on Ticket Detail (#71) | UI-01 – UI-09, STYLE-03; completes UI-28 with the Actions Taken controls |
+| 6 — Ticket workflow and resolution gate (#72) | UNIT-07 – UNIT-10, WF-01 – WF-17, WF-19, WF-20, UI-10 – UI-16, STYLE-06; extends SEC-01 for the status-history route and SEC-08 (`changedBy`) |
+| 7 — Requester Dashboard (#73) | UNIT-11, DASH-01 – DASH-09, UI-18 – UI-21, UI-29, UI-37 (Requester), STYLE-02; completes SEC-05 (the Requester dashboard half) and extends SEC-01, SEC-07, and UI-27 |
+| 8 — IT Staff and Administrator Dashboard (#74) | DASH-10 – DASH-19, UI-22 – UI-26, UI-37 (IT Staff and Administrator), UI-38; completes SEC-05 (the staff dashboard half) and extends SEC-01, SEC-07, and UI-27 |
+| 9 — Final hardening and full regression (#75) | UNIT-12, WF-18, UI-17, HARD-01 – HARD-03, PERF-01 – PERF-03, UI-30 – UI-36, STYLE-01, STYLE-04, STYLE-05 |
+| 10 — Lab 4 E2E suite and visual evidence (#76) | RESP-01 – RESP-06, E2E-01 – E2E-09, STYLE-07, REG-01 – REG-03 |
+| 11 — Staging integration, documentation, and delivery (#77) | nine client tests that close the gaps found by the client breaks the approving review of PR #85 asked for (§8.5) |
+
+Each issue also keeps every earlier test passing, and updates the old tests §6
+names in the issue that changes the behaviour they check.
+
+**Tests that grow across issues.** This table first assigned all of SEC-01 –
+SEC-09, UI-27, and UI-28 to Issue 2. Writing Issue 2 showed that parts of them
+exercise endpoints and screens that do not exist until later, so they could not
+pass, or even be written honestly, in Issue 2. They are completed in the issue
+that adds the thing they test, by appending a row to the route tables in
+`server/tests/lab-04/authorization.api.test.ts` and by extending the client test:
+
+| Test | Complete at Issue 2 | Completed in |
+| :--- | :--- | :--- |
+| SEC-01 | no cookie → 401 on every staff and admin route, including one that is not written | ~~4~~ (done: the Actions Taken routes), ~~6~~ (done: the status-history route), ~~7~~ (done: the Requester dashboard), ~~8~~ (done: the staff dashboard) — complete |
+| SEC-05 | not possible: both dashboards are later | ~~7~~ (done: the Requester half), ~~8~~ (done: the staff half) — complete |
+| SEC-07 | not possible: the dashboards and Actions Taken take no ids yet | ~~4~~ (done: the Actions Taken endpoints), ~~7~~ (done: the Requester dashboard), ~~8~~ (done: the staff dashboard) — complete |
+| SEC-08 | an Administrator is the author of their comments and notes, and the Owner of what they claim | ~~4~~ (done: `performedBy`), ~~6~~ (done: `changedBy`, including the `NEW` to `OPEN` a claim causes) — complete |
+| SEC-09 | a foreign `Origin` is refused on an Administrator's writes to the existing staff routes | ~~4~~ (done: the Actions Taken writes), ~~9~~ (done: every write route the server registers, from the table of HARD-01, in `hardening.api.test.ts`) — complete |
+| UI-27 | the Administrator's navigation and routes; the sign-in deep link; the refusals; "sent home" means the role's Lab 3 home | ~~7~~ (done for the Requester: a Requester typing `/queue` or `/users` lands on their Dashboard with the callout), ~~8~~ (done: the Dashboard is the home of IT Staff and Administrators, UI-37) — complete |
+| UI-28 | the owner, IT Priority, and status controls, and the Internal Notes region | ~~5~~ (done: the Actions Taken controls) |
+
+SEC-02, SEC-03, SEC-04, and SEC-06 are complete at Issue 2.
+
+The same happened at Issue 3: MIG-03 and MIG-04 were assigned to it whole, but each
+has a half that needs something built later. What the migration itself guarantees
+is tested now, against the data; what a screen or the gate does with it is tested
+when that exists:
+
+| Test | Complete at Issue 3 (the data) | Completed in |
+| :--- | :--- | :--- |
+| MIG-03 | a legacy Ticket has no row in `ActionTaken` or `TicketStatusChange` and keeps its version 1 | ~~4~~ (done: the actions list answers `[]` for a seeded legacy Ticket, in API-01), ~~6~~ (done in Issue 9, which found Issue 6 had left it: the status history answers `[]`, the detail loads with its version 1, and the moves its status allows, in `ticket-workflow.api.test.ts`) |
+| MIG-04 | a legacy `RESOLVED`, `CLOSED`, and `IN_PROGRESS` Ticket is exactly as it was, with its owner | ~~6~~ (done in Issue 9, which found Issue 6 had left it): a legacy `RESOLVED` or `CLOSED` Ticket can be reopened, and a legacy `IN_PROGRESS` one is gated like any other |
+
+MIG-08 was added in Issue 3 for what the plan lacked: a test of the migrated
+schema itself. It was not in the plan approved in PR #78, which had 151 tests, and
+it brings the plan to 152.
+
+E2E-09 and STYLE-07 were added in Issue 10 for the same reason, and bring it to
+154. Labsheet Part 7 asks for the Reopened and Cancelled cases and a stale update;
+the plan had the first and the third (E2E-08, E2E-03) but no journey for a
+Cancelled Ticket, which AC-09 and AC-11 both name, so E2E-09 is that. The issue
+asks for UI-style assertions in the end-to-end suite; STYLE-01 to STYLE-06 read
+the stylesheet and the DOM in jsdom, so STYLE-07 is the same rules, drawn by a
+real browser.
+
+---
+
+## 4. Test commands
+
+The database must be migrated and seeded first; the API suites log in with the
+seeded accounts from `specification.md` §7.5.
+
+### Backend — unit, API, authorization, workflow, dashboards, migration
+
+```sh
+cd server
+npx prisma migrate deploy
+npm run prisma:seed
+npx vitest run
+```
+
+### Frontend — UI component and UI style
+
+```sh
+cd client
+npx vitest run
+npx tsc --noEmit
+```
+
+### Responsive and E2E
+
+```sh
+# from the repo root, with server and client running
+npx playwright test e2e/lab-04
+```
+
+### Everything, including the Lab 1–3 regression
+
+```sh
+cd server && npx prisma migrate deploy && npm run prisma:seed && npx vitest run
+cd ../client && npx vitest run && npx tsc --noEmit
+cd .. && npx playwright test
+```
+
+To start again from a clean database:
+
+```sh
+docker exec toktickit-server npx prisma migrate reset --force
+```
+
+The migration test (MIG-05) and the rollback need a scratch copy of the database
+and never touch the working one; the exact commands are recorded with the test.
+
+---
+
+## 5. Responsive, visual, and accessibility checklist
+
+The checklist is `ui-spec.md` §11. It was completed in Issue 10 (#76), for every
+Lab 4 screen and the Lab 2 and Lab 3 screens it touches, at 1440×900 (desktop),
+820×1180 (tablet), and 390×844 (mobile), and at 320×568 for the overflow row. Each
+row was checked two ways, named in its last column: **assertions** in `e2e/lab-04`,
+which read the real browser (geometry, computed style, focus, console), and
+**inspection**, which is reading every one of the 111 screenshots of §5.1,
+one by one, at all three sizes. A cell says **Pass** only where both agree. **Pass,
+after fix** means the inspection found a defect in this issue, a test that fails
+without the fix now guards it, and the fix is in this pull request (§5.2).
+
+| Check | Desktop | Tablet | Mobile | How it was checked |
+| :--- | :--- | :--- | :--- | :--- |
+| Design consistency — only Lab 2 and Lab 3 tokens | Pass | Pass | Pass, after fix | STYLE-01 (every font size a token), STYLE-07 (each colour and size equals its token's value in the browser); inspection of all screenshots: the green, white, grey, amber, and red of Lab 2 and Lab 3, and nothing else. At 390 px an attachment's ACTIVE badge was stretched across the card, which no badge in Lab 2 or Lab 3 is (§5.2, 4) |
+| Role navigation; Dashboard first and current on `/dashboard` | Pass | Pass, after fix | Pass | UI-27, UI-37, E2E-05 to E2E-07 (the links of each role, in order, and `aria-current`); RESP-05 (the header from 768 to 991 px for each role, and the menu below 768 px). At 820 px the labels broke across lines (§5.2, 1) |
+| Metric cards: label, value, working "View all", `0` shown as `0` | Pass | Pass | Pass | E2E-05, E2E-06 (every card followed, its list's total equal to its number; zeros kept and linked), RESP-01, RESP-02; the zero-data shots |
+| Drill-down lists show the number on their card | Pass | Pass | Pass | E2E-05, E2E-06 (`Showing n of n`, the chip for the open group); the drill-down-result shots |
+| Dashboard zero-data, loading, forbidden, and failure states | Pass | Pass | Pass | RESP-01, RESP-02; the `zero-data`, `loading`, `failure`, `forbidden` shots. Loading, failure, and forbidden are produced by holding or replacing the dashboard's response (§5.1) |
+| Actions Taken: seven fields, Performed by read-only, Follow-up Note rule | Pass | Pass | Pass | E2E-01, E2E-04, STYLE-07, RESP-03; the `list`, `create-form`, `follow-up-note-required` shots |
+| Editable, read-only, and disabled are visibly different | Pass | Pass | Pass | STYLE-07 (`--tt-readonly-bg` against `--tt-disabled-bg` and the cursor; the first focusable, the second not); the `edit-mode`, `ticket-not-active`, `requester-read-only-view` shots |
+| Requester Ticket Detail: Actions Taken and Status History with no controls | Pass | Pass | Pass | E2E-01 (no button, no field, in the region), RESP-04; the `requester-read-only-view` shot |
+| Status control offers only reachable moves and explains blocked ones | Pass | Pass | Pass | E2E-02, E2E-08, E2E-09 (the options, the "Not available now" list with the API's words, the same move refused by the API); the `status-blocked`, `success` shots |
+| Status History in order, spelled out, starting with "Ticket created" | Pass | Pass | Pass | E2E-02, E2E-08, E2E-09 (every step, in order, with who made it), RESP-06; the `status-history` shots |
+| Validation messages beneath their own field | Pass | Pass | Pass | E2E-04 and STYLE-07 (the message directly beneath, in `--tt-error`, tied by `aria-describedby`); the `validation-errors` shots |
+| Conflict, gate, and not-active messages distinct from a generic failure | Pass | Pass | Pass | E2E-03 (stale), E2E-02 (gate), E2E-09 (not active), RESP-03 and RESP-06 (the conflict, gate-refusal, stale-conflict, ticket-not-active shots), each asserting its own sentence (E2E-03 also that the generic "That did not work" is absent) |
+| Owner label tells Inactive from No longer IT Staff | Pass | Pass, after fix | Pass | RESP-06 (two real owners, one deactivated and one demoted, in the queue and the detail); the `owner-labels` shots. At 820 px the "No longer IT Staff" pill was drawn past the card (§5.2, 3) |
+| Keyboard reach, visible focus, and focus movement after create, edit, and **Go to Actions Taken** | Pass | Pass | Pass | RESP-06 (an outline on every control that takes focus, on every screenshotted screen, and focus going to the region heading, the new card's heading, and back to Edit, at each width); E2E-01, E2E-02; UI-35 for Tab order and the dialogs. The audit moves focus by script after one real Tab press, so it proves every control *can* take focus and shows it; the order Tab visits them in is UI-35's |
+| Readable with colour removed: status, priority, role, follow-up | Pass | Pass | Pass | RESP-06 (every badge, pill, and tag has its words; also with `filter: grayscale(1)` on the IT Staff Ticket Detail), STYLE-07 (two statuses of one tone are told apart by their words). The words are in the page at every width |
+| No clipping, no overlap, no horizontal overflow, including 320 px | Pass, after fix | Pass, after fix | Pass | RESP-06 after each of the 111 screenshots, and on every Lab 4 screen at 320 px (nothing past the window, nothing hidden behind an edge, nothing spilling out of its cell or card, no two controls overlapping), and RESP-05's line counts. At 1440 and 820 px a long Summary in the Lab 2 My Tickets table put the Ticket Number on two lines (§5.2, 2); at 820 px the "No longer IT Staff" pill was drawn past the card (§5.2, 3). `html, body { overflow-x: hidden }` hides a sideways scroll, so the audit looks at every element (§5.2, 5) |
+| No console error, placeholder text, obsolete control, or broken link | Pass | Pass | Pass | RESP-06 sweep: every screen of each role, and every distinct link on them followed, at all three widths: no console error, no failed `/api` request, no placeholder text, every link landing where it says. UI-34 for the obsolete controls (`RoleHome.tsx` is gone) |
+
+### 5.1 Screenshot artifacts
+
+Per `ui-spec.md` §12, under `artifacts/lab-04/screenshots/` in
+`requester-dashboard/`, `staff-dashboard/`, `actions-taken/`, `ticket-workflow/`,
+and `regression/`. Each file is `<shot>-<desktop|tablet|mobile>.png`, captured by
+`e2e/lab-04/responsive.spec.ts` at 1440×900, 820×1180, and 390×844. **111
+files:** 37 shots at three sizes, 6 in `requester-dashboard/`, 7 in
+`staff-dashboard/`, 9 in `actions-taken/`, 7 in `ticket-workflow/`, and 8 in
+`regression/`. `ui-spec.md` §12 lists the file names.
+
+* Every state is reached through the screen, **except three**, which no honest path
+  reaches: the dashboard's `loading` (its response is held until the picture is
+  taken), `failure` (answered with a `500`), and `forbidden` (answered with the API's
+  own `403`; a role that has a dashboard is never refused it). The same stand-ins
+  are used for the staff dashboard. The sentences on those screens are the real
+  ones; only the response is not.
+* The Actions Taken shots are of the region itself at its full height, and the
+  workflow shots of the Operational region or the Status History, because a
+  whole-page picture of a Ticket Detail is five thousand pixels tall on a phone and
+  unreadable. The dashboards, lists, and the Lab 2 and Lab 3 screens are whole pages.
+* The **User Management** picture is of the seeded accounts, found with the
+  screen's own search for `toktickit.local`: the list is not paginated, by design
+  (Lab 3 FR-39), and this database holds every account the suites have made.
+* The hover state is cleared before each picture, and nothing in them is edited.
+* They are rewritten by every run of the responsive suite and carry the numbers
+  of the database it ran on, so a re-run on another database changes the counts
+  on the dashboards and, on a tablet, whether By status wraps, and shows 111
+  differing files that are not a regression. **The committed set is from the run
+  on a freshly migrated and seeded database that §8 describes** (the review of
+  PR #89 asked for that); a database that many runs have added to draws wider
+  counts, and RESP-02 holds both cases (§2.10).
+
+### 5.2 What the inspection found
+
+| # | Where | What was wrong | Found by | Fix | Guard, red without the fix |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| 1 | the header, 768–991 px, every role | the navigation labels broke across lines ("My / Tickets", "Ticket / Queue", "User / Management") and "Logout" stood alone on a second line: Lab 4's Dashboard item made the row too wide for a tablet | inspection of `requester-dashboard/failure-tablet`, then every role | `white-space: nowrap` on the wordmark, the links, the name, the badge, and the actions, and the header wraps as a whole between 768 and 991 px, so the user's block is a second row of its own | RESP-05 "every role's header keeps each label on one line": failed for the Requester at 768 px |
+| 2 | My Tickets (Lab 2), 768 px and up | a long Summary squeezed the Ticket Number and the date onto two lines each ("TT-2026-" / "00628") | inspection of `regression/my-tickets-desktop` | the number and date cells keep one line each (`tt-table__nowrap`) | RESP-05 counts the lines of each: failed, a Ticket Number on 2 lines |
+| 3 | Ticket Queue (Lab 3), 768–991 px | the Ticket Owner column held 115 px, and the "No longer IT Staff" pill (119 px, in a cell with 24 px of padding) was drawn out past the card's right edge | inspection of `ticket-workflow/owner-labels-tablet` | that column is 150 px on a tablet; the Summary, which wraps there, gives up the difference | the audit's "spills out of its cell or card" check (below): failed with 2 problems on that screen |
+| 4 | the Requester Ticket Detail (Lab 2), below 768 px | an attachment's row is a column whose items are stretched so its buttons can be full width, and the ACTIVE badge was stretched with them into a bar across the card | inspection of `regression/requester-ticket-detail-mobile` | a badge keeps `align-self: flex-start` there | RESP-05 measures the badge: failed, 298 px wide |
+| 5 | **the suites' own measure**, not the application | the stylesheet says `html, body { overflow-x: hidden }`, so `scrollWidth > clientWidth`, which Labs 2 and 3 use for "no horizontal scroll", can never see content pushed past the edge | probing the audit with an injected defect: a card 520 px wide in a 320 px window was not reported | RESP-06 reads the position of every element instead (past the window; hidden behind an edge; spilling out of its cell or card; overlapping a control; with no outline) | RESP-06 "the layout audit finds what it claims to" puts each of five defects into a clean screen and fails unless each is reported |
+
+Defects 1 to 4 are in this pull request, and each fix is CSS or one class name
+(`client/src/styles/zen-green.css`, `client/src/screens/MyTickets.tsx`); no Lab 2
+or Lab 3 test changed (§6). Three things were seen and **not** changed, because
+nothing is clipped or overlapped and each is a decision of an earlier lab: the
+Change Password title is the 28 px heading where the other screens' card titles are
+20 px; the Lab 3 queue's Last Updated column mixes "14 hours ago" with dates; and
+My Tickets (Lab 2) is a six-column table from 768 px, so at 820 px its Summary
+column is about 100 px wide and wraps to five lines now that the Ticket Number
+keeps its line (folding columns, as the Lab 3 queue does, would be a design change
+to a Lab 2 screen).
+
+## 6. Changes to Lab 1–3 tests
+
+BR-50 allows an old test to change only where a rule Lab 4 deliberately changed
+is encoded in it, and requires every such change to be listed with its reason.
+These are the changes foreseen from reading the Lab 3 suites against the contract.
+Each is made in the issue named, in the same pull request as the behaviour that
+forces it, and the **Status** column records it when it is done.
+
+| Lab 3 test | What it asserted | Change in Lab 4 | Reason | Issue | Status |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `server/tests/lab-03/authorization.api.test.ts` — SEC-03 "refuses an Administrator on every IT Staff route (BR-19)" | an Administrator is `403` on every `/api/staff/*` route | an Administrator is allowed on them; the Requester and no-session cases are untouched | D-08 and BR-43: labsheet §4.3 gives Administrators IT Staff behaviour, superseding Lab 3 BR-19 | 2 | Done: now asserts the Administrator is *not* refused (the route answers), so it still guards something |
+| `server/tests/lab-03/staff-queue.api.test.ts` — "is refused to a Requester and an Administrator (BR-19)" and the same name under "assignable users" (two cases) | queue endpoints refuse an Administrator | each splits in two: refuse a Requester (unchanged assertions), and a new case that an Administrator is let in (the queue returns the same `totalItems` IT Staff see) | D-08 | 2 | Done |
+| `server/tests/lab-03/staff-ticket-detail.api.test.ts` — "is refused to a Requester and an Administrator…" and "refuses a Requester and an Administrator on each operation" | detail and every operation refuse an Administrator | refuse a Requester only (same assertions, `before`/after row unchanged); a new case that an Administrator opens the detail | D-08 | 2 | Done |
+| `server/tests/lab-03/staff-ticket-detail.api.test.ts` — "keeps the staff download to IT Staff, and keeps IT Staff off the Requester routes (BR-18)" | **not foreseen when this table was written; found by running the suite.** The staff attachment-download route refuses an Administrator | the Requester is still `403`, an Administrator now gets `200`, and IT Staff are still refused the Requester's route | D-08: the guard is on the `/api/staff` prefix, so this route opens too | 2 | Done |
+| `client/tests/lab-03/RoleNavigation.test.tsx` — UI-07 | the Administrator's only item is User Management; the first nav link is the current page after landing; an Administrator typing `/queue` is sent home | the list is Ticket Queue then User Management; the current-page assertion names the landing link (User Management) because the first link is no longer it; the `/queue` row is removed (it is allowed now and the Lab 4 suite covers it) | D-08. Landing stays User Management until the Dashboard (Issue 8) | 2 (nav and `/queue`); 7, 8 (Dashboard-first lists) | Issue 2 part Done; **Issue 7 part Done** (the Requester's list is Dashboard, My Tickets, Create Ticket, its home is the Dashboard, and the two Requester typed-URL rows are sent to the Dashboard, with a `fetchRequesterDashboard` mock added); **Issue 8 part Done** (IT Staff's list is Dashboard, Ticket Queue; an Administrator's is Dashboard, Ticket Queue, User Management; the Dashboard is every role's home, so the three IT Staff and Administrator typed-URL rows are sent to it, with a `fetchStaffDashboard` mock added) |
+| `server/tests/lab-03/staff-ticket-detail.api.test.ts` — API-51 and the assertions that compare `permittedTransitions` with the bare matrix | `permittedTransitions` equals the matrix row | `permittedTransitions` plus `blockedTransitions` equals the matrix row (a `wholeRow` helper, compared sorted); the two tests are API-51 and API-45 | BR-17, api-spec §3.1: the list now excludes moves the owner rule or the gate blocks | 6 | Done |
+| `server/tests/lab-03/staff-ticket-detail.api.test.ts` — the cases that move a Ticket to `RESOLVED` | a Ticket resolves with only an owner and a reason | the fixture records an Action Taken first (a `recordAction` helper writing the table, as the suite writes its other fixtures): API-45 for the move to `RESOLVED`, API-48, and "two simultaneous transitions". The new case that proves the refusal is WF-04, in the Lab 4 suite | BR-17: the gate. Lab 3 D-20 said this would come | 6 | Done |
+| `client/tests/lab-03/StaffTicketDetail.test.tsx` — the mock | the mocked detail has no `version` or `blockedTransitions`, and its owner has no `role` | the mock gains `version: 1`, `blockedTransitions: []`, and the owner's `role`; the inactive-owner mock gets a `role` too | api-spec §3.1: a mock-shape change, no assertion changes | 6 | Done |
+| `e2e/lab-03/staff-ticket-flow.spec.ts` — E2E-05 | an IT Staff member resolves a Ticket with only a reason, and reads "TT-… moved to In Progress." | the journey first sees Resolved listed under "Not available now" with the API's reason and absent from the select, follows **Go to Actions Taken**, records an action through the screen, then resolves; the message it reads is "Status changed to In Progress." and "Status changed to Resolved." | BR-17, ui-spec §5: the gate and the status message | 6 | Done |
+| `client/tests/lab-03/RequesterRegression.test.tsx` — "a signed-in Requester lands on My Tickets" | the landing page is My Tickets | the landing page is the Dashboard (the test is renamed, looks for the Dashboard link as the current page, and its `fetch` stub answers the dashboard route with an empty board) | D-09 | 7 | Done |
+| `e2e/lab-03/authentication.spec.ts` — E2E-01 and the landing-page table | the Requester's navigation is exactly My Tickets and Create Ticket; IT Staff land on `/queue` and an Administrator on `/users` | the Administrator's list gains Ticket Queue (**Issue 2, Done**: `Ticket Queue, User Management`, landing still `/users`); then each role's navigation starts with Dashboard and each lands on `/dashboard` (Issues 7, 8) | D-08, D-09 | 2, 7, 8 | Issue 2 part Done; **Issue 7 part Done** (a Requester's navigation is Dashboard, My Tickets, Create Ticket, they land on `/dashboard`, and Dashboard is the current page; plus the two landings the issue did not name, which the run found: E2E-02 after the forced password change, and E2E-08 in `user-administration.spec.ts`, both now `/dashboard`); **Issue 8 part Done** (IT Staff's navigation is Dashboard, Ticket Queue and an Administrator's is Dashboard, Ticket Queue, User Management; each lands on `/dashboard` with Dashboard the current page; the six other specs the run found are in the rows below) |
+| `client/tests/lab-02/Navigation.test.tsx` | iterates the Requester's navigation items | **re-verified, and it did not pass unchanged:** the iteration over `NAV_ITEMS` does, but two tests assert the landing page. "sends an unknown route to My Tickets" and "skips Login when someone is already signed in" now expect the Dashboard's heading, and the file mocks `fetchRequesterDashboard` | D-09 | 7 | Done |
+| `client/tests/lab-02/RequesterTicketDetail.test.tsx` | mocks each client call with `vi.spyOn(api, …)`: the ticket detail, comments, and attachments | the mocks gain the two calls the Requester Ticket Detail now makes, `fetchActionsTaken` (Issue 5) and `fetchStatusHistory` (Issue 6); no assertion changes | the screen loads two more resources; an unmocked call would reach the network | 5, 6 | Done |
+| `client/tests/lab-03/RequesterComments.test.tsx` | the same per-call mocks, with `fetchComments` | the same two mocks are added; and the helper text the panel shows is asserted as "Only IT Staff can resolve a ticket. This tells them you think it is fixed." | as above, and ui-spec §5.1: the panel's helper text changed because a Requester no longer "closes" anything | 5, 6 | Done |
+| `client/tests/lab-03/StaffTicketDetail.test.tsx` — "groups the ticket into the four regions, in order", and the mocks in `beforeEach` | **not foreseen when this table was written; found by running the suite.** The screen has four regions, and each test mocks only the calls Lab 3's screen made | the region list has five, with Actions Taken between Operational and Attachments; the mocks gain `fetchActionsTaken` (an empty list) | FR-01 and ui-spec §4: the Ticket Detail now has an Actions Taken region and loads its list. Left unmocked, the region reports its own load failure, a second `alert`, and three tests that look for a single one failed | 5 | Done |
+| `client/tests/lab-03/StaffTicketDetail.test.tsx` — "groups the ticket into the five regions, in order" (now six), and the `beforeEach` mocks | **not foreseen when this table was written; found by running the suite.** The screen has five regions and mocks no history call | the region list has six, with Status History last; the mocks gain `fetchStatusHistory` (an empty list), so the timeline's own request does not reach the network or add a second `alert` | FR-13, ui-spec §6.1: the Status History is the last region of the staff screen | 6 | Done |
+| `client/tests/lab-03/StaffTicketDetail.test.tsx` — the calls to the owner, IT Priority, and status client functions | the claim, reassignment, unassignment, IT Priority, and status calls were asserted with their Lab 3 arguments | each now also carries the ticket's `version` (`1`, the mock's) as the last argument | BR-26: every change sends the version the screen was showing; the expected arguments are the only change | 6 | Done |
+| `client/tests/lab-03/StaffTicketDetail.test.tsx` — the status-change message and the terminal text | "TT-… moved to In Progress." and a cancelled ticket "is final" | "Status changed to In Progress." and "This ticket is cancelled and cannot change." (two assertions) | ui-spec §5: Lab 4 gives the control its own words | 6 | Done |
+| `client/tests/lab-04/RoleNavigation.test.tsx` — UI-28 (Issue 2) | the Administrator's claim and IT Priority calls were asserted without a version; the mocked detail had no `version`, `blockedTransitions`, or owner `role` | the claim is `(12, ADMIN.id, null, 1)`, the IT Priority call `(12, "URGENT", 1)`; the shared mock gains `version` and `blockedTransitions`, the owners the tests set gain `role`, and `fetchStatusHistory` is mocked | BR-26 and api-spec §3.1, as the Lab 3 rows above. This is a Lab 4 test written in Issue 2, changed by a Lab 4 rule from Issue 6 | 6 | Done |
+| `server/tests/lab-04/authorization.api.test.ts` — SEC-01 and SEC-08 (Issue 2, grown in Issue 4) | the route table had no status-history route; SEC-08 had no status change | `GET /api/tickets/1/status-history` is added to the shared routes, and SEC-08 gains the `changedBy` case; not a change of a rule, the growth the table in §3.1 foresaw | tests.md §3.1 | 6 | Done |
+| `client/tests/lab-03/ChangePassword.test.tsx` — UI-06 "lets the user into the application once the password is saved" | after a mandatory change the Requester arrives at My Tickets, whose search box the test waits for | the Requester arrives at the Dashboard, so it waits for "Welcome, Somchai", and the suite mocks `fetchRequesterDashboard` | **not foreseen when this table was written; found by running the suite.** D-09: the landing page a password change leads to is the role's home | 7 | Done |
+| `e2e/lab-02/requester-ticket-flow.spec.ts` — E2E-02 "Requester B's list never contains Requester A's ticket" | after signing in as Requester B the list's search box is on the page | it opens My Tickets from the navigation first, because signing in lands on the Dashboard | **not foreseen; found by running the suite.** D-09 | 7 | Done |
+| `server/tests/lab-02/list-query.test.ts` — "applies the documented defaults when nothing is supplied" | the parsed query is exactly the nine Lab 2 fields | the parsed query also carries `group: null` | **not foreseen; found by running the suite.** D-12: `group` is a new optional parameter, so a query without it parses to a shape with the new field empty. No Lab 2 request changes meaning | 7 | Done |
+| `client/tests/lab-03/ZenGreenLab3.test.tsx` — STYLE-01 "introduces no new font size" | **not changed, and worth knowing:** the test reads from "Lab 3: Login" to the **end** of the stylesheet, so every Lab 4 section is held to "every font size is a `--tt-font` variable". The metric card's 12 px label and 32 px value (ui-spec §1.1; Lab 2 already draws 12 px in the badge and 32 px in the empty-state icon) are therefore named as `--tt-font-caption` and `--tt-font-metric` on the card, so the test passes as written | none | FR-26 and ui-spec §1.1 | 7 | No change |
+| `client/tests/lab-04/RoleNavigation.test.tsx` — UI-27 (Issue 2) | a Requester typing `/queue`, `/queue/12`, or `/users` is sent to My Tickets | they are sent to the Dashboard (three rows), and the suite mocks `fetchRequesterDashboard` | D-09. A Lab 4 test from Issue 2, changed by a Lab 4 rule from Issue 7 | 7 | Done |
+| `e2e/lab-03/responsive.spec.ts` — RESP-03 "the queue" and RESP-05 "User Management" (three viewports each); `e2e/lab-03/staff-ticket-flow.spec.ts` — E2E-04, E2E-05's `openFromQueue`, and E2E-07; `e2e/lab-03/user-administration.spec.ts` — E2E-08 and E2E-09 | each signs in as IT Staff or an Administrator and goes straight on to the queue's search box or User Management's "+ Create user", as if signing in landed there | each opens its screen first: `page.goto("/queue")` or `page.goto("/users")` in the two responsive specs, the Ticket Queue or User Management link of the navigation in the others; E2E-04 takes the Dashboard's **Unassigned Tickets** quick action, and so also asserts the filtered queue it opens (the address, the Owner control, the "Open tickets" chip) | **not foreseen when this table was written; found by running the suite.** D-09: signing in lands on the Dashboard. The issue named E2E-01 only | 8 | Done |
+| `server/tests/lab-03/queue-query.test.ts` — UNIT-09 "applies the documented defaults when nothing is supplied" | the parsed queue query is exactly the nine Lab 3 fields | it also carries `group: null` | **not foreseen; found by running the suite.** D-12: `group` is a new optional parameter, so a query without it parses to a shape with the new field empty. No Lab 3 request changes meaning | 8 | Done |
+| `client/tests/lab-04/RoleNavigation.test.tsx` — UI-27 (Issue 2), and three tests of Issue 7 | IT Staff and an Administrator typing a forbidden URL are sent to the queue and to User Management; an Administrator's navigation is Ticket Queue, User Management; and three tests written in Issue 7 said `/dashboard` is the Requester's alone "until Issue 8": other roles are sent home from it, a staff sign-in that began there goes home without the notice, and their navigation is unchanged | the three rows are sent to the Dashboard; the Administrator's list starts with Dashboard; and the three Issue 7 tests are replaced by their Issue 8 form: each role opens its own Dashboard on `/dashboard`, has the navigation and landing UI-37 gives it, and is taken back to the page it asked for | D-09. Tests of Lab 4's own, changed by a Lab 4 rule from Issue 8; the Issue 7 ones were written knowing they were interim | 8 | Done |
+| `server/tests/lab-03/staff-queue.api.test.ts` — "returns the documented row shape and nothing wider" (the row's owner) and API-39 "still shows the owner of a deactivated account, marked inactive" | the owner of a queue row equals `{ id, fullName, isActive }` | it equals `{ id, fullName, role, isActive }`; the row's other keys are untouched | BR-55, api-spec §1.4: every staff shape carries the owner's `role`, so a screen can tell Inactive from No longer IT Staff | 9 | Done |
+| `client/tests/lab-03/StaffTicketQueue.test.tsx` (the two owner mocks) and `client/tests/lab-03/ZenGreenLab3.test.tsx` (the owner given to the label) | the mocked owner is `{ id, fullName, isActive }` | each gains `role: "IT_STAFF"`; no assertion changes | api-spec §1.4: a mock-shape change that `tsc` forces, because the owner type now carries `role` | 9 | Done |
+| `client/tests/lab-03/StaffTicketDetail.test.tsx` — "renders the 403 state" and `client/tests/lab-03/UserManagement.test.tsx` — UI-20 "shows the empty, loading, failure, and forbidden states" | the forbidden screens say "You do not have permission to open this ticket…" and "…to manage users" | they say "You do not have access to this ticket." and "You do not have access to User Management.", each with a second line saying who can | FR-26, AC-28, ui-spec §8: one wording and one component (`ForbiddenState`) for a refusal on every screen; the screens had drawn it three ways | 9 | Done |
+| `server/tests/lab-04/staff-dashboard.api.test.ts` — DASH-14 (two cases) and `client/tests/lab-04/StaffDashboard.test.tsx`, `client/tests/lab-04/DrillDown.test.tsx` (the owner mocks) | the owner of a dashboard row has the keys `fullName`, `id`, `isActive`, and equals `{ id, fullName, isActive }` | it has `role` too | BR-55. Tests of Lab 4's own, written in Issue 8 knowing api-spec §1.4 said "no `role` until Issue 9" | 9 | Done |
+| `e2e/lab-02/requester-ticket-flow.spec.ts` — E2E-03 "add, download, and soft-remove an attachment" | after pressing Remove attachment it reads the page at once, as if the dialog had closed | it first waits for the dialog to be gone, and then reads the page; no assertion changes | **not foreseen; found by running the suite.** BR-53, BR-54: the removal dialog now stays open, busy, until the server has answered, so a failure can show its message beside the reason. Read at once, the page held the file name twice (the row and the dialog) and Playwright's strict mode refused | 9 | Done |
+| `client/tests/lab-04/ActionsTaken.test.tsx` — UI-07 "is what the Requester's Ticket Detail screen shows, between the ticket and its attachments, with no write call ever made" | the test mocks the ticket, the comments, and the actions | it also mocks `fetchStatusHistory` (an empty list); no assertion changes | **not foreseen; found by the offline guard of the review of PR #88.** The screen has loaded the Status History since Issue 6, so this test had been sending a real request to `localhost:3000` (tests.md §7) | 9 | Done |
+| `server/tests/lab-04/requester-dashboard.api.test.ts` — DASH-09 "bounds both lists at five, even for the Requester with the most Tickets" | the Requester with the most Tickets was sought among every account in the database | it is sought among the four seeded Requesters (`SEEDED_REQUESTER_EMAILS`, already in the file); the assertions are untouched | **not foreseen; found by the review of PR #89, on a freshly seeded database.** `signInAs` signs in with the seed password, so it can only sign in as a seeded account. `responsive.spec.ts` makes a Requester that ends with 24 Tickets, changes its password, and is deactivated afterwards (BR-50); on a fresh seed that is more Tickets than any seeded Requester has, so DASH-09 chose it and could not sign in (`401`). On the development database the seeded Requesters have far more, so it was never seen there | 10 | Done |
+
+No Lab 1 test changes. **Issue 10 changed no Lab 1–3 test**: its four fixes to the
+stylesheet and the class names in `MyTickets.tsx` left every Lab 1–3 test passing as
+written (REG-01 to REG-03, §8). Its review changed one Lab 4 test, DASH-09 (the last
+row above), and the server's test time budget (§7). A change not in this table is a defect to be fixed in the
+code, not in the test. If implementation finds a Lab 3 test that must change and
+is not listed, the issue adds it here with its reason in the same pull request.
+
+---
+
+## 7. Known limitations and deferred tests
+
+| Area | Limitation |
+| :--- | :--- |
+| Duplicate protection | Only Action Taken creation has a server-side idempotency key (D-15). A comment or note retried across a network failure after the server accepted it is posted twice; the UI single-flight (UI-30) and the conflicts on status and claim are what protect the rest. |
+| Dashboards | There is no trend and no time window (D-10), so no test asserts a "since yesterday" figure. Dashboard numbers are instantaneous and are not cached (BR-30). |
+| Performance | PERF-01 to PERF-03 are a smoke check on seed data, not a load or scaling test (D-16). |
+| Accessibility | Checked by assertions on roles, labels, and focus (UI-35, UI-36, RESP-06) plus the manual checklist of §5. No automated scanner runs, and none is added (§3.2 of the specification). |
+| Concurrency | WF-13, API-12, and API-13 send two requests at once against the row lock and the unique key; sustained parallel load is not tested. |
+| Action edit history | Edits overwrite in place and are not kept (D-13); no test can assert what an action said before an edit. |
+| Rollback | MIG-05 proves the rollback on a scratch database in the Lab 3 state, **before** the Lab 4 seed runs. A database seeded after migrating keeps the seed's two accounts and the moved `Ticket.updatedAt` values after a rollback, because the script undoes the migration and not the seed (`specification.md` §7.6); the dump taken before migrating is the recovery for that case, and for one that already holds real Lab 4 actions, which a rollback loses by design. |
+| Lab 3 limitations, closed | Issue 9 closed three of the four limitations Lab 3 recorded (`docs/lab-03/tests.md` §7, specification D-22). A NUL character in a request body, and an id outside `1`–`2147483647` in a request body, answer `400 VALIDATION_FAILED` on the field and no longer `500` (UNIT-12, HARD-01, HARD-02); `owner` carries `role` in the queue, the detail, and the dashboard (WF-18); and the Owner label reads "No longer IT Staff" for an active account whose role was changed, and "Inactive" only for a deactivated one (UI-17). The fourth is below. |
+| Lab 3 intermittent client suites | **Cause found, and fixed in the review of PR #88.** Lab 3 saw `RoleNavigation.test.tsx` and Lab 2's `Navigation.test.tsx` fail 1–2 tests in some full client runs. A test whose screen called an api function the test had not mocked sent a **real request to `http://localhost:3000`**. Where the real API is running, as on a developer's machine, it answers `401`, because no cookie goes with the request; the client takes any `401` outside `/api/auth` for a session that ended (Lab 3 Issue 6), tells every mounted `AuthProvider`, and the screen of whichever test is running at that moment becomes the Login screen, so its `findBy` waits out its limit. The page printed by every failure is the Login screen. **Evidence:** on the host with the API up, 3 of 5 full client runs failed (5 tests in all) and 2 of 6 runs of the three navigation files failed; with the API stopped, 8 of 8 runs of those files passed; and one failure took 85 ms, which is the same thing arriving mid-test (Lab 3's 130 ms failure is very probably it; I did not see that one). Inside the client container the API is unreachable, so the `401` cannot happen there, which is why the container runs never showed it. **Fix:** `tests/setup.ts` gives every test an offline `fetch` and fails any test that reaches for it, naming the call; `vite.config.ts` runs hooks in the order they are defined (`sequence.hooks: "list"`), so Testing Library unmounts the previous screen before a file's `afterEach(vi.restoreAllMocks)` removes its mocks (in the default order the guard reported late calls from the previous test's screen, different ones in each run, and in order only the genuine ones were left); and the two real calls the guard found are mocked (ActionsTaken UI-07's Status History, and one of Issue 9's own tests). **After:** 6 of 6 full client runs and 10 of 10 runs of the navigation files on the host with the API up. **A second, separate cause**, which Issue 9 at first mistook for the whole story: when suites share a CPU, the five-second test limit and Testing Library's one-second default run out in the heaviest tests (Create Ticket, Actions Taken). Four full suites at once failed 37 of 7 800 tests, every one by timing out; `testTimeout` and `hookTimeout` are now 30 s and `asyncUtilTimeout` 5 s, and the same eight loaded runs then passed 7 944 of 7 944. That did not cure the navigation failures. |
+| Dialogs | The attachment removal dialog and the user panel are modal for the keyboard (UI-35): focus goes in, Tab stays inside, Escape closes them, and focus returns. The page behind them is not made `inert`, so a screen reader's virtual cursor can still leave a dialog; no test can observe that, and the manual checklist (§5) does not claim it. |
+| Skip link | The shell has no "skip to content" link, as in Labs 2 and 3, and no specification asks for one: the header's navigation comes before the content on every screen, so a keyboard user passes the header's links first. UI-35 checks that Tab reaches every control in reading order; it does not check this. |
+| Lab 1's Check System page | `client/src/App.tsx` and `checkSystem` are not used by the application (`main.tsx` mounts `TokTickITApp`), and are kept, because `client/tests/lab-01/App.test.tsx` tests them and BR-50 forbids weakening a Lab 1 test. UI-34 lists this exception by name. |
+| Inherited | CSRF has no token test (Lab 3 D-13), and none is added (specification §3.2, D-22). |
+| The visual and accessibility checklist | It is the work of assertions on geometry, computed style, focus, and the console, plus inspection of the screenshots (§5). No automated accessibility scanner runs and none is added (specification §3.2); a screen reader was not used; and the audit moves focus by script after one real Tab press, so the Tab *order* is UI-35's and not RESP-06's. |
+| Stand-in responses in three pictures | The dashboards' `loading`, `failure`, and `forbidden` screenshots hold or replace the API's response for one shot (§5.1). RESP-01 and RESP-02 also assert what each screen says; UI-18 to UI-26 prove the states in jsdom with a real mock. |
+| The browser's own 401 line | The signed-out Login screen asks `/api/auth/me` who is signed in, and the answer, `401`, is the contract (Lab 3). The browser writes it to the console as "Failed to load resource". RESP-06's sweep ignores exactly that line and nothing else. |
+| User Management is not paginated | By design (Lab 3 FR-39). On a database that every suite has added accounts to, the list is hundreds of rows, so its picture is of the seeded accounts, found by search (§5.1). |
+| Clock skew in the development stack | Docker Desktop's clock ran four seconds ahead of the host's and stepped now and then, so an action dated "now" by the host's clock, a few calls after its Ticket was created, was refused with "cannot be before the ticket was created" (BR-06), three times in Issue 10's own runs. The suites date an action from the server's clock and never earlier than a second after the Ticket's own creation (`actionTime` in `e2e/lab-04/helpers.ts`). The application is right in refusing it. **It also steps backwards, which the review of PR #89 caught.** A probe in the server container against the host (7 minutes, a sample every 100 ms) showed the VM's clock, on the machine that ran Issue 10, reading about 3.4 s ahead, drifting down to about 0.7 s ahead over 32.7 s, stepping back by 0.69 to 0.71 s (13 times, 32.76 s apart), and 0.2 s later jumping forward 3.4 s again. Two moves made a quarter of a second apart on either side of a backward step are stored with the second stamped earlier, and the Status History, which is ordered by `createdAt` and then `id` (api-spec, BR-22), shows them swapped: that is the rule working on the data it was given, not a defect. In 62 runs of E2E-08 on a fresh seed it happened twice (the Resolve and Reopen rows, 0.25 s apart, stamped 0.40 s the wrong way round). `settledTimeline` accepts a swapped list only when the API's own rows prove it, and only then: taken in the order they were made (`id`) they are exactly the moves expected, their stamps run backwards somewhere, the API returned them in the order BR-22 asks for (`createdAt`, then `id`), and the screen shows precisely what the API returned. A list that is wrong for any other reason still fails (§8.3, R05), and so does a server that sorts wrongly on a Ticket whose stamps also ran backwards, which the approving review of PR #89 found the first version of this tolerance would have accepted (§8.4, R10). |
+| A second place the stepping clock can reach | After a reopen, E2E-08 checks that an action recorded **before** it no longer opens the resolution gate (AC-12, D-07). The gate compares the two stored stamps, and in that test they are 0.57 to 1.14 s apart (15 runs on the real clock, six of them under 0.7 s). A backward step of 0.7 s landing between them would stamp the reopen before the action, and the application would then, correctly, count the action as recorded after the reopen, so the gate would be open and the test would fail at the expectation that "Resolved — Record at least one action before resolving this ticket." is listed. **Nothing failed this way in the 15 runs, so this is an estimate and not an observed rate:** a step every 32.76 s and a gap of about 0.6 s give about one run in a hundred on the machine that ran this lab. With the stamps pulled back at random by up to 2 s in the database, a far harsher clock than the VM's, the same expectation failed in 8 of 12 runs (§8.4), which shows the mechanism. The test is left as it is; a failure of E2E-08 at that expectation on a machine with a stepping clock should be read as this and the run repeated. |
+| A third place the stepping clock can reach | Lab 3's API-70 locks two emails and compares what each is told. A lock lasts exactly 15 minutes (`LOCK_MS`) and the message rounds the minutes left up (`auth.ts`), so "16 minutes" can only be said if the clock has gone back between the lock and the answer, and a 0.7 s step inside the well under a second between them does that. It failed once, in the first server run of Issue 11 (1091 of 1092, "16 minutes" against "15 minutes"); the test file then passed 15 of 15 runs alone, and the whole suite passed on the second run (§8.6). That the step caused it follows from the code's arithmetic and from the clock probe above; the step itself was not observed. No Lab 3 test is changed (BR-50). A failure of API-70 that says "16 minutes" on a machine with a stepping clock is this, and the run is repeated. |
+| PostgreSQL image | The suites are written for and run on `postgres:16-alpine`, which `docker-compose.yml` names, and whose text ordering is by bytes. On the Debian-based `postgres:16`, whose `en_US` collation orders by language rules, Lab 3's "orders by name" test fails once the Lab 4 E2E has made accounts called `E2E deactivated…` and `E2E First…`: there "deactivated" sorts before "First", and on Alpine the reverse (checked in Issue 11 with the same two names in each image). The reviewer of PR #89 met it on the Debian image and re-ran on Alpine, where the whole suite passed. No test is changed, because the compose file fixes the image; a different one is outside what the suites claim. |
+| Server test time budget | Lab 3's MIG-06 and Lab 4's MIG-06 run the whole seed twice, and the seed has grown across the labs: they took 4.2 and 4.7 s on the reviewer's machine against vitest's default of 5 s for a test, and MIG-06 failed by timing out in 3 of 5 of the review's server runs. **The approving review of PR #88 asked for this as a small thing and I missed it;** the review of PR #89 raised it again. `server/vitest.config.ts` now sets `testTimeout` and `hookTimeout` to 30 s, as `client/vite.config.ts` has since PR #88. No assertion is touched. |
+| The development database grows | A full Playwright run of every suite added 108 Tickets and 18 accounts in Issue 10 (the accounts deactivated afterwards, BR-50). Nothing deletes them; `docker exec toktickit-server npx prisma migrate reset --force` starts again from the seed. The dashboards' tests state their expectations from Tickets and accounts they make, or tally the whole queue themselves, so they hold at any size. |
+
+---
+
+## 8. Final results
+
+Run in Issue 10 (#76) on branch `feature/10-lab4-e2e-and-evidence`: `lab4-staging` at
+`c89e486` (PR #88 merged) plus this issue and the fixes of the review of PR #89. Every
+figure below is the runner's own output, read from its log; nothing is estimated or
+restated from memory. The run from `main` (Part 3) is recorded in the submission PDF, because nothing
+can be committed after the release.
+
+**On a fresh database, as the review asked.** The review found three checks that
+passed only on the large development database. The results below therefore come from
+a **second, empty stack**: its own PostgreSQL, migrated and seeded from nothing
+(16 Tickets and 14 accounts), its API on port 3100 and its client on 5174, so that
+the development database was never touched. The suites ran in the order Part 3 uses:
+every Playwright suite first, then the server tests on the same database.
+
+| Suite | Command | Result |
+| :--- | :--- | :--- |
+| Playwright, every suite, on the fresh seed | `E2E_BASE_URL=http://localhost:5174 E2E_API_URL=http://localhost:3100 npx playwright test` | **85 passed** in 6.6 min: 21 of Lab 2, 25 of Lab 3 (REG-03), and 39 of Lab 4 (RESP-01 to RESP-06, E2E-01 to E2E-09, STYLE-07), none failed, skipped, or flaky; the database went from 16 to 124 Tickets and 14 to 32 accounts |
+| Server, Labs 1–4: unit, API, authorization, workflow, dashboards, migration, hardening, performance smoke, **on that same database** | `docker exec -e CLIENT_ORIGINS=http://localhost:5173 toktickit-fresh-server npx vitest run` | **38 files, 1092 tests, all passed** (81 s) |
+| Client, Labs 1–4: UI component and UI style | `docker exec toktickit-client npx vitest run` | **26 files, 1019 tests, all passed** (34 s) |
+| Type check | `npx tsc --noEmit` in each container | **exit 0 and no output**, server and client |
+| Production build | `npx vite build` | built |
+| The Lab 4 folder alone, on two more fresh seeds | `npx playwright test e2e/lab-04` | **39 passed** (6.9 min) and **39 passed** (6.3 min) |
+| E2E-08 alone, twenty times in a row, on a fresh seed | `npx playwright test e2e/lab-04/ticket-resolution.spec.ts -g E2E-08` | **20 passed, 0 failed** |
+| The Lab 4 folder, on the large development database | `npx playwright test e2e/lab-04` | **39 passed** (4.9 min), from 1688 to 1771 Tickets and 295 to 308 accounts |
+
+The second stack's API names its own client's origin (`CLIENT_ORIGINS`,
+`server/src/app.ts`), so that the browser's requests from port 5174 are allowed. The
+server tests send the default origin, `http://localhost:5173`, so they are run with
+that value, as the table shows. The first server run, without it, failed exactly five
+tests that check the Origin header (SEC-09 in two files, SEC-11, and one more case of
+Lab 3's authorization suite) and nothing else; on a stack with the default
+configuration, as the review ran it, no override is needed.
+
+The server and client suites are the whole of every lab's tests, so they contain
+the Lab 1 to Lab 3 regression (REG-01, REG-02) and every earlier Lab 4 issue's
+tests, and the Final column of §2 reads **Pass** for all of them. No client file
+changed in the review's round, so the client figures are those of a run on the same
+sources.
+
+**Is anything flaky?** The first fresh-seed runs found what the large database had
+hidden, and each was fixed in the test, not hidden:
+
+* **RESP-02 on a tablet** passed only where the counts were three digits wide: five
+  one-digit pills fit on one line at 820 px, which is correct. The test now holds the
+  layout to what it must do with *any* figures, and makes the wide and the narrow
+  case itself (§2.10, RESP-02).
+* **E2E-08** read the status control before the screen had read the Ticket again, as
+  the review said (1 failure in 4 runs of the review's; reproduced here
+  deterministically with a slow read, §8.3). It now waits, as E2E-02 does.
+* **DASH-09** (a Lab 4 server test) looked for the Requester with the most Tickets
+  among everyone, and the Requester that `responsive.spec.ts` makes and deactivates
+  can win that on a fresh seed (§6).
+* **The development stack's clock steps backwards** (§7). Run alone, E2E-08 failed 2
+  times in 62 because two history rows 0.25 s apart were stamped the wrong way round,
+  and the first fresh-seed run of the folder failed E2E-05 for the same reason (two
+  Tickets 0.4 s apart). `settledTimeline` and four order checks now read the
+  server's own stamps, and a run that was stepped over says so in its report.
+
+After the fixes, the Lab 4 folder passed on three fresh seeds, on the large database,
+and E2E-08 passed twenty times in a row, as the table shows. The earlier flake of
+Issue 10 (E2E-08 reading the Status History before the screen had read it again) was
+fixed before the review, in `settledTimeline`.
+
+### 8.1 Do the new tests fail when the application is wrong?
+
+Twenty deliberate breaks of the application, one at a time: the file changed, its
+container restarted, the specs that should notice run, the file restored byte for
+byte (SHA-256 checked before and after), and the container restarted again.
+**All twenty were caught**, each by the specs named; none survived. After the review
+changed E2E-05, E2E-06, E2E-08, RESP-02, and RESP-03, the six breaks that those
+tests catch (E03, E04, E07, E09, E11, E15) were run again against the changed tests:
+**all six caught**, with the files restored byte for byte.
+
+| Break | What was broken | Caught by |
+| :--- | :--- | :--- |
+| E01 | Performed by is always the lowest-id IT Staff member, not the person who recorded | E2E-01 |
+| E02 | an action that needs follow-up does not hold the resolution gate | E2E-02 |
+| E03 | a Cancelled Ticket counts as open on the Requester dashboard | E2E-05 |
+| E04 | IT Staff are sent the Administrator's account counts | E2E-06 |
+| E05 | an Administrator is refused the staff routes | E2E-07 |
+| E06 | an IT Priority save ignores a stale version | E2E-03 |
+| E07 | after a reopen, an action recorded before it still opens the gate | E2E-08 |
+| E08 | the Requester's Actions Taken region carries an Edit button | E2E-01 |
+| E09 | "Latest recorded" sits on the last card instead of the newest recorded | RESP-03 |
+| E10 | Show latest drops the reason the person typed | E2E-03 |
+| E11 | the Open Tickets card opens an unfiltered My Tickets | E2E-05 |
+| E12 | the Follow-up needed pill is drawn in the neutral tone | STYLE-07 |
+| E13 | the red asterisk is drawn in the muted grey | STYLE-07 |
+| E14 | the focus outline is removed from buttons and fields | RESP-01, through the audit run after its first screenshot |
+| E15 | the staff dashboard's two lists stay side by side on a tablet | RESP-02 |
+| E16 | the Requester dashboard logs a console error | RESP-06 (the sweep) |
+| E17 | a quick action links to a page that does not exist | RESP-06 (the sweep) |
+| E18 | a heading carries placeholder text | RESP-06 (the sweep) |
+| E19 | the No follow-up pill has no words | RESP-06 (words) |
+| E20 | the Open Tickets card is wider than a phone | RESP-06 (320 px) |
+
+The checks written for the inspection's own findings were each shown **red before
+the fix and green after** (§5.2): the header's labels, the Ticket Number's lines,
+the owner pill's spill, the stretched badge, and the audit's five injected defects.
+
+### 8.2 What the runs left behind
+
+The full run on the fresh seed added 108 Tickets and 18 accounts (16 to 124 Tickets, 14 to 32
+accounts); the Lab 4 folder on the large development database added 83 Tickets and 13 accounts. The accounts they made are deactivated, and nothing can delete
+them (BR-50). §7 says how to reset. **The committed screenshots (§5.1) are from the fresh-seed run
+above**, so a reader who re-runs the suite on another database will see 111 files differ
+in their numbers and, on a tablet, in whether By status wraps; that is not a regression.
+
+### 8.3 What the review of PR #89 found, and the check made for each
+
+The review ran the branch on a fresh seed. Each finding was reproduced first on the
+second stack, then fixed, then shown to turn from red to green by breaking the
+application (or putting the old test back) and running the new test against it. The
+driver restores every file byte for byte and checks the SHA-256.
+
+| # | Finding | Reproduced | The check, and its result |
+| :--- | :--- | :--- | :--- |
+| 1 | RESP-02 on a tablet passed only on a database with wide counts | on the fresh seed, RESP-02 alone: the tablet failed, desktop and phone passed (`By status wraps`, expected ≥ 2, received 1) | R01 By status never wraps (`flex-wrap: nowrap`): **RESP-02 fails**. R02 each pill at least 300 px wide: **fails**. The fixed test passes on the fresh seed at all three widths |
+| 2 | E2E-08 read the status control before the refresh | R06: the Ticket read made to take 1.5 s, the test as it was: **fails** with the review's own message (`Resolved` missing from the options) | R07 the same slow read, the fixed test: **passes**. 20 of 20 runs on a fresh seed |
+| 3 | DASH-09 chose a Requester that cannot sign in | on the database a fresh seed leaves after the Lab 4 folder, the old test: `Signing in as e2e.responsive.… answered 401` (the Requester has 29 Tickets, Anucha 20) | the fixed test: **51 of 51**. With that account made *active* again, as after a killed run, a lookup restricted to `isActive` still fails with the same 401 and the seeded-only lookup passes; that is why DASH-09 looks among the seeded Requesters |
+| 4 | the server's `testTimeout` | `server/vitest.config.ts` had only `fileParallelism` | `testTimeout` and `hookTimeout` are 30 s; the whole server suite passes on the fresh database (1092 of 1092) |
+| 5 | not in the review: **the stack's clock steps backwards** | the DB: two E2E-08 tickets whose Resolve row is stamped 0.40 s *after* the Reopen row that came after it; a probe: 13 steps back of 0.69–0.71 s in 7 minutes, every 32.76 s (§7) | R03 a Reopen stamped 0.7 s early, the test as it was: **fails**; R04 the same, the fixed test: **passes**. R05 the history returned newest first (a real ordering fault), the fixed test: **still fails**, so the tolerance hides nothing. R08 the second and third action of a Ticket stamped 0.7 s early, E2E-06 and RESP-03 as they were: **2 fail**; R09 the same, the fixed tests: **2 pass** |
+
+### 8.4 What the approving review of PR #89 asked for
+
+The review approved PR #89 and asked for one small thing in `settledTimeline`, "in Issue 11's PR, in its own
+follow-ups section", and noted a difference between PostgreSQL images (§7).
+
+**R10: the hole in the clock-step tolerance.** `swappedByAClockStep` accepted a swapped Status History when the
+API's rows, taken in `id` order, were exactly the expected moves, their stamps ran backwards somewhere, and the screen
+showed what the API had returned. It never checked that the API's order was the order BR-22 asks for (`createdAt`,
+then `id`). So a server that sorted newest first, on a Ticket whose stamps also ran backwards, was accepted. The
+review made it happen with `statusHistory.ts` ordering `createdAt desc, id desc` and a database trigger that pulls
+each history row's `createdAt` back by up to 2 s. It was reproduced on the second stack with the same two changes,
+then fixed with the review's three lines: the API's rows must already be in `(createdAt, id)` order. Each row is a
+run of the test against the changed server; the server file and the helper were restored byte for byte afterwards
+(SHA-256).
+
+| Server | Stamps | `settledTimeline` | Test | Passed |
+| :--- | :--- | :--- | :--- | :--- |
+| newest first | pulled back by up to 2 s | as it was | E2E-02 | **6 of 10**: the wrong order was accepted |
+| newest first | pulled back by up to 2 s | fixed | E2E-02 | **0 of 10** |
+| newest first | pulled back by up to 2 s | fixed | E2E-08 | **0 of 6** |
+| newest first | as they are (R05) | fixed | E2E-02 | **0 of 3** |
+| correct | pulled back by up to 2 s | fixed | E2E-02 | **10 of 10**: a clock step is still accepted |
+
+**What the same experiment showed about E2E-08.** With every history stamp pulled back at random by up to 2 s,
+E2E-08 itself fails: 2 of 10 in the run above, and 8 of 12 in a later run that recorded where. All 8 failed at the
+same expectation, the gate after the reopen (`ticket-resolution.spec.ts:232`), and none in `settledTimeline`. That
+clock is far harsher than the VM's 0.7 s step every 32.8 s, so it is not a defect of the fix; it shows the mechanism
+that §7 records, with its estimated rate, as a residual risk.
+
+**The image.** The review's note is right and was checked: with the two names `E2E First user` and `E2E deactivated
+user`, `postgres:16` orders "deactivated" first and `postgres:16-alpine` orders "First" first (§7).
+
+**The review's last note** is also right: E2E-05's "Recently updated" no longer pins the order the Tickets were made
+in. It checks that the dashboard equals the API's own sort, which is the right call given the clock; the E2E-05 row of
+§2.11 now says so.
+
+### 8.5 The client breaks the review of PR #85 asked for
+
+In Issue 6, 66 client breaks were written and the machine ran low on memory after 29, so **37 never ran**, and three
+tests were added afterwards for the three breaks that survived and "not seen failing" (D08, D23, D26). The approving
+review of PR #85 asked for those 40 to be run once, on a quieter machine, before the final regression. It was missed
+in Issue 9 and is done here, one break at a time in the client container, nothing else running; the driver restores
+each file byte for byte and checks its SHA-256 (all 40 restored, and the working tree was clean afterwards). Two
+anchors had moved since Issue 6 and were refreshed with the same intent (D26 and D60).
+
+| Outcome | Breaks |
+| :--- | :--- |
+| **Caught by the tests that already existed** | 27 of the 37 (D31 to D47, D49, D51, and D56 to D63; D41 once it was written to compile); and all **3 earlier survivors**, D08, D23, and D26, so the three tests added in Issue 6 are now seen failing |
+| **Not caught: real gaps, now closed** | 9: **D16, D16b, D16c** (the API client dropped `expectedVersion` from a status, an owner, and an IT Priority change), **D48** (the first line of the timeline showed the current time instead of the Ticket's own), **D50** (a refresh blanked the timeline with a skeleton), **D52** (a failed read still drew the timeline), **D53** (the history of the wrong Ticket was requested), **D55** (the wrong path was requested), **D64** (on a phone the time stayed beside the name) |
+| **Not caught: an equivalent break** | 1: **D54** (a failed read leaves the old entries). The entries are drawn only when the state is `ready`, and a retry replaces them before it is, so the old ones are never visible and no test could tell the difference |
+| **Written wrongly** | D41 (the timeline an unordered list) changed only the opening tag, so the file did not compile and vitest ran no test; it was reported as "survived" and was not. Rewritten to change both tags, it is caught by two existing tests (STYLE-06 and UI-15) |
+
+The nine gaps were closed with nine small tests and a stronger assertion in an existing one. Each was written, then the
+break that it should catch was run again: **all nine are now caught** (the same driver, the same anchors), and D54
+still survives, as it should.
+
+| Break | The test that now catches it |
+| :--- | :--- |
+| D16, D16b, D16c | UI-13 (continued): three tests send the real client's request through a stubbed `fetch` and compare the path, the method, and the whole JSON body, `expectedVersion` included |
+| D55 | the same group: the Status History is read from `GET /api/tickets/:id/status-history` with the session cookie |
+| D53 | UI-15: on the staff screen and on the Requester's screen, the only history asked for is that of the Ticket shown (a Ticket other than the default, so a wrong id cannot match by luck) |
+| D48 | UI-15: the first line's time is the Ticket's own creation time, in the same format as the second |
+| D50 | UI-15: with the first read done and a second one held open, the four lines are still on screen and no skeleton is, until the second arrives with a fifth |
+| D52 | UI-15 (the failure test): a failed read draws no list and no "Ticket created" line |
+| D64 | STYLE-06: the time is pushed to the right edge, and on a phone it has its own line (`margin-left: 0`, `flex-basis: 100%`) |
+
+The client suite grows from 1019 to 1028 tests (nine new; none removed or weakened).
+
+### 8.6 The run on the tree of Issue 11
+
+Run in Issue 11 (#77) on branch `feature/11-lab4-delivery`: `lab4-staging` at `6911ca6` (PR #89 merged)
+plus this issue, on the same kind of **second, empty stack** as §8 (16 Tickets and 14 accounts from the
+seed; API on port 3100, client on 5174), and in the same order: every Playwright suite, then the server
+tests on the database they left, then the client tests. Every figure is the runner's own output, read
+from its log. The run from `main` (Part 3) is recorded in the submission PDF, because nothing
+can be committed after the release.
+
+| Suite | Command | Result |
+| :--- | :--- | :--- |
+| Playwright, every suite, on the fresh seed | `E2E_BASE_URL=http://localhost:5174 E2E_API_URL=http://localhost:3100 npx playwright test` | **85 passed** in 7.0 min: 21 of Lab 2, 25 of Lab 3, and 39 of Lab 4; the database went from 16 to 124 Tickets and 14 to 32 accounts |
+| Server, Labs 1–4, **on that same database** | `docker exec -e CLIENT_ORIGINS=http://localhost:5173 toktickit-fresh-server npx vitest run` | **first run: 38 files, 1091 passed and 1 failed** (96 s): Lab 3's API-70, "16 minutes" against "15 minutes" (§7, a third place the stepping clock can reach). **Second run, the same database: 38 files, 1092 passed** (92 s) |
+| `login-throttle.api.test.ts` alone, 15 times | `docker exec … npx vitest run tests/lab-03/login-throttle.api.test.ts` | **15 passed, 0 failed** |
+| Client, Labs 1–4 | `docker exec toktickit-client npx vitest run` | **26 files, 1028 passed** (44 s): the 1019 of §8 and the nine of §8.5 |
+| Type check | `npx tsc --noEmit` in each container | **exit 0 and no output**, server and client |
+| Production build | `npx vite build` | built |
+| The README's database commands | `prisma migrate deploy`, `npm run prisma:seed` twice, `prisma migrate reset --force` | "No pending migrations to apply"; the two seeds report the same totals; after the reset, 16 Tickets, 14 accounts, 18 Actions Taken, and 37 status changes |
+| The README's Lab 4 API claims | `curl` with a cookie jar per role, on what the README's API section states | every status and code the README states, as the roles it names: the dashboards `200` and `403` for the other role; the staff routes `200` for an Administrator and `403` for a Requester; the gate `409 ACTION_REQUIRED` and `409 FOLLOW_UP_PENDING`, then `200` once a colleague recorded the closing action; `409 STALE_UPDATE`; `409 TICKET_NOT_ACTIVE` on a resolved Ticket; `404` for another Requester's Ticket; `400` for a NUL character and for an out-of-range id |
+| The README's demonstration path | a throwaway Playwright script (not kept) that did what each of the eleven steps says, through the real screens, and checked what it says you see | passed on a fresh seed once the README told the reader to choose **Dashboard** after switching accounts (§8.7) |
+
+The Playwright run rewrote 152 tracked screenshots, as it always does; they were restored with
+`git checkout -- artifacts`, and the committed ones (§5.1) are unchanged.
+
+### 8.7 What checking the README found
+
+The README's Lab 4 text was written from the specification and then checked, claim by claim, against the running
+application. That found:
+
+* **Two claims that were wrong, and are fixed:** the IT Staff endpoints were still described as closed to an
+  Administrator ("IT Staff only … BR-19", Lab 3's text), when Lab 4 opens them (D-08); and the Lab 4 seed's
+  one-time catch-up of Last Updated, which the approving review of PR #80 asked the README to mention, was not
+  there. The catch-up was tested as the README now says it: with every sample Ticket's Last Updated set to 2020,
+  the first seed put all 16 back to their seeded values and the second changed none.
+* **A behaviour the demonstration path must work around:** a sign-in returns the person to the page they were
+  sent from, when their role may open it (Lab 3's `state.from`). After a Logout that page is the one the previous
+  person left, so a second sign-in in the same tab does not always land on the Dashboard. The README says so and
+  tells the reader to choose **Dashboard**; a first sign-in does land there, and the walk checked it.
+
+The walk also failed three times on mistakes in the script itself (a locator that matched both a card and the By
+status link of the same name, the wrong label for the staff queue's search field, and a click on a summary where
+the ticket opens from its number). They changed the script, not the README.
+
+### 8.8 What the review of PR #90 changed
+
+The review of PR #90 asked for one change before the merge: nothing in the repository may promise a commit
+that has to follow the release Pull Request into `main`, because nothing can follow it. Four places in this
+file did. The opening paragraph, the opening of §8, and the opening of §8.6 now say that the run from `main`
+(Part 3) is recorded in the submission PDF, and the Issue 11 row of §3.1 no longer lists it.
+
+One line the review did not name followed from it. `specification.md` §10.2 said `tests.md` records the
+runner's output from `main`. It now says the output from `lab4-staging` is here and the output from `main` is
+in the PDF. That is a change to the approved specification, made on this review's account. The evidence for
+Part 2 is not affected: the contract is PR #78, merged at 2026-10-05 16:08:34 UTC as `f14ae15`.

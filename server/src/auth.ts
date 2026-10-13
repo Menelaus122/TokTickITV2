@@ -1,6 +1,7 @@
 import express, { type NextFunction, type Request, type Response } from "express";
 import { getPrisma } from "./prisma.js";
 import { loginThrottle } from "./loginThrottle.js";
+import { nulFailure } from "./bodyGuards.js";
 import { checkNewPassword, hashPassword, verifyPasswordForLogin } from "./password.js";
 import {
   SESSION_COOKIE,
@@ -103,6 +104,10 @@ authRouter.use((_req, res, next) => {
 
 // §2.1 — POST /api/auth/login
 authRouter.post("/login", async (req: Request, res: Response) => {
+  // Lab 4 (BR-52): a NUL character is not a guess at a password, so it is refused here, before the
+  // attempt is reserved, and does not count towards the lock (Lab 3 BR-67).
+  const nul = nulFailure(req.body);
+  if (nul) return res.status(400).json(nul);
   const body = (req.body ?? {}) as Record<string, unknown>;
   // BR-45 — emails are compared lowercased. Passwords are never trimmed.
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
@@ -200,6 +205,8 @@ authRouter.get("/me", requireSession, (req: Request, res: Response) => {
 // §2.4 — POST /api/auth/password
 authRouter.post("/password", requireSession, async (req: Request, res: Response) => {
   const { user, sessionId } = req.auth!;
+  const nul = nulFailure(req.body);
+  if (nul) return res.status(400).json(nul);
   const body = (req.body ?? {}) as Record<string, unknown>;
   const currentPassword = typeof body.currentPassword === "string" ? body.currentPassword : "";
   const newPassword = body.newPassword;

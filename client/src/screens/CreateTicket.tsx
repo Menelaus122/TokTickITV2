@@ -16,6 +16,7 @@ import {
 } from "../api.js";
 import { checkFileBeforeUpload } from "../components/AttachmentSection.js";
 import { useRequester } from "../context/RequesterContext.js";
+import { useSingleFlight } from "../components/useSingleFlight.js";
 import {
   ActionBar,
   Button,
@@ -104,7 +105,7 @@ export function CreateTicket({
 
   const [values, setValues] = useState<FormValues>(EMPTY_FORM);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [submitting, setSubmitting] = useState(false);
+  const { busy: submitting, once } = useSingleFlight();
   const [formError, setFormError] = useState<string>();
   const [created, setCreated] = useState<Ticket | null>(null);
 
@@ -179,12 +180,14 @@ export function CreateTicket({
     setFiles((current) => current.filter((file) => file.name !== name));
   }
 
-  async function handleSubmit(event: React.FormEvent) {
+  // BR-30, BR-53 — one in-flight submission at a time, so a double click, or three presses in one task, cannot
+  // create three tickets: the guard is taken before anything is awaited (useSingleFlight).
+  function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    // BR-30 — one in-flight submission at a time, so a double click cannot
-    // create two tickets.
-    if (submitting) return;
+    void once(submitTicket);
+  }
 
+  async function submitTicket() {
     setFormError(undefined);
 
     const clientErrors = validateForm(values);
@@ -203,7 +206,6 @@ export function CreateTicket({
       requestedPriority: values.requestedPriority as RequestedPriority,
     };
 
-    setSubmitting(true);
     try {
       const ticket = await createTicket(payload);
 
@@ -246,8 +248,6 @@ export function CreateTicket({
           "Cannot reach the TokTickIT API. Your ticket has not been created, and nothing you entered has been lost — try again.",
         );
       }
-    } finally {
-      setSubmitting(false);
     }
   }
 

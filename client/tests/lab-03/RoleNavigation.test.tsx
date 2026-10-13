@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { TokTickITApp } from "../../src/TokTickITApp.js";
 import * as api from "../../src/api.js";
 import type { AuthUser, Role } from "../../src/api.js";
+import type { TicketStatus } from "../../src/components/index.js";
 
 // Lab 3, Issue 5 — UI-07 and UI-08 in docs/lab-03/tests.md (ui-spec §2,
 // FR-13, FR-14, FR-07).
@@ -14,13 +15,54 @@ const USERS: Record<Role, AuthUser> = {
   ADMINISTRATOR: { id: 9, fullName: "Malee Sutthiwong", email: "malee.admin@toktickit.local", role: "ADMINISTRATOR", isActive: true, mustChangePassword: false },
 };
 
+// Changed in Lab 4 (Issue 2, D-08, BR-42): an Administrator also has the Ticket
+// Queue; and (Issues 7 and 8, D-09) every role's list starts with the Dashboard.
+// docs/lab-04/tests.md §6.
 const NAV: Record<Role, string[]> = {
-  REQUESTER: ["My Tickets", "Create Ticket"],
-  IT_STAFF: ["Ticket Queue"],
-  ADMINISTRATOR: ["User Management"],
+  REQUESTER: ["Dashboard", "My Tickets", "Create Ticket"],
+  IT_STAFF: ["Dashboard", "Ticket Queue"],
+  ADMINISTRATOR: ["Dashboard", "Ticket Queue", "User Management"],
+};
+
+// The link that is the current page after landing: the first link again, as it was in
+// Lab 3, since the Dashboard is every role's home (D-09).
+const HOME: Record<Role, string> = {
+  REQUESTER: "Dashboard",
+  IT_STAFF: "Dashboard",
+  ADMINISTRATOR: "Dashboard",
 };
 
 beforeEach(() => {
+  // Lab 4, Issue 8: IT Staff and an Administrator land on the Dashboard too.
+  vi.spyOn(api, "fetchStaffDashboard").mockResolvedValue({
+    generatedAt: "2026-10-05T09:00:00.000Z",
+    metrics: {
+      unassigned: { value: 0, href: "/queue?owner=unassigned&group=open" },
+      assignedToMe: { value: 0, href: "/queue?owner=me&group=open" },
+      waitingForRequester: { value: 0, href: "/queue?status=WAITING_FOR_REQUESTER" },
+      urgent: { value: 0, href: "/queue?itPriority=URGENT&group=open" },
+    },
+    byStatus: ["NEW", "OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "REOPENED"].map((status) => ({
+      status: status as TicketStatus,
+      value: 0,
+      href: `/queue?status=${status}`,
+    })),
+    myTickets: [],
+    urgentTickets: [],
+    myRecentActions: [],
+  });
+  // Lab 4, Issue 7: a Requester's home is the Dashboard, which asks for its own data.
+  vi.spyOn(api, "fetchRequesterDashboard").mockResolvedValue({
+    generatedAt: "2026-10-05T09:00:00.000Z",
+    metrics: {
+      openTickets: { value: 0, href: "/tickets?group=open" },
+      waitingForYou: { value: 0, href: "/tickets?status=WAITING_FOR_REQUESTER" },
+      resolved: { value: 0, href: "/tickets?status=RESOLVED" },
+      closed: { value: 0, href: "/tickets?status=CLOSED" },
+    },
+    needsAttention: [],
+    recentTickets: [],
+  });
   vi.spyOn(api, "fetchMyTickets").mockResolvedValue({
     data: [], meta: { page: 1, pageSize: 10, totalItems: 0, totalPages: 0, hasPrev: false, hasNext: false },
   });
@@ -48,16 +90,18 @@ describe("UI-07 each role sees only its own destinations", () => {
     const labels = within(nav).getAllByRole("link").map((link) => link.textContent);
     expect(labels).toEqual(NAV[role]);
     // Landed on the role's own home, marked as the current page.
-    expect(within(nav).getByRole("link", { name: NAV[role][0] })).toHaveAttribute("aria-current", "page");
+    expect(within(nav).getByRole("link", { name: HOME[role] })).toHaveAttribute("aria-current", "page");
   });
 
+  // The Lab 3 row for an Administrator typing /queue is gone: the queue is open
+  // to them now, and the Lab 4 suite (client/tests/lab-04/RoleNavigation.test.tsx)
+  // covers it.
   it.each([
-    ["IT_STAFF", "/tickets", "Ticket Queue"],
-    ["IT_STAFF", "/users", "Ticket Queue"],
-    ["ADMINISTRATOR", "/queue", "User Management"],
-    ["ADMINISTRATOR", "/tickets/new", "User Management"],
-    ["REQUESTER", "/queue", "My Tickets"],
-    ["REQUESTER", "/users", "My Tickets"],
+    ["IT_STAFF", "/tickets", "Dashboard"],
+    ["IT_STAFF", "/users", "Dashboard"],
+    ["ADMINISTRATOR", "/tickets/new", "Dashboard"],
+    ["REQUESTER", "/queue", "Dashboard"],
+    ["REQUESTER", "/users", "Dashboard"],
   ] as [Role, string, string][])("a %s typing %s lands on their own home with a forbidden notice", async (role, path, home) => {
     signedInAs(role);
     render(<TokTickITApp initialEntries={[path]} />);

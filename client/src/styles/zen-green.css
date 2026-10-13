@@ -213,8 +213,9 @@ textarea.tt-field__control {
   cursor: not-allowed;
 }
 
-/* Busy keeps the disabled appearance and adds a spinner. */
-.tt-btn--busy { cursor: progress; }
+/* Busy keeps the disabled appearance and adds a spinner. A busy button is disabled, so this has to be as specific
+   as `.tt-btn:disabled` above, or its not-allowed cursor wins and the wait looks like a refusal (Lab 4, Issue 9). */
+.tt-btn--busy:disabled { cursor: progress; }
 
 .tt-spinner {
   width: 14px;
@@ -385,38 +386,6 @@ textarea.tt-field__control {
 /* The hamburger is hidden until the mobile breakpoint. */
 .tt-shell__menu-toggle { display: none; color: #fff; font-size: 20px; }
 
-/* Pushed to the right edge; the identity is the last thing on the bar. */
-.tt-shell__requester {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: var(--tt-space-3);
-}
-
-.tt-shell__requester-name { font-weight: 600; }
-.tt-shell__change { color: #fff; text-decoration: underline; }
-
-.tt-shell__notice {
-  margin: 0;
-  padding: var(--tt-space-2) var(--tt-space-6);
-  background: var(--tt-warning-bg);
-  color: var(--tt-warning);
-  font-size: var(--tt-font-help);
-  text-align: center;
-}
-
-/* --- Requester Selection screen (ui-spec.md 8) ---------------------------- */
-
-.tt-selection {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.tt-selection__card { width: 100%; max-width: 440px; }
-.tt-selection__card .tt-btn { width: 100%; }
-
 /* --- List toolbar and pagination (ui-spec.md 10.2) ------------------------ */
 
 .tt-toolbar {
@@ -574,7 +543,6 @@ textarea.tt-field__control {
      wordmark and the toggle, so nothing is pushed off the side. */
   .tt-shell__desktop-nav { display: none; }
   .tt-shell__menu-toggle { display: inline-flex; margin-left: auto; }
-  .tt-shell__requester { width: 100%; order: 3; justify-content: flex-start; }
 
   .tt-shell__header { flex-wrap: wrap; min-height: 56px; padding: var(--tt-space-2) var(--tt-space-4); }
 
@@ -659,8 +627,10 @@ html, body { overflow-x: hidden; }
 /* Owner presentation: a name, or the word Unassigned — never an empty cell. */
 .tt-owner { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--tt-space-1); }
 .tt-owner--unassigned { color: var(--tt-text-muted); font-style: italic; }
-.tt-owner .tt-badge { text-transform: none; letter-spacing: 0; }
-.tt-badge[data-badge="owner-inactive"] { background: var(--tt-surface); border-color: var(--tt-border); }
+/* A pill keeps its words on one line: wrapped, "No longer IT Staff" reads as two labels in a narrow Owner column (Lab 4, Issue 9). */
+.tt-owner .tt-badge { text-transform: none; letter-spacing: 0; white-space: nowrap; }
+.tt-badge[data-badge="owner-inactive"],
+.tt-badge[data-badge="owner-not-staff"] { background: var(--tt-surface); border-color: var(--tt-border); }
 
 .tt-queue__search { flex: 1 1 260px; }
 .tt-queue__search .tt-field__control { width: 100%; }
@@ -792,4 +762,371 @@ html, body { overflow-x: hidden; }
 
 @media (min-width: 992px) {
   .tt-drawer__panel { max-width: 480px; box-shadow: -4px 0 16px rgba(28, 43, 36, .15); }
+}
+
+/* --- Lab 4: Actions Taken (ui-spec §1.2, §1.3, §4) --------------------------
+   Lab 2's and Lab 3's tokens only. The region is a card; each entry is a
+   bordered surface with a definition list inside it. Cards are one column at
+   every width, so there is no table-to-card switch and nothing to scroll. */
+
+.tt-actions-taken { margin-bottom: var(--tt-space-4); }
+.tt-actions-taken__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tt-space-2);
+  margin-bottom: var(--tt-space-3);
+}
+.tt-actions-taken__head .tt-h2 { margin: 0; }
+.tt-actions-taken__list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--tt-space-3); }
+.tt-actions-taken > .tt-callout,
+.tt-actions-taken > .tt-action-form { margin-bottom: var(--tt-space-4); }
+
+.tt-action {
+  background: var(--tt-surface);
+  border: 1px solid var(--tt-border);
+  border-radius: var(--tt-radius);
+  padding: var(--tt-space-4);
+  min-width: 0;
+}
+.tt-action__head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tt-space-2) var(--tt-space-3); }
+.tt-action__head .tt-btn { margin-left: auto; }
+.tt-action__title { margin: 0; font-size: var(--tt-font-body); font-weight: 700; }
+.tt-action__title:focus { outline: 2px solid var(--tt-green-secondary); outline-offset: 2px; }
+.tt-action__by { display: inline-flex; align-items: center; gap: var(--tt-space-2); font-size: var(--tt-font-label); color: var(--tt-text-muted); }
+
+/* The tag is text with its own outline, so it never depends on colour alone. */
+.tt-action__latest {
+  font-size: var(--tt-font-help);
+  font-weight: 700;
+  color: var(--tt-green-primary);
+  border: 1px solid var(--tt-green-primary);
+  border-radius: 999px;
+  padding: 0 var(--tt-space-2);
+}
+
+.tt-action__fields { display: grid; grid-template-columns: 1fr; gap: var(--tt-space-1) var(--tt-space-4); margin: var(--tt-space-3) 0; }
+.tt-action__fields dt { font-weight: 600; color: var(--tt-text-muted); }
+.tt-action__fields dd { margin: 0 0 var(--tt-space-2); overflow-wrap: anywhere; white-space: pre-wrap; }
+.tt-action__footer { margin: 0; font-size: var(--tt-font-help); color: var(--tt-text-muted); overflow-wrap: anywhere; }
+
+.tt-action-form .tt-field__control { width: 100%; }
+.tt-action-form__performer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--tt-space-3); }
+.tt-action-form__performer .tt-field { flex: 0 1 28rem; }
+.tt-action-form__performer .tt-badge { margin-bottom: var(--tt-space-2); }
+.tt-action-form__latest { margin-top: var(--tt-space-3); }
+.tt-radio { display: inline-flex; align-items: center; gap: var(--tt-space-2); margin-right: var(--tt-space-6); }
+.tt-action-form .tt-fieldset { border: 0; padding: 0; margin: var(--tt-space-4) 0; }
+.tt-action-form .tt-fieldset legend { padding: 0; }
+
+@media (min-width: 992px) {
+  .tt-action__fields { grid-template-columns: 180px minmax(0, 1fr); }
+  .tt-action__fields dd { margin-bottom: 0; }
+}
+
+/* --- Lab 4: Status History (ui-spec §1.4, §6) -------------------------------
+   An ordered list with a vertical rule on the left in --tt-border and one marker
+   per step. The newest step is not marked by colour: it is simply last. */
+
+.tt-history { margin-bottom: var(--tt-space-4); }
+.tt-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 var(--tt-space-4);
+  border-left: 2px solid var(--tt-border);
+}
+.tt-timeline__step {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tt-space-2) var(--tt-space-3);
+  padding: var(--tt-space-2) 0 var(--tt-space-3);
+  overflow-wrap: anywhere;
+}
+.tt-timeline__step::before {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--tt-space-4) - 6px);
+  top: var(--tt-space-4);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--tt-green-primary);
+}
+.tt-timeline__what { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--tt-space-1); font-weight: 600; }
+.tt-timeline__who { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--tt-space-2); font-size: var(--tt-font-label); color: var(--tt-text-muted); }
+.tt-timeline__step time { margin-left: auto; font-size: var(--tt-font-help); color: var(--tt-text-muted); }
+
+@media (max-width: 767px) {
+  .tt-timeline__step time { margin-left: 0; flex-basis: 100%; }
+}
+
+/* --- Lab 4: Status control (ui-spec §5) --------------------------------------
+   "Not available now": the moves the matrix allows that the ticket cannot make
+   yet, each with the API's own reason. */
+
+.tt-staff-detail__blocked { margin-top: var(--tt-space-3); padding-top: var(--tt-space-3); border-top: 1px solid var(--tt-border); }
+.tt-staff-detail__blocked ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--tt-space-2); }
+.tt-staff-detail__blocked li { overflow-wrap: anywhere; }
+.tt-staff-detail__group .tt-staff-detail__blocked .tt-btn { margin-bottom: 0; }
+
+/* --- Lab 4: Metric card and Requester Dashboard (ui-spec §1.1, §3.1, §3.6) -----
+   A card that is also a link, built from Lab 2's card so it adds no colour. The three
+   sizes are the ones the specification gives: the label 12 px, the value 32 px, and
+   the link text 14 px, which is the label size. Lab 2 already draws 12 px (the badge) and
+   32 px (the empty-state icon) as literals, so these are not new sizes; the card names
+   them, so every font size in the stylesheet is still a variable. */
+
+.tt-metric {
+  --tt-font-caption: 12px;
+  --tt-font-metric: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tt-space-2);
+  padding: var(--tt-space-4) var(--tt-space-6);
+  background: var(--tt-surface);
+  border: 1px solid var(--tt-border);
+  border-radius: var(--tt-radius);
+  box-shadow: var(--tt-shadow-card);
+  color: var(--tt-text);
+  text-decoration: none;
+}
+.tt-metric__label { font-size: var(--tt-font-caption); font-weight: 600; text-transform: uppercase; color: var(--tt-text-muted); overflow-wrap: anywhere; }
+.tt-metric__value { font-size: var(--tt-font-metric); line-height: 1.1; font-weight: 600; color: var(--tt-green-primary); }
+.tt-metric__link { font-size: var(--tt-font-label); color: var(--tt-green-primary); }
+
+.tt-metric--link:hover { border-color: var(--tt-green-primary); background: var(--tt-green-pale); }
+.tt-metric--link:hover .tt-metric__link { text-decoration: underline; }
+.tt-metric--link:active { background: var(--tt-green-pale); }
+.tt-metric--link:focus-visible {
+  outline: 2px solid var(--tt-green-secondary);
+  outline-offset: 2px;
+}
+
+.tt-dash__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tt-space-4);
+  margin-bottom: var(--tt-space-6);
+}
+.tt-dash__head .tt-h1 { margin: 0; }
+
+.tt-dash__cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--tt-space-4);
+  margin-bottom: var(--tt-space-6);
+}
+
+.tt-dash__list-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--tt-space-4);
+  margin-bottom: var(--tt-space-3);
+}
+.tt-dash__list-head .tt-h2 { margin: 0; }
+.tt-dash__view-all { font-size: var(--tt-font-label); font-weight: 600; color: var(--tt-green-primary); text-decoration: none; white-space: nowrap; }
+.tt-dash__view-all:hover { text-decoration: underline; }
+.tt-dash__view-all:focus-visible {
+  outline: 2px solid var(--tt-green-secondary);
+  outline-offset: 2px;
+}
+
+.tt-dash__list > .tt-muted { margin: 0; }
+.tt-dash__rows { list-style: none; margin: 0; padding: 0; }
+.tt-dash-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--tt-space-3);
+  padding: var(--tt-space-3) var(--tt-space-2);
+  border-top: 1px solid var(--tt-border);
+  color: var(--tt-text);
+  text-decoration: none;
+}
+.tt-dash__rows li:first-child .tt-dash-row { border-top: 0; }
+.tt-dash-row:hover { background: var(--tt-green-pale); }
+.tt-dash-row:focus-visible {
+  outline: 2px solid var(--tt-green-secondary);
+  outline-offset: 2px;
+}
+.tt-dash-row__number { font-family: var(--bs-font-monospace, monospace); font-weight: 600; color: var(--tt-green-primary); white-space: nowrap; }
+.tt-dash-row__summary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt-dash-row time { font-size: var(--tt-font-help); color: var(--tt-text-muted); white-space: nowrap; }
+
+.tt-dash__empty { display: flex; align-items: center; flex-wrap: wrap; gap: var(--tt-space-4); }
+.tt-dash__empty p { margin: 0; }
+
+.tt-dash__buttons { display: flex; flex-wrap: wrap; gap: var(--tt-space-3); }
+a.tt-btn { text-decoration: none; }
+
+.tt-skeleton--card { height: 112px; margin: 0; }
+.tt-skeleton--list { height: 148px; margin-bottom: var(--tt-space-6); }
+
+@media (max-width: 991px) {
+  .tt-dash__cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 767px) {
+  .tt-dash__head { flex-direction: column; align-items: flex-start; }
+  .tt-dash__cards { grid-template-columns: 1fr; }
+  .tt-dash-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .tt-dash-row__summary { grid-column: 1 / -1; order: 3; }
+  .tt-dash-row time { grid-column: 1 / -1; order: 4; }
+  .tt-dash__buttons { flex-direction: column; }
+  .tt-dash__buttons .tt-btn { width: 100%; }
+}
+
+/* --- Lab 4: Filter chip (ui-spec §7) -------------------------------------------
+   The group filter on My Tickets, shown beside the other filters so the list's scope
+   is visible, with a cross that removes it. Lab 2's green badge colours, no new ones. */
+
+.tt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tt-space-1);
+  padding: 2px var(--tt-space-2) 2px var(--tt-space-3);
+  border: 1px solid var(--tt-green-secondary);
+  border-radius: 999px;
+  background: var(--tt-green-pale);
+  color: var(--tt-green-primary);
+  font-size: var(--tt-font-label);
+  font-weight: 600;
+}
+.tt-chip__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.tt-chip__remove:hover { background: var(--tt-surface); }
+.tt-chip__remove:focus-visible {
+  outline: 2px solid var(--tt-green-secondary);
+  outline-offset: 2px;
+}
+
+/* The Ticket Queue's chip sits above its filters, outside them so a phone's folded filters do
+   not hide it, and needs a gap before them. */
+.tt-queue__chips { margin-bottom: var(--tt-space-3); }
+
+@media (max-width: 767px) {
+  /* Lab 2 gives the search box `flex: 1 1 240px`, a width in a row. In the column the toolbar
+     becomes on a phone it is a height, and the box was 240 px tall. */
+  .tt-toolbar input[type="search"] { flex: 0 0 auto; }
+  .tt-chip { align-self: flex-start; }
+  .tt-chip__remove { min-width: 44px; min-height: 44px; }
+}
+
+/* --- Lab 4: Staff Dashboard (ui-spec §3.2, §3.3, §3.6) -----------------------------
+   The IT Staff and Administrator Dashboard, built from the metric card and the rows of the
+   Requester Dashboard above: the status counts, the two lists side by side, the one-line
+   action rows, and the Administrator's plain counts. No new colour. */
+
+.tt-dash__statuses { margin-bottom: var(--tt-space-6); }
+.tt-dash__status-row {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tt-space-3);
+}
+.tt-dash-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tt-space-2);
+  padding: var(--tt-space-2) var(--tt-space-4);
+  background: var(--tt-surface);
+  border: 1px solid var(--tt-border);
+  border-radius: var(--tt-radius);
+  color: var(--tt-text);
+  text-decoration: none;
+}
+.tt-dash-status:hover { background: var(--tt-green-pale); border-color: var(--tt-green-primary); }
+.tt-dash-status:focus-visible {
+  outline: 2px solid var(--tt-green-secondary);
+  outline-offset: 2px;
+}
+.tt-dash-status__value { font-size: var(--tt-font-h2); font-weight: 600; color: var(--tt-green-primary); }
+
+.tt-accounts { margin-bottom: var(--tt-space-6); }
+.tt-accounts > .tt-muted { margin: 0; }
+.tt-accounts .tt-dash__cards { margin: var(--tt-space-3) 0 0; }
+
+.tt-dash__pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tt-space-6);
+  margin-bottom: var(--tt-space-6);
+}
+.tt-dash__pair > .tt-card { margin-top: 0; }
+
+.tt-dash-row--staff { grid-template-columns: auto minmax(0, 1fr) auto; }
+.tt-dash-row__meta {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tt-space-2) var(--tt-space-3);
+}
+.tt-dash-row--action { grid-template-columns: auto auto minmax(0, 1fr) auto; }
+
+.tt-skeleton--row { height: 72px; margin-bottom: var(--tt-space-6); }
+
+@media (max-width: 991px) {
+  .tt-dash__pair { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 767px) {
+  .tt-dash-row--staff,
+  .tt-dash-row--action { grid-template-columns: minmax(0, 1fr) auto; }
+  .tt-dash-row__meta { order: 5; }
+  .tt-dash__status-row { flex-direction: column; }
+  .tt-dash-status { justify-content: space-between; }
+}
+
+/* --- Lab 4, Issue 10: what the visual inspection found (tests.md section 5) ---------------------- */
+
+/* A navigation label or an account action never breaks across two lines. Dashboard, the new first item,
+   made the header too wide for a tablet, and "My Tickets", "Ticket Queue", and "User Management" had
+   been wrapping mid-name, with "Logout" alone on a second line. Each now keeps its own line, and the
+   header wraps as a whole instead: the signed-in user's block moves to a second row of its own. */
+.tt-shell__brand,
+.tt-shell__link,
+.tt-shell__user-name,
+.tt-shell__user .tt-badge,
+.tt-shell__action { white-space: nowrap; }
+
+@media (min-width: 768px) and (max-width: 991px) {
+  .tt-shell__header { flex-wrap: wrap; row-gap: var(--tt-space-1); padding-top: var(--tt-space-2); padding-bottom: var(--tt-space-2); }
+}
+
+/* The Ticket Number and the date in the My Tickets table keep one line each. A long Summary used to
+   squeeze them until "TT-2026-" and "00628" were on separate lines. */
+.tt-table__nowrap,
+.tt-table__nowrap .tt-btn { white-space: nowrap; }
+
+/* On a tablet the Ticket Queue's Ticket Owner column held 115 px, and "No longer IT Staff" (119 px, in a
+   cell with 24 px of padding) was drawn out past the right edge of the card. 150 px holds it; the Summary,
+   which wraps there, gives up the difference. */
+@media (min-width: 768px) and (max-width: 991px) {
+  .tt-queue-table .tt-queue__col-6 { width: 150px; }
+}
+
+/* On a phone an attachment is a column whose items are stretched, so the buttons can be full width, and the
+   ACTIVE badge was stretched with them into a bar across the card. A badge is as wide as its word. */
+@media (max-width: 767px) {
+  .tt-attachment .tt-badge { align-self: flex-start; }
 }

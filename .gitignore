@@ -19,6 +19,8 @@ docs/lab-02/TokTickIT_GitHub_Workflow_Guide_TH_EN.md
 docs/lab-02/MyIssue.md
 docs/lab-03/labsheet/
 docs/lab-03/MyIssue.md
+docs/lab-04/labsheet/
+docs/lab-04/MyIssue.md
 
 # uploaded attachment files (metadata lives in PostgreSQL)
 server/uploads/
@@ -39,3 +41,9 @@ test-results/
 docs/lab-02/*.docx
 docs/lab-03/*.docx
 ~$*.docx
+
+# Lab 4's submission working documents: the .docx the PDF is made from, and the screenshots
+# captured for it. The PDF is the deliverable. The evidence that belongs to the code is
+# under artifacts/lab-04/, which stays tracked.
+docs/lab-04/*.docx
+docs/lab-04/image/

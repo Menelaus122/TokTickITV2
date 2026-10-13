@@ -6,9 +6,14 @@ import { attachSession, authRouter, enforcePasswordChange, requireSession } from
 import { apiNotFound, rejectForeignOrigin, requireRole, resolveRequesterIdentity, safeErrors } from "./authorization.js";
 import { validateTicketInput } from "./validation.js";
 import { nextTicketNumber } from "./ticketNumber.js";
-import { parseTicketListQuery, buildPageMeta } from "./listQuery.js";
+import { allowedStatuses, parseTicketListQuery, buildPageMeta } from "./listQuery.js";
 import { conversationRouter } from "./conversation.js";
+import { actionsTakenReadRouter, actionsTakenStaffRouter } from "./actionsTaken.js";
+import { statusHistoryRouter } from "./statusHistory.js";
+import { dashboardRouter } from "./dashboard.js";
+import { staffDashboardRouter } from "./staffDashboard.js";
 import { staffRouter } from "./staff.js";
+import { nulFailure } from "./bodyGuards.js";
 import { adminRouter } from "./admin.js";
 import { routeId } from "./routeId.js";
 import { ATTACHMENT_SELECT, UPLOAD_DIR, attachmentView, sendAttachment } from "./attachmentResponse.js";
@@ -63,10 +68,13 @@ app.use(attachSession);
 app.use(enforcePasswordChange);
 app.use("/api/auth", authRouter);
 
-// Lab 3, Issue 4 — the BR-18 matrix by route family. Administrators are not
-// IT Staff (BR-19), so each family admits exactly one role. Mounted here, the
-// guard covers every route Issues 8 to 10 add under these prefixes.
-app.use("/api/staff", requireRole("IT_STAFF"));
+// Lab 3, Issue 4 — the role matrix by route family, as Lab 4 BR-42 and BR-43
+// restate it. Lab 3 admitted exactly one role per family because an
+// Administrator was not IT Staff (Lab 3 BR-19). Lab 4 D-08 reverses that for
+// the ticket operations: /api/staff admits IT Staff and Administrators, and
+// /api/admin stays Administrator-only. Mounted here, the guard covers every
+// route added under these prefixes, including ones not written yet.
+app.use("/api/staff", requireRole("IT_STAFF", "ADMINISTRATOR"));
 app.use("/api/admin", requireRole("ADMINISTRATOR"));
 
 // ---------------------------------------------------------------------------
@@ -104,7 +112,7 @@ app.get("/api/categories", requireSession, async (_req: Request, res: Response) 
     res.status(200).json(categories);
   } catch {
     // Never leak internal/database details to the client.
-    res.status(500).json({ error: "Failed to load categories" });
+    res.status(500).json({ error: { code: "INTERNAL_ERROR", message: "Failed to load categories." } });
   }
 });
 
@@ -173,6 +181,10 @@ app.post("/api/tickets", async (req: Request, res: Response) => {
       .json({ error: { code: context.code, message: context.message } });
   }
 
+  // Lab 4 (BR-52): a NUL character anywhere in the body is a 400 on its field, before the body is read.
+  const nul = nulFailure(req.body);
+  if (nul) return res.status(400).json(nul);
+
   // Any ticketNumber, requesterId, or currentStatus in the body is simply not
   // read — those are the server's to decide.
   const validation = validateTicketInput(req.body);
@@ -196,8 +208,9 @@ app.post("/api/tickets", async (req: Request, res: Response) => {
     ]);
 
     const fields: Record<string, string> = {};
-    if (!category) fields.categoryId = "Category is required.";
-    if (!relatedSystem) fields.relatedSystemId = "Related System is required.";
+    // The id was sent, and names nothing active: it is not missing (review of PR #88).
+    if (!category) fields.categoryId = "Choose a valid category.";
+    if (!relatedSystem) fields.relatedSystemId = "Choose a valid related system.";
     if (Object.keys(fields).length > 0) {
       return res.status(400).json({
         error: { code: "VALIDATION_FAILED", message: "One or more fields are invalid.", fields },
@@ -290,6 +303,8 @@ app.get("/api/tickets", async (req: Request, res: Response) => {
     return res.status(400).json({ error: { code: "INVALID_QUERY", message: parsed.message } });
   }
   const query = parsed.value;
+  // Lab 4 (D-12): `group` and `currentStatus` narrow the same column, and combine by AND.
+  const statuses = allowedStatuses(query.group, query.currentStatus);
 
   try {
     const where = {
@@ -297,7 +312,7 @@ app.get("/api/tickets", async (req: Request, res: Response) => {
       ...(query.categoryId ? { categoryId: query.categoryId } : {}),
       ...(query.relatedSystemId ? { relatedSystemId: query.relatedSystemId } : {}),
       ...(query.requestedPriority ? { requestedPriority: query.requestedPriority } : {}),
-      ...(query.currentStatus ? { currentStatus: query.currentStatus } : {}),
+      ...(statuses ? { currentStatus: { in: statuses } } : {}),
       // Search spans Ticket Number and Summary, case-insensitively (BR-18),
       // and combines with the filters above using AND (BR-19).
       ...(query.search
@@ -501,6 +516,10 @@ app.post("/api/tickets/:id/attachments", (req: Request, res: Response) => {
       // Ownership is checked before the file is even looked at (BR-37).
       if (!ticket) return res.status(404).json(NOT_FOUND);
 
+      // Lab 4 (BR-52): the file's name is a string of the request, and PostgreSQL text cannot hold a NUL.
+      const nul = nulFailure({ file: file.originalname });
+      if (nul) return res.status(400).json(nul);
+
       const check = checkUpload(file.originalname, file.mimetype, file.size);
       if (!check.ok) {
         return res
@@ -618,6 +637,10 @@ app.patch("/api/attachments/:id/remove", async (req: Request, res: Response) => 
       .json({ error: { code: "INVALID_QUERY", message: "The attachment id is not valid." } });
   }
 
+  // Lab 4 (BR-52): a NUL character anywhere in the body is a 400 on its field, before the body is read.
+  const nul = nulFailure(req.body);
+  if (nul) return res.status(400).json(nul);
+
   const reason = checkRemovalReason((req.body as { removalReason?: unknown })?.removalReason);
   if (!reason.ok) {
     return res.status(400).json({
@@ -674,8 +697,18 @@ app.patch("/api/attachments/:id/remove", async (req: Request, res: Response) => 
 // Lab 3, Issue 4 — safe errors to the very end (FR-47, api-spec §6.2).
 // Lab 3, Issue 7 — Public Comments, Internal Notes, and appears-resolved.
 app.use("/api/tickets", conversationRouter);
+// Lab 4, Issue 4 — the Actions Taken list of a Ticket.
+app.use("/api/tickets", actionsTakenReadRouter);
+// Lab 4, Issue 6 — the Status History of a Ticket, read-only.
+app.use("/api/tickets", statusHistoryRouter);
+// Lab 4, Issue 7 — the Requester dashboard. The staff dashboard is under /api/staff (Issue 8).
+app.use("/api/dashboard", dashboardRouter);
 // Lab 3, Issue 8 — the IT Staff queue, behind the /api/staff role guard above.
+// Lab 4, Issue 8 — the IT Staff and Administrator dashboard, behind the same role guard.
+app.use("/api/staff", staffDashboardRouter);
 app.use("/api/staff", staffRouter);
+// Lab 4, Issue 4 — recording and editing Actions Taken, behind the same role guard.
+app.use("/api/staff", actionsTakenStaffRouter);
 // Lab 3, Issue 10 — user management, behind the /api/admin role guard above.
 app.use("/api/admin", adminRouter);
 

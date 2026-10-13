@@ -30,6 +30,10 @@ test("E2E-08 an Administrator creates a user, who must change the password; a ne
   const fullName = `E2E Admin Made ${RUN}`;
 
   await signIn(page, ACCOUNTS.admin.email, ACCOUNTS.admin.name);
+  // Changed in Lab 4 (Issue 8, D-09): an Administrator lands on the Dashboard, and opens User
+  // Management from its navigation.
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "User Management" }).click();
   await expect(page).toHaveURL(/\/users$/);
   await page.getByRole("button", { name: "+ Create user" }).click();
   await dialog(page).getByLabel(/^Full name/).fill(fullName);
@@ -55,6 +59,7 @@ test("E2E-08 an Administrator creates a user, who must change the password; a ne
   expect((await heldOpen.get("/api/auth/me")).status()).toBe(200);
 
   await signIn(page, ACCOUNTS.admin.email, ACCOUNTS.admin.name);
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "User Management" }).click();
   await searchFor(page, email);
   await page.getByRole("row").filter({ hasText: email }).getByRole("button", { name: `Edit ${fullName}` }).click();
   await dialog(page).getByRole("button", { name: "Set new initial password" }).click();
@@ -74,12 +79,15 @@ test("E2E-08 an Administrator creates a user, who must change the password; a ne
   // The new one forces the change, then the user lands in the app.
   await fillLogin(page, email, "Second-initial#2026");
   await changeForcedPassword(page, "Second-initial#2026", "Their-own#2026");
-  await expect(page).toHaveURL(/\/tickets$/);
+  // Changed in Lab 4, Issue 7 (D-09): they land on the Dashboard.
+  await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByTestId("current-user")).toHaveText(fullName);
 });
 
 test("E2E-09 a duplicate email is refused, and an Administrator cannot remove themselves", async ({ page }) => {
   await signIn(page, ACCOUNTS.admin.email, ACCOUNTS.admin.name);
+  // Changed in Lab 4 (Issue 8, D-09): open User Management from the Dashboard's navigation.
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "User Management" }).click();
 
   // An email already in use, in different case, is refused on the field (AC-31).
   await page.getByRole("button", { name: "+ Create user" }).click();

@@ -66,6 +66,25 @@ const patch = (id: number, action: "owner" | "it-priority" | "status", body: unk
 const row = (id: number) => prisma.ticket.findUniqueOrThrow({ where: { id } });
 const reasonFor = (to: TicketStatus) => (NEEDS_REASON.includes(to) ? { reason: REASON } : {});
 
+// Lab 4 (BR-17, tests.md §6): a move to RESOLVED is gated on an Action Taken, so a ticket
+// that is about to be resolved has one first. Written straight to the table, as this suite
+// writes its other fixtures.
+const recordAction = (ticketId: number) =>
+  prisma.actionTaken.create({
+    data: {
+      ticketId,
+      performedById: ids.me,
+      actionAt: new Date(Date.now() - 60 * 1000),
+      description: "Replaced the lamp and checked the picture.",
+      result: "The picture is steady.",
+      followUpRequired: false,
+    },
+  });
+
+/** Lab 4 (api-spec §3.1): the moves the ticket can make now and the ones held back are together the matrix's row. */
+const wholeRow = (ticket: { permittedTransitions: string[]; blockedTransitions: Array<{ to: string }> }) =>
+  [...ticket.permittedTransitions, ...ticket.blockedTransitions.map((b) => b.to)].sort();
+
 beforeAll(async () => {
   const [me, colleague] = await prisma.user.findMany({
     where: { role: "IT_STAFF", isActive: true, mustChangePassword: false },
@@ -101,7 +120,8 @@ describe("GET /api/staff/tickets/:id", () => {
       const res = await detail(id);
       expect(res.status, status).toBe(200);
       expect(res.body.ticket.currentStatus).toBe(status);
-      expect(res.body.ticket.permittedTransitions).toEqual(MATRIX[status]);
+      // Lab 4 narrows permittedTransitions by the owner rule and the gate; the rest is in blockedTransitions.
+      expect(wholeRow(res.body.ticket)).toEqual([...MATRIX[status]].sort());
     }
   });
 
@@ -128,14 +148,21 @@ describe("GET /api/staff/tickets/:id", () => {
     expect((await detail("abc")).status).toBe(400);
   });
 
-  it("is refused to a Requester and an Administrator with no ticket data, and 401 without a session (BR-19, BR-21)", async () => {
+  it("is refused to a Requester with no ticket data, and 401 without a session (BR-21)", async () => {
     const id = await makeTicket();
-    for (const cookie of [cookies.requester, cookies.admin]) {
-      const res = await detail(id, cookie);
-      expect(res.status).toBe(403);
-      expect(res.body.ticket).toBeUndefined();
-    }
+    const res = await detail(id, cookies.requester);
+    expect(res.status).toBe(403);
+    expect(res.body.ticket).toBeUndefined();
     expect((await request(app).get(`/api/staff/tickets/${id}`)).status).toBe(401);
+  });
+
+  // Changed in Lab 4 (Issue 2, D-08, BR-42): an Administrator opens the staff
+  // ticket detail, which supersedes Lab 3 BR-19. docs/lab-04/tests.md §6.
+  it("is open to an Administrator (Lab 4 D-08)", async () => {
+    const id = await makeTicket();
+    const res = await detail(id, cookies.admin);
+    expect(res.status).toBe(200);
+    expect(res.body.ticket.id).toBe(id);
   });
 });
 
@@ -274,10 +301,11 @@ describe("status — PATCH /api/staff/tickets/:id/status", () => {
     for (const from of TICKET_STATUSES) {
       for (const to of MATRIX[from]) {
         const id = await makeTicket({ ownerId: ids.me, currentStatus: from });
+        if (to === "RESOLVED") await recordAction(id);
         const res = await patch(id, "status", { currentStatus: to, ...reasonFor(to) });
         expect(res.status, `${from} → ${to}`).toBe(200);
         expect(res.body.ticket.currentStatus).toBe(to);
-        expect(res.body.ticket.permittedTransitions).toEqual(MATRIX[to]);
+        expect(wholeRow(res.body.ticket)).toEqual([...MATRIX[to]].sort());
       }
     }
   });
@@ -314,6 +342,7 @@ describe("status — PATCH /api/staff/tickets/:id/status", () => {
 
   it("API-48 posts the reason as a Public Comment in the same operation (D-08)", async () => {
     const id = await makeTicket({ ownerId: ids.me, currentStatus: "IN_PROGRESS" });
+    await recordAction(id);
     const res = await patch(id, "status", { currentStatus: "RESOLVED", reason: `  ${REASON}  ` });
     expect(res.status).toBe(200);
     expect(res.body.comment).toMatchObject({ body: REASON, author: { id: ids.me, role: "IT_STAFF" } });
@@ -372,6 +401,7 @@ describe("status — PATCH /api/staff/tickets/:id/status", () => {
 
   it("two simultaneous transitions from one status: exactly one wins", async () => {
     const id = await makeTicket({ ownerId: ids.me, currentStatus: "IN_PROGRESS" });
+    await recordAction(id);
     const results = await Promise.all([
       patch(id, "status", { currentStatus: "RESOLVED", reason: REASON }),
       patch(id, "status", { currentStatus: "RESOLVED", reason: REASON }, cookies.colleague),
@@ -382,19 +412,21 @@ describe("status — PATCH /api/staff/tickets/:id/status", () => {
 });
 
 describe("roles on every write", () => {
-  it("refuses a Requester and an Administrator on each operation, changing nothing (BR-18, BR-19)", async () => {
+  // Changed in Lab 4 (Issue 2, D-08, BR-42): only a Requester is refused now; an
+  // Administrator may perform each operation (the Lab 4 suite
+  // server/tests/lab-04/authorization.api.test.ts proves that end to end).
+  // docs/lab-04/tests.md §6.
+  it("refuses a Requester on each operation, changing nothing (BR-18)", async () => {
     const id = await makeTicket();
     const before = await row(id);
-    for (const cookie of [cookies.requester, cookies.admin]) {
-      for (const [action, body] of [
-        ["owner", { ownerId: ids.me }],
-        ["it-priority", { itPriority: "URGENT" }],
-        ["status", { currentStatus: "CANCELLED", reason: REASON }],
-      ] as const) {
-        const res = await patch(id, action, body, cookie);
-        expect(res.status, action).toBe(403);
-        expect(res.body.error.code).toBe("FORBIDDEN");
-      }
+    for (const [action, body] of [
+      ["owner", { ownerId: ids.me }],
+      ["it-priority", { itPriority: "URGENT" }],
+      ["status", { currentStatus: "CANCELLED", reason: REASON }],
+    ] as const) {
+      const res = await patch(id, action, body, cookies.requester);
+      expect(res.status, action).toBe(403);
+      expect(res.body.error.code).toBe("FORBIDDEN");
     }
     expect(await row(id)).toEqual(before);
   });
@@ -441,12 +473,14 @@ describe("attachments on the staff detail", () => {
     expect(gone.body.error.code).toBe("ATTACHMENT_REMOVED");
   });
 
-  it("keeps the staff download to IT Staff, and keeps IT Staff off the Requester routes (BR-18)", async () => {
+  // Changed in Lab 4 (Issue 2, D-08, BR-42): the staff download is open to an
+  // Administrator too. A Requester is still refused it, and IT Staff are still
+  // kept off the Requester's route. docs/lab-04/tests.md §6.
+  it("keeps the staff download to IT Staff and Administrators, and keeps IT Staff off the Requester routes (BR-18)", async () => {
     const id = await makeTicket();
     const active = await attach(id, false);
-    for (const cookie of [cookies.requester, cookies.admin]) {
-      expect((await request(app).get(`/api/staff/attachments/${active.id}/download`).set("Cookie", cookie)).status).toBe(403);
-    }
+    expect((await request(app).get(`/api/staff/attachments/${active.id}/download`).set("Cookie", cookies.requester)).status).toBe(403);
+    expect((await request(app).get(`/api/staff/attachments/${active.id}/download`).set("Cookie", cookies.admin)).status).toBe(200);
     expect((await request(app).get(`/api/attachments/${active.id}/download`).set("Cookie", cookies.staff)).status).toBe(403);
     expect((await request(app).get("/api/staff/attachments/2147483647/download").set("Cookie", cookies.staff)).status).toBe(404);
   });

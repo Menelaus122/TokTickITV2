@@ -32,12 +32,22 @@ export const TICKET_STATUSES = [
 ] as const;
 export type TicketStatus = (typeof TICKET_STATUSES)[number];
 
+// Lab 4, Issue 7 — the open group (specification.md BR-31, D-12; api-spec §5.1): the five
+// statuses nobody has resolved, closed, or cancelled. A single `status` value cannot say
+// that, so the lists gain `group=open`, which a dashboard card's link carries. The Ticket
+// Queue of Issue 8 uses the same two functions below.
+export const OPEN_GROUP = ["NEW", "OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "REOPENED"] as const satisfies readonly TicketStatus[];
+
+export const STATUS_GROUPS = ["open"] as const;
+export type StatusGroup = (typeof STATUS_GROUPS)[number];
+
 export interface TicketListQuery {
   search: string | null;
   categoryId: number | null;
   relatedSystemId: number | null;
   requestedPriority: RequestedPriority | null;
   currentStatus: TicketStatus | null;
+  group: StatusGroup | null;
   sortBy: SortField;
   sortDir: SortDirection;
   page: number;
@@ -59,6 +69,31 @@ export function single(value: unknown): string | undefined {
 
 export function absent(value: unknown): boolean {
   return value === undefined || value === null || value === "";
+}
+
+export type GroupResult = { ok: true; value: StatusGroup | null } | { ok: false; message: string };
+
+/** `group`: absent is no group; anything but a lone `open` is rejected, never corrected (BR-23). */
+export function parseGroup(raw: unknown): GroupResult {
+  if (absent(raw)) return { ok: true, value: null };
+  const text = single(raw);
+  if (text === undefined || !STATUS_GROUPS.includes(text as StatusGroup)) {
+    return { ok: false, message: `group must be ${STATUS_GROUPS.join(", ")}.` };
+  }
+  return { ok: true, value: text as StatusGroup };
+}
+
+/**
+ * The statuses a list may show once `group` and `status` are both applied, or null when neither
+ * narrows it. They combine by AND (api-spec §5.1): a status outside the group leaves nothing,
+ * which is an empty list and not an error.
+ */
+export function allowedStatuses(group: StatusGroup | null, status: TicketStatus | null): TicketStatus[] | null {
+  const inGroup: readonly TicketStatus[] | null = group === "open" ? OPEN_GROUP : null;
+  if (inGroup && status) return inGroup.includes(status) ? [status] : [];
+  if (inGroup) return [...inGroup];
+  if (status) return [status];
+  return null;
 }
 
 export function parseTicketListQuery(raw: RawQuery): ParseResult {
@@ -109,6 +144,9 @@ export function parseTicketListQuery(raw: RawQuery): ParseResult {
     currentStatus = text as TicketStatus;
   }
 
+  const group = parseGroup(raw.group);
+  if (!group.ok) return group;
+
   // --- sorting ------------------------------------------------------------
   let sortBy: SortField = "createdAt";
   if (!absent(raw.sortBy)) {
@@ -155,6 +193,7 @@ export function parseTicketListQuery(raw: RawQuery): ParseResult {
       relatedSystemId: relatedSystemId as number | null,
       requestedPriority,
       currentStatus,
+      group: group.value,
       sortBy,
       sortDir,
       page,

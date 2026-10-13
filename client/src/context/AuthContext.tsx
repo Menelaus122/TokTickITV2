@@ -25,11 +25,13 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 // Each role's home: where sign-in lands and where an unauthorized URL bounces
-// back to (ui-spec §2).
+// back to (ui-spec §2). Since Lab 4 (D-09) it is the Dashboard for every role, which
+// shows that role's own: the Requester's from Issue 7, IT Staff's and the Administrator's
+// from Issue 8. The screens that were each role's home in Lab 3 stay one click away.
 export const LANDING: Record<Role, string> = {
-  REQUESTER: "/tickets",
-  IT_STAFF: "/queue",
-  ADMINISTRATOR: "/users",
+  REQUESTER: "/dashboard",
+  IT_STAFF: "/dashboard",
+  ADMINISTRATOR: "/dashboard",
 };
 
 export const ROLE_LABEL: Record<Role, string> = {

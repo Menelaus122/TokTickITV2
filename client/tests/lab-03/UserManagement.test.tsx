@@ -124,7 +124,7 @@ describe("UI-20 the list (AC-28, AC-29)", () => {
 
     fetchSpy.mockRejectedValue(new ApiError(403, "FORBIDDEN", "x"));
     render(<UserManagement currentUserId={ME} />);
-    expect(await screen.findByText(/do not have permission to manage users/)).toBeInTheDocument();
+    expect(await screen.findByText(/do not have access to User Management/)).toBeInTheDocument();
   });
 });
 

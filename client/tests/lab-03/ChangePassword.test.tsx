@@ -88,6 +88,18 @@ describe("UI-06 a mandatory change blocks the application (BR-02)", () => {
     });
     vi.spyOn(api, "fetchCategories").mockResolvedValue([]);
     vi.spyOn(api, "fetchRelatedSystems").mockResolvedValue([]);
+    // Lab 4, Issue 7 (D-09): once the password is saved, a Requester lands on the Dashboard.
+    vi.spyOn(api, "fetchRequesterDashboard").mockResolvedValue({
+      generatedAt: "2026-10-05T09:00:00.000Z",
+      metrics: {
+        openTickets: { value: 0, href: "/tickets?group=open" },
+        waitingForYou: { value: 0, href: "/tickets?status=WAITING_FOR_REQUESTER" },
+        resolved: { value: 0, href: "/tickets?status=RESOLVED" },
+        closed: { value: 0, href: "/tickets?status=CLOSED" },
+      },
+      needsAttention: [],
+      recentTickets: [],
+    });
   });
 
   it.each(["/tickets", "/tickets/new", "/tickets/5", "/queue", "/nowhere"])(
@@ -124,7 +136,8 @@ describe("UI-06 a mandatory change blocks the application (BR-02)", () => {
 
     await fill("Toktickit#2026", "Brand-new-horse-9");
 
-    expect(await screen.findByLabelText("Search tickets")).toBeInTheDocument();
+    // Changed in Lab 4, Issue 7 (D-09): the application they enter is the Dashboard.
+    expect(await screen.findByRole("heading", { level: 1, name: "Welcome, Somchai" })).toBeInTheDocument();
     expect(screen.getByTestId("current-user")).toHaveTextContent("Somchai Jaidee");
   });
 });

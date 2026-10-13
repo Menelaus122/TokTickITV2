@@ -11,11 +11,15 @@ import {
   issueInitialPassword,
   updateUser,
 } from "../api.js";
+import { useModal } from "../components/useModal.js";
+import { useSingleFlight } from "../components/useSingleFlight.js";
 import {
   Button,
   Card,
   EmptyState,
+  ErrorCallout,
   ErrorState,
+  ForbiddenState,
   LoadingState,
   NoResultsState,
   ROLE_LABEL,
@@ -132,7 +136,7 @@ export function UserManagement({ currentUserId }: { currentUserId: number }) {
   }
 
   if (state === "forbidden") {
-    return <ErrorState message="You do not have permission to manage users. Only an Administrator can." />;
+    return <ForbiddenState what="User Management" hint="Only an Administrator can open it." />;
   }
 
   const filtering = debounced !== "" || role !== "";
@@ -142,6 +146,7 @@ export function UserManagement({ currentUserId }: { currentUserId: number }) {
       <div className="tt-users__head">
         <Button
           variant="primary"
+          data-control="create-user"
           onClick={() => {
             setSuccess(null);
             setPanel({ mode: "create" });
@@ -257,16 +262,13 @@ function UserPanel({ panel, currentUserId, onClose, onSaved }: UserPanelProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [refusal, setRefusal] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const { busy, once } = useSingleFlight();
   const [issuing, setIssuing] = useState(false);
 
-  useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape" && !busy) onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [busy, onClose]);
+  // Focus goes in, Tab stays inside, Escape closes it unless a request is in flight, and focus goes back to
+  // the control that opened it, or to + Create user when that row has been replaced by a reload (AC-30).
+  const panelRef = useRef<HTMLDivElement>(null);
+  useModal(panelRef, { onEscape: () => !busy && onClose(), restoreFocusTo: () => document.querySelector<HTMLElement>('[data-control="create-user"]') });
 
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -276,15 +278,17 @@ function UserPanel({ panel, currentUserId, onClose, onSaved }: UserPanelProps) {
     });
   }
 
-  async function submit(event: FormEvent) {
+  function submit(event: FormEvent) {
     event.preventDefault();
-    if (busy) return;
+    void once(save);
+  }
+
+  async function save() {
     const problems = draftProblems(draft, creating);
     setRefusal(null);
     setFailure(null);
     if (Object.keys(problems).length > 0) return setErrors(problems);
 
-    setBusy(true);
     try {
       if (creating) {
         const user = await createUser({
@@ -311,28 +315,16 @@ function UserPanel({ panel, currentUserId, onClose, onSaved }: UserPanelProps) {
       if (refused) setRefusal(refused);
       else if (error instanceof ApiError && Object.keys(error.fields).length > 0) setErrors(error.fields);
       else setFailure(error instanceof ApiError && error.status < 500 ? error.message : "That did not work. Please try again.");
-    } finally {
-      setBusy(false);
     }
   }
 
   return (
-    <div className="tt-drawer" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+    <div className="tt-drawer" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={panelRef} tabIndex={-1}>
       <form className="tt-drawer__panel tt-card" onSubmit={submit} noValidate>
         <h2 className="tt-h2" id={titleId}>{creating ? "Create user" : "Edit user"}</h2>
 
-        {refusal && (
-          <div className="tt-callout tt-callout--error" role="alert" data-state="refused">
-            <span aria-hidden="true">!</span>
-            <div>{refusal}</div>
-          </div>
-        )}
-        {failure && (
-          <div className="tt-callout tt-callout--error" role="alert" data-state="error">
-            <span aria-hidden="true">!</span>
-            <div>{failure}</div>
-          </div>
-        )}
+        {refusal && <ErrorCallout state="refused">{refusal}</ErrorCallout>}
+        {failure && <ErrorCallout>{failure}</ErrorCallout>}
 
         <TextInput label="Full name" required value={draft.fullName} error={errors.fullName} disabled={busy} onChange={(event) => set("fullName", event.target.value)} />
         <TextInput label="Email" type="email" required value={draft.email} error={errors.email} disabled={busy} onChange={(event) => set("email", event.target.value)} />
@@ -428,12 +420,11 @@ function UserPanel({ panel, currentUserId, onClose, onSaved }: UserPanelProps) {
 function InitialPasswordConfirm({ user, onCancel, onIssued }: { user: AdminUser; onCancel: () => void; onIssued: () => void }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string>();
-  const [busy, setBusy] = useState(false);
+  const { busy, once } = useSingleFlight();
 
-  async function confirm() {
+  async function issue() {
     const problem = passwordProblem(password);
     if (problem) return setError(problem);
-    setBusy(true);
     setError(undefined);
     try {
       await issueInitialPassword(user.id, password);
@@ -442,13 +433,20 @@ function InitialPasswordConfirm({ user, onCancel, onIssued }: { user: AdminUser;
       setError(
         failure instanceof ApiError ? failure.fields.initialPassword ?? failure.message : "The new initial password could not be set.",
       );
-    } finally {
-      setBusy(false);
     }
   }
 
   return (
-    <div className="tt-users__confirm" role="group" aria-label="Set new initial password">
+    <div
+      className="tt-users__confirm"
+      role="group"
+      aria-label="Set new initial password"
+      // This group sits inside the panel's form, so Enter in its field would save the panel (the person's other edits)
+      // and not set the password. Setting it signs the user out everywhere, so only the button does (Lab 4, Issue 9).
+      onKeyDown={(event) => {
+        if (event.key === "Enter" && (event.target as HTMLElement).tagName === "INPUT") event.preventDefault();
+      }}
+    >
       <p>
         <strong>Set a new initial password for {user.fullName}?</strong> {NEW_PASSWORD_WARNING}
       </p>
@@ -470,7 +468,7 @@ function InitialPasswordConfirm({ user, onCancel, onIssued }: { user: AdminUser;
         <Button variant="secondary" disabled={busy} onClick={onCancel}>
           Cancel
         </Button>
-        <Button variant="destructive" busy={busy} busyLabel="Setting…" onClick={() => void confirm()}>
+        <Button variant="destructive" busy={busy} busyLabel="Setting…" onClick={() => void once(issue)}>
           Set password and sign out
         </Button>
       </div>

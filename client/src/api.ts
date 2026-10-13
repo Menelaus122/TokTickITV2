@@ -164,6 +164,8 @@ export interface TicketListParams {
   relatedSystemId?: number | "";
   requestedPriority?: RequestedPriority | "";
   currentStatus?: TicketStatus | "";
+  /** Lab 4 (D-12): `open` is the five statuses nobody has resolved, closed, or cancelled (BR-31). */
+  group?: "open" | "";
   sortBy?: "createdAt" | "updatedAt";
   sortDir?: "asc" | "desc";
   page?: number;
@@ -404,6 +406,8 @@ export class ApiError extends Error {
     public readonly code: string,
     message: string,
     public readonly fields: Record<string, string> = {},
+    /** On a 409 STALE_UPDATE, the record as it is now: what the edit lost the race to (api-spec §1.2). */
+    public readonly current?: unknown,
   ) {
     super(message);
   }
@@ -411,8 +415,8 @@ export class ApiError extends Error {
 
 async function failure(response: Response, fallback: string): Promise<ApiError> {
   try {
-    const body = (await response.json()) as { error?: { code?: string; message?: string; fields?: Record<string, string> } };
-    return new ApiError(response.status, body.error?.code ?? "UNKNOWN", body.error?.message ?? fallback, body.error?.fields ?? {});
+    const body = (await response.json()) as { error?: { code?: string; message?: string; fields?: Record<string, string>; current?: unknown } };
+    return new ApiError(response.status, body.error?.code ?? "UNKNOWN", body.error?.message ?? fallback, body.error?.fields ?? {}, body.error?.current);
   } catch {
     return new ApiError(response.status, "UNKNOWN", fallback);
   }
@@ -461,6 +465,9 @@ export async function changePassword(change: PasswordChange): Promise<void> {
 export interface QueueOwner {
   id: number;
   fullName: string;
+  // Lab 4 (BR-55): every staff shape carries the owner's role beside isActive, so the screen can tell
+  // a deactivated account ("Inactive") from an active one that is no longer IT Staff.
+  role: Role;
   // false marks work held by a deactivated account (BR-26).
   isActive: boolean;
 }
@@ -493,6 +500,8 @@ export type QueueSort = "itPriority" | "createdAt" | "updatedAt";
 export interface QueueParams {
   q?: string;
   status?: TicketStatus;
+  /** Lab 4 (D-12): `open` is the five statuses nobody has resolved, closed, or cancelled (BR-31). */
+  group?: "open";
   itPriority?: RequestedPriority;
   categoryId?: number;
   // "any" | "unassigned" | "me" | a user id (D-18)
@@ -531,13 +540,29 @@ export async function fetchAssignableUsers(): Promise<AssignableUser[]> {
 
 // --- Lab 3, Issue 9 — IT Staff Ticket Detail (api-spec §4.3, §4.4, §5.2–§5.5) --
 
+/** Why a move the matrix allows is not available yet (api-spec §3.1, BR-17, BR-18). */
+export interface BlockedTransition {
+  to: TicketStatus;
+  code: "OWNER_REQUIRED" | "ACTION_REQUIRED" | "FOLLOW_UP_PENDING";
+  /** Words safe to show; the API answers a refused move with the same sentence. */
+  message: string;
+}
+
 export interface StaffTicketDetail extends QueueTicket {
   description: string;
   relatedSystemName: string;
   requester: { id: number; fullName: string; email: string; role: Role; isActive: boolean };
   attachments: Attachment[];
-  /** From the BR-33 matrix on the server; the only statuses the screen offers (FR-34). */
+  /** Lab 4 (BR-25, BR-26): sent back as `expectedVersion` with every change, so a stale save is refused. */
+  version: number;
+  owner: QueueOwner | null;
+  /**
+   * The moves the ticket can make right now: the matrix's targets less any held back by the
+   * owner rule or the resolution gate (api-spec §3.1). The only statuses the screen offers (FR-09).
+   */
   permittedTransitions: TicketStatus[];
+  /** The matrix's other targets, each with the reason it is not available yet. */
+  blockedTransitions: BlockedTransition[];
 }
 
 /** Statuses whose move posts a 5–2000 character reason as a Public Comment (BR-36, BR-37). */
@@ -565,16 +590,27 @@ async function patchStaffTicket<T>(ticketId: number, action: string, body: unkno
  * the screen was showing, so a change someone else made first is refused with
  * 409 TICKET_ALREADY_OWNED instead of being overwritten (BR-25).
  */
-export async function setTicketOwner(ticketId: number, ownerId: number | null, expectedOwnerId: number | null): Promise<StaffTicketDetail> {
+export async function setTicketOwner(
+  ticketId: number,
+  ownerId: number | null,
+  expectedOwnerId: number | null,
+  expectedVersion?: number,
+): Promise<StaffTicketDetail> {
   const result = await patchStaffTicket<{ ticket: StaffTicketDetail }>(
-    ticketId, "owner", { ownerId, expectedOwnerId }, "The owner could not be changed.",
+    ticketId,
+    "owner",
+    { ownerId, expectedOwnerId, ...(expectedVersion === undefined ? {} : { expectedVersion }) },
+    "The owner could not be changed.",
   );
   return result.ticket;
 }
 
-export async function setItPriority(ticketId: number, itPriority: RequestedPriority): Promise<StaffTicketDetail> {
+export async function setItPriority(ticketId: number, itPriority: RequestedPriority, expectedVersion?: number): Promise<StaffTicketDetail> {
   const result = await patchStaffTicket<{ ticket: StaffTicketDetail }>(
-    ticketId, "it-priority", { itPriority }, "The IT Priority could not be changed.",
+    ticketId,
+    "it-priority",
+    { itPriority, ...(expectedVersion === undefined ? {} : { expectedVersion }) },
+    "The IT Priority could not be changed.",
   );
   return result.ticket;
 }
@@ -585,10 +621,135 @@ export interface StatusChangeResult {
   comment: ThreadEntry | null;
 }
 
-export async function changeTicketStatus(ticketId: number, currentStatus: TicketStatus, reason?: string): Promise<StatusChangeResult> {
+/**
+ * Moves a ticket. `expectedVersion` is the version the screen was showing: when the ticket has
+ * since changed, the API answers 409 STALE_UPDATE with the ticket as it is now in `ApiError.current`
+ * (BR-26). A refused gate is 409 ACTION_REQUIRED or FOLLOW_UP_PENDING (BR-18).
+ */
+export async function changeTicketStatus(
+  ticketId: number,
+  currentStatus: TicketStatus,
+  reason?: string,
+  expectedVersion?: number,
+): Promise<StatusChangeResult> {
   return patchStaffTicket<StatusChangeResult>(
-    ticketId, "status", reason === undefined ? { currentStatus } : { currentStatus, reason }, "The status could not be changed.",
+    ticketId,
+    "status",
+    { currentStatus, ...(reason === undefined ? {} : { reason }), ...(expectedVersion === undefined ? {} : { expectedVersion }) },
+    "The status could not be changed.",
   );
+}
+
+// --- Lab 4, Issue 6 — Status History (api-spec §3.3) ----------------------
+
+/** One change of status: who, from what, to what, and when. Append-only (BR-22). */
+export interface StatusChange {
+  id: number;
+  fromStatus: TicketStatus;
+  toStatus: TicketStatus;
+  changedBy: { id: number; fullName: string; role: Role };
+  createdAt: string;
+}
+
+/** The changes in the order they were made, oldest first. A ticket that has never changed has none (BR-22). */
+export async function fetchStatusHistory(ticketId: number): Promise<StatusChange[]> {
+  const response = await apiFetch(`${API_URL}/api/tickets/${ticketId}/status-history`);
+  if (!response.ok) throw await failure(response, "Cannot load the status history.");
+  return ((await response.json()) as { history: StatusChange[] }).history;
+}
+
+// --- Lab 4, Issue 7 — the Requester dashboard (api-spec §4.1) ----------------------------------
+
+/** One card: its number, and the client route whose list shows exactly that many Tickets (BR-40). */
+export interface DashboardMetric {
+  value: number;
+  href: string;
+}
+
+/** The concise row of api-spec §1.4: enough to identify a Ticket and open it. */
+export interface DashboardTicket {
+  id: number;
+  ticketNumber: string;
+  summary: string;
+  currentStatus: TicketStatus;
+  updatedAt: string;
+}
+
+export interface RequesterDashboard {
+  generatedAt: string;
+  metrics: {
+    openTickets: DashboardMetric;
+    waitingForYou: DashboardMetric;
+    resolved: DashboardMetric;
+    closed: DashboardMetric;
+  };
+  needsAttention: DashboardTicket[];
+  recentTickets: DashboardTicket[];
+}
+
+/** The signed-in Requester's dashboard. A refused role is an `ApiError` with status 403. */
+export async function fetchRequesterDashboard(): Promise<RequesterDashboard> {
+  const response = await apiFetch(`${API_URL}/api/dashboard/requester`);
+  if (!response.ok) throw await failure(response, "The dashboard could not be loaded.");
+  return (await response.json()) as RequesterDashboard;
+}
+
+// --- Lab 4, Issue 8 — the IT Staff and Administrator dashboard (api-spec §4.2) -------------------
+
+/** A Ticket in a staff list: the concise row plus the IT Priority and the owner (api-spec §1.4). */
+export interface StaffDashboardTicket extends DashboardTicket {
+  itPriority: RequestedPriority;
+  owner: QueueOwner | null;
+}
+
+/** An Action Taken the signed-in member recorded, with its Ticket's number. The description arrives already cut to 120 characters. */
+export interface DashboardAction {
+  id: number;
+  ticketId: number;
+  ticketNumber: string;
+  actionAt: string;
+  description: string;
+  followUpRequired: boolean;
+}
+
+/** One row of the status breakdown: a status, how many Tickets are in it, and the queue that lists them. */
+export interface DashboardStatusRow extends DashboardMetric {
+  status: TicketStatus;
+}
+
+/** A count with no destination: no list can reproduce an *active* number (BR-40). */
+export interface PlainCount {
+  value: number;
+}
+
+export interface AccountCounts {
+  activeRequesters: PlainCount;
+  activeItStaff: PlainCount;
+  activeAdministrators: PlainCount;
+  inactive: PlainCount;
+}
+
+export interface StaffDashboard {
+  generatedAt: string;
+  metrics: {
+    unassigned: DashboardMetric;
+    assignedToMe: DashboardMetric;
+    waitingForRequester: DashboardMetric;
+    urgent: DashboardMetric;
+  };
+  byStatus: DashboardStatusRow[];
+  myTickets: StaffDashboardTicket[];
+  urgentTickets: StaffDashboardTicket[];
+  myRecentActions: DashboardAction[];
+  /** Present only for an Administrator (BR-38). */
+  userCounts?: AccountCounts;
+}
+
+/** The signed-in IT Staff member's or Administrator's dashboard. A refused role is an `ApiError` with status 403. */
+export async function fetchStaffDashboard(): Promise<StaffDashboard> {
+  const response = await apiFetch(`${API_URL}/api/staff/dashboard`);
+  if (!response.ok) throw await failure(response, "The dashboard could not be loaded.");
+  return (await response.json()) as StaffDashboard;
 }
 
 export async function fetchNotes(ticketId: number): Promise<ThreadEntry[]> {
@@ -606,6 +767,92 @@ export async function postNote(ticketId: number, body: string): Promise<ThreadEn
   });
   if (response.status !== 201) throw await failure(response, "The note could not be posted.");
   return (await response.json()) as ThreadEntry;
+}
+
+// --- Lab 4, Issue 5 — Actions Taken (api-spec §1.3, §2) ----------------------
+
+/** One Action Taken, as every endpoint returns it (api-spec §1.3). */
+export interface ActionTaken {
+  id: number;
+  ticketId: number;
+  actionAt: string;
+  description: string;
+  result: string;
+  performedBy: { id: number; fullName: string; role: Role };
+  followUpRequired: boolean;
+  followUpNote: string | null;
+  attachmentNotes: string | null;
+  /** What an edit sends back as `expectedVersion` (BR-27). */
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  updatedBy: { id: number; fullName: string; role: Role } | null;
+}
+
+/** The limits the server enforces (BR-03, BR-04). The server re-checks every one. */
+export const ACTION_LIMITS = {
+  descriptionMin: 5,
+  descriptionMax: 2000,
+  resultMin: 2,
+  resultMax: 1000,
+  followUpNoteMin: 5,
+  followUpNoteMax: 1000,
+  attachmentNotesMax: 500,
+} as const;
+
+/** Every Action Taken of a ticket, in the server's reading order (BR-08). */
+export async function fetchActionsTaken(ticketId: number): Promise<ActionTaken[]> {
+  const response = await apiFetch(`${API_URL}/api/tickets/${ticketId}/actions-taken`);
+  if (!response.ok) throw await failure(response, "Cannot load the actions taken.");
+  return ((await response.json()) as { actions: ActionTaken[] }).actions;
+}
+
+/**
+ * What a person fills in. Performed by, the ticket, and the times are never sent:
+ * the server takes them from the session and the path (BR-05).
+ */
+export interface ActionTakenInput {
+  actionAt: string;
+  description: string;
+  result: string;
+  followUpRequired: boolean;
+  followUpNote?: string;
+  attachmentNotes?: string;
+}
+
+/**
+ * Records an action. `requestKey` names this submission, so a retry that reaches
+ * the server twice is recorded once (BR-28): the answer is 201 the first time and
+ * 200 with the same action after that, and both are success.
+ */
+export async function createActionTaken(ticketId: number, input: ActionTakenInput, requestKey: string): Promise<ActionTaken> {
+  const response = await apiFetch(`${API_URL}/api/staff/tickets/${ticketId}/actions-taken`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...input, requestKey }),
+  });
+  if (response.status !== 201 && response.status !== 200) throw await failure(response, "The action could not be recorded.");
+  return ((await response.json()) as { action: ActionTaken }).action;
+}
+
+/**
+ * Edits an action. `expectedVersion` is the version the screen was showing, so an
+ * edit made against an older one is refused with 409 STALE_UPDATE, carrying the
+ * current record in `ApiError.current`, instead of overwriting someone's work (BR-27).
+ */
+export async function editActionTaken(
+  ticketId: number,
+  actionId: number,
+  expectedVersion: number,
+  input: ActionTakenInput,
+): Promise<ActionTaken> {
+  const response = await apiFetch(`${API_URL}/api/staff/tickets/${ticketId}/actions-taken/${actionId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...input, expectedVersion }),
+  });
+  if (!response.ok) throw await failure(response, "The action could not be saved.");
+  return ((await response.json()) as { action: ActionTaken }).action;
 }
 
 // --- Lab 3, Issue 10 — Administrator User Management (api-spec §6) ----------

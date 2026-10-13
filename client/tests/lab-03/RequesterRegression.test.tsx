@@ -26,6 +26,18 @@ const EMPTY_PAGE = {
   meta: { page: 1, pageSize: 10, totalItems: 0, totalPages: 0, hasPrev: false, hasNext: false },
 };
 
+const EMPTY_BOARD = {
+  generatedAt: "2026-10-05T09:00:00.000Z",
+  metrics: {
+    openTickets: { value: 0, href: "/tickets?group=open" },
+    waitingForYou: { value: 0, href: "/tickets?status=WAITING_FOR_REQUESTER" },
+    resolved: { value: 0, href: "/tickets?status=RESOLVED" },
+    closed: { value: 0, href: "/tickets?status=CLOSED" },
+  },
+  needsAttention: [],
+  recentTickets: [],
+};
+
 function json(status: number, body: unknown): Response {
   return new Response(body === null ? null : JSON.stringify(body), {
     status,
@@ -46,6 +58,8 @@ function stubApi(...routes: Route[]) {
     if (url.pathname === "/api/auth/me") return json(200, { user: REQUESTER });
     if (url.pathname === "/api/categories" || url.pathname === "/api/related-systems") return json(200, []);
     if (url.pathname === "/api/tickets") return json(200, EMPTY_PAGE);
+    // Lab 4, Issue 7: a Requester lands on the Dashboard, which has its own request.
+    if (url.pathname === "/api/dashboard/requester") return json(200, EMPTY_BOARD);
     return json(404, { error: { code: "NOT_FOUND", message: "That resource does not exist." } });
   });
   vi.stubGlobal("fetch", fetchMock);
@@ -73,10 +87,11 @@ describe("UI-09 no Development Requester selector anywhere", () => {
     expect(screen.getByTestId("current-user")).toHaveTextContent(REQUESTER.fullName);
   });
 
-  it("the old selector URL is gone: a signed-in Requester lands on My Tickets", async () => {
+  // Changed in Lab 4, Issue 7 (D-09): the Requester's landing page is the Dashboard.
+  it("the old selector URL is gone: a signed-in Requester lands on the Dashboard", async () => {
     stubApi();
     render(<TokTickITApp initialEntries={["/select-requester"]} />);
-    expect(await screen.findByRole("link", { name: "My Tickets" })).toHaveAttribute("aria-current", "page");
+    expect(await screen.findByRole("link", { name: "Dashboard" })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByText(/Select a Development Requester/i)).not.toBeInTheDocument();
   });
 

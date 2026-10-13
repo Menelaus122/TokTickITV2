@@ -25,8 +25,22 @@ const EMPTY_LIST: TicketListResponse = {
   meta: { page: 1, pageSize: 10, totalItems: 0, totalPages: 0, hasPrev: false, hasNext: false },
 };
 
+// Lab 4, Issue 7 (D-09): a Requester lands on the Dashboard, which asks for its own data.
+const EMPTY_BOARD: api.RequesterDashboard = {
+  generatedAt: "2026-10-05T09:00:00.000Z",
+  metrics: {
+    openTickets: { value: 0, href: "/tickets?group=open" },
+    waitingForYou: { value: 0, href: "/tickets?status=WAITING_FOR_REQUESTER" },
+    resolved: { value: 0, href: "/tickets?status=RESOLVED" },
+    closed: { value: 0, href: "/tickets?status=CLOSED" },
+  },
+  needsAttention: [],
+  recentTickets: [],
+};
+
 beforeEach(() => {
   vi.spyOn(api, "fetchCurrentUser").mockResolvedValue(REQUESTER);
+  vi.spyOn(api, "fetchRequesterDashboard").mockResolvedValue(EMPTY_BOARD);
   vi.spyOn(api, "fetchMyTickets").mockResolvedValue(EMPTY_LIST);
   vi.spyOn(api, "fetchCategories").mockResolvedValue([{ id: 2, name: "Hardware" }]);
   vi.spyOn(api, "fetchRelatedSystems").mockResolvedValue([{ id: 1, name: "Email" }]);
@@ -213,9 +227,10 @@ describe("route guarding", () => {
     expect(await screen.findByRole("button", { name: "Sign in" })).toBeInTheDocument();
   });
 
-  it("sends an unknown route to My Tickets", async () => {
+  // Changed in Lab 4, Issue 7 (D-09): a Requester's home is the Dashboard. docs/lab-04/tests.md §6.
+  it("sends an unknown route to the Requester's home, the Dashboard", async () => {
     renderAt("/nowhere");
-    expect(await screen.findByLabelText("Search tickets")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Welcome, Pornchai" })).toBeInTheDocument();
   });
 
   it("sends a malformed ticket id back to the list", async () => {
@@ -225,7 +240,8 @@ describe("route guarding", () => {
 
   it("skips Login when someone is already signed in", async () => {
     renderAt(ROUTES.login);
-    expect(await screen.findByLabelText("Search tickets")).toBeInTheDocument();
+    // Changed in Lab 4, Issue 7 (D-09): they arrive at the Dashboard, not My Tickets.
+    expect(await screen.findByRole("heading", { level: 1, name: "Welcome, Pornchai" })).toBeInTheDocument();
   });
 
   it("honours a deep link once the session is known", async () => {

@@ -4,6 +4,8 @@ import { getPrisma } from "./prisma.js";
 import { requireSession } from "./auth.js";
 import { requireRole, resolveRequesterIdentity } from "./authorization.js";
 import { routeId } from "./routeId.js";
+import { lockTicketRow } from "./ticketLock.js";
+import { nulFailure } from "./bodyGuards.js";
 
 // Lab 3, Issue 7 — Public Comments, Internal Notes, and "Problem Appears
 // Resolved" (docs/lab-03/api-spec.md §3.1, §4; specification.md §5.6).
@@ -58,7 +60,7 @@ export function checkBody(value: unknown, min = 1, label = "Comment"): { ok: tru
  * their own ticket, and another Requester's ticket is answered exactly like one
  * that does not exist (FR-12, AC-11). IT Staff and Administrators see any.
  */
-async function visibleTicket(prisma: PrismaClient, req: Request, id: number): Promise<boolean> {
+export async function visibleTicket(prisma: PrismaClient, req: Request, id: number): Promise<boolean> {
   const user = req.auth!.user;
   const where = user.role === "REQUESTER" ? { id, requesterId: user.id } : { id };
   return (await prisma.ticket.findFirst({ where, select: { id: true } })) !== null;
@@ -93,6 +95,10 @@ function postToThread(thread: Thread, label: string) {
     const prisma = getPrisma();
     try {
       if (!(await visibleTicket(prisma, req, id))) return res.status(404).json(TICKET_NOT_FOUND);
+
+      // Lab 4 (BR-52): after the ownership check, and before the body is read.
+      const nul = nulFailure(req.body);
+      if (nul) return res.status(400).json(nul);
 
       const checked = checkBody((req.body as { body?: unknown } | undefined)?.body, 1, label);
       if (!checked.ok) return invalid(res, "body", checked.message);
@@ -144,6 +150,10 @@ conversationRouter.patch("/:id/appears-resolved", async (req: Request, res: Resp
     const owned = await prisma.ticket.findFirst({ where: { id, requesterId: context.requesterId }, select: { id: true } });
     if (!owned) return res.status(404).json(TICKET_NOT_FOUND);
 
+    // Lab 4 (BR-52): after the ownership check, and before the body is read.
+    const nul = nulFailure(req.body);
+    if (nul) return res.status(400).json(nul);
+
     const raw = (req.body ?? {}) as { appearsResolved?: unknown; comment?: unknown };
     if (typeof raw.appearsResolved !== "boolean") {
       return invalid(res, "appearsResolved", "Say whether the problem appears resolved.");
@@ -151,9 +161,18 @@ conversationRouter.patch("/:id/appears-resolved", async (req: Request, res: Resp
 
     const ticketSelect = { id: true, requesterResolvedAt: true, currentStatus: true } as const;
 
+    // Lab 4 (BR-25, BR-29): the signal is one of the fields that moves the Ticket's version, so
+    // it is written under the Ticket's lock like every other write to it. A staff save made from a
+    // screen loaded before it is then refused as stale, which is how the advisory gets seen.
     if (!raw.appearsResolved) {
       // BR-30 — the Requester may withdraw the signal; no comment is needed.
-      const ticket = await prisma.ticket.update({ where: { id }, data: { requesterResolvedAt: null }, select: ticketSelect });
+      const ticket = await prisma.$transaction(async (tx) => {
+        await lockTicketRow(tx, id);
+        const now = await tx.ticket.findUniqueOrThrow({ where: { id }, select: ticketSelect });
+        // Withdrawing a signal that is not there changes nothing, so the version stays (BR-25).
+        if (now.requesterResolvedAt === null) return now;
+        return tx.ticket.update({ where: { id }, data: { requesterResolvedAt: null, version: { increment: 1 } }, select: ticketSelect });
+      });
       return res.status(200).json({ ticket, comment: null });
     }
 
@@ -161,13 +180,20 @@ conversationRouter.patch("/:id/appears-resolved", async (req: Request, res: Resp
     if (!checked.ok) return invalid(res, "comment", checked.message);
 
     const now = new Date();
-    const [comment, ticket] = await prisma.$transaction([
-      prisma.publicComment.create({
+    const { comment, ticket } = await prisma.$transaction(async (tx) => {
+      await lockTicketRow(tx, id);
+      const posted = await tx.publicComment.create({
         data: { ticketId: id, authorId: context.requesterId, body: checked.body, createdAt: now },
         select: ENTRY_SELECT,
-      }),
-      prisma.ticket.update({ where: { id }, data: { requesterResolvedAt: now }, select: ticketSelect }),
-    ]);
+      });
+      // Marking again moves the timestamp, so it is a change like the first mark (BR-25).
+      const marked = await tx.ticket.update({
+        where: { id },
+        data: { requesterResolvedAt: now, version: { increment: 1 } },
+        select: ticketSelect,
+      });
+      return { comment: posted, ticket: marked };
+    });
     return res.status(200).json({ ticket, comment });
   } catch {
     return res.status(500).json(SERVER_ERROR);
