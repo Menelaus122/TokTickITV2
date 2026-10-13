@@ -237,6 +237,14 @@ describe("STYLE-06 the Action Taken card and the timeline (AC-29, ui-spec §1.2,
     }
   });
 
+  it("puts a step's time on its own line on a phone, and at the right edge of the step above that", () => {
+    const timeline = sectionOf("Status History");
+    expect(rule(".tt-timeline__step time", timeline)).toMatch(/margin-left:\s*auto/);
+    const phone = rule(".tt-timeline__step time", mediaBlock("(max-width: 767px)", timeline));
+    expect(phone).toMatch(/margin-left:\s*0/);
+    expect(phone).toMatch(/flex-basis:\s*100%/);
+  });
+
   it("wraps a long name or reason instead of clipping it or widening the page", () => {
     const step = rule(".tt-timeline__step", sectionOf("Status History"));
     expect(step).toMatch(/flex-wrap:\s*wrap/);

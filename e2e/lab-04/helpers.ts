@@ -386,8 +386,10 @@ const STATUS_WORDS: Record<string, string> = {
  * moves a quarter of a second apart on either side of a step are stored with the second one stamped earlier, so the
  * list shows them swapped. That is the rule working on the data it was given, not a defect, and it must not fail a test of
  * something else. It is accepted only when the API's own rows prove all of it: taken in the order they were made (by
- * `id`) they are exactly the moves expected; their stamps run backwards somewhere; and the screen shows precisely what
- * the API sorted. A list that is wrong for any other reason, such as an ordering bug or a missing step, is still a failure.
+ * `id`) they are exactly the moves expected; their stamps run backwards somewhere; the API returned them in the order BR-22
+ * asks for (`createdAt`, then `id`), so that a server which sorts wrongly is not excused by a clock step as well; and the
+ * screen shows precisely what the API returned. A list that is wrong for any other reason, such as an ordering bug or a
+ * missing step, is still a failure.
  */
 async function swappedByAClockStep(page: Page, shown: string[], expected: string[]): Promise<boolean> {
   const id = /\/(?:queue|tickets)\/(\d+)/.exec(new URL(page.url()).pathname)?.[1];
@@ -396,11 +398,15 @@ async function swappedByAClockStep(page: Page, shown: string[], expected: string
   if (!res.ok()) return false;
   const rows = ((await res.json()) as { history: { id: number; fromStatus: string; toStatus: string; createdAt: string }[] }).history;
   const words = (row: { fromStatus: string; toStatus: string }) => `${STATUS_WORDS[row.fromStatus]} → ${STATUS_WORDS[row.toStatus]}`;
-  const sameList = (a: string[], b: string[]) => a.length === b.length && a.every((item, index) => item === b[index]);
+  const sameList = <T>(a: T[], b: T[]) => a.length === b.length && a.every((item, index) => item === b[index]);
   const inOrderMade = [...rows].sort((a, b) => a.id - b.id);
   const stampedBackwards = inOrderMade.some((row, index) => index > 0 && Date.parse(row.createdAt) < Date.parse(inOrderMade[index - 1].createdAt));
+  // BR-22: oldest stamp first, the lower id first among equal stamps. Whatever the clock did, the API must return that order.
+  const bySpec = [...rows].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.id - b.id);
+  const apiSorted = sameList(rows.map((row) => row.id), bySpec.map((row) => row.id));
   const explained =
     stampedBackwards &&
+    apiSorted &&
     sameList(["Ticket created", ...inOrderMade.map(words)], expected) &&
     sameList(shown, ["Ticket created", ...rows.map(words)]);
   if (explained) {

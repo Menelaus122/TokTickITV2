@@ -8,8 +8,9 @@ The **Final** column reads **Planned** until the owning issue merges, then the
 real runner result. **Partial** means the part of the test that can exist at that
 issue passes, and the rest arrives with the issue §3.1 names; it never means
 that a test fails. Issue 10 (#76) refreshes §8 with the full run from
-`lab4-staging`, and Issue 11 (#77) repeats it from `main`. Counts in §8 are only
-ever the runner's own output.
+`lab4-staging`, and Issue 11 (#77) runs it again on the tree of its own Pull Request
+(§8.6). The run from `main` (Part 3) is recorded in the submission PDF, because nothing
+can be committed after the release. Counts in §8 are only ever the runner's own output.
 
 ---
 
@@ -260,9 +261,9 @@ route's query string unchanged). DASH-07 and DASH-17 follow every link and compa
 | UI-10 | UI | AC-16, FR-09 | the status select and the "Not available now" list | the select offers only `permittedTransitions`; each `blockedTransitions` entry is listed with its message | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
 | UI-11 | UI | AC-16, BR-19 | reasons for Resolved, Cancelled, and Reopened | the reason textarea is required before **Apply** is enabled | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
 | UI-12 | UI | AC-03, AC-16 | a gate refusal that reaches the server | the `ACTION_REQUIRED` and `FOLLOW_UP_PENDING` messages as their own callout, with **Go to Actions Taken** focusing the region | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
-| UI-13 | UI | AC-16, FR-14 | a successful change | the summary, badge, select options, blocked list, and timeline refresh from the response, without a reload | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
+| UI-13 | UI | AC-16, FR-14 | a successful change | the summary, badge, select options, blocked list, and timeline refresh from the response, without a reload; the API client puts `expectedVersion` in the body of a status, an owner, and an IT Priority change, and asks for `/api/tickets/:id/status-history` (§8.5) | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
 | UI-14 | UI | AC-14, BR-26 | a `409 STALE_UPDATE` on a status change | the conflict callout naming the current status and owner; **Show latest** reloads and keeps the typed reason | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
-| UI-15 | UI | AC-13, FR-13 | the Status History on the staff and Requester screens | an ordered list starting with "Ticket created"; badges spelled out; actor and time on each step | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
+| UI-15 | UI | AC-13, FR-13 | the Status History on the staff and Requester screens | an ordered list starting with "Ticket created", dated by the Ticket's own creation time; badges spelled out; actor and time on each step; the region asks for its own Ticket's history, on both screens; a refresh keeps the list on screen while it reads again; a failed read draws no list at all (§8.5) | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
 | UI-16 | UI | AC-15, BR-20 | the Requester's appears-resolved panel | helper text says only IT Staff can resolve; no status control exists on the Requester screen | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
 | UI-17 | UI | AC-33, BR-55 | an Owner who is inactive, and one who is no longer IT Staff | "Inactive" for the first; "No longer IT Staff" for the second, on the Ticket Detail (and in its owner picker), in the Ticket Queue, and in the Dashboard's Urgent list; "Inactive" alone when both are true | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
 | UI-18 | UI | AC-18, AC-21, FR-15 | the four Requester cards | each shows its label and value; each is one link with an accessible name that includes the destination | `client/tests/lab-04/RequesterDashboard.test.tsx` | Pass |
@@ -296,7 +297,7 @@ route's query string unchanged). DASH-07 and DASH-17 follow every link and compa
 | STYLE-03 | UI style | AC-30, AC-04 | the follow-up pill and the Follow-up Note's asterisk | the pill carries text; the red asterisk appears with the note's `required` for Yes only | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Pass |
 | STYLE-04 | UI style | AC-29 | read-only against disabled | `readonly` fields use `--tt-readonly-bg`, distinct from a disabled **Add action**, which uses the disabled tokens and the cursor that says no; a read-only field can be focused, a disabled button cannot | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Pass |
 | STYLE-05 | UI style | AC-27 | validation placement and busy buttons | messages sit beneath their own field on five forms; a busy button is disabled, labelled, shows a spinner a screen reader skips, permits one request, and shows the progress cursor | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Pass |
-| STYLE-06 | UI style | AC-29, `ui-spec.md` §1.2, §1.4 | the Action Taken card and the timeline | the card's definition-list structure and the timeline's `<ol>` with its tokens | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Pass |
+| STYLE-06 | UI style | AC-29, `ui-spec.md` §1.2, §1.4 | the Action Taken card and the timeline | the card's definition-list structure and the timeline's `<ol>` with its tokens; a step's time at the right edge, and on its own line on a phone (§8.5) | `client/tests/lab-04/ZenGreenLab4.test.tsx` | Pass |
 | STYLE-07 | UI style | AC-27, AC-29, AC-30, FR-26, FR-31 | **in a real browser, with nothing read from the stylesheet:** the metric card, every status badge, the type scale, the Action Taken card and its follow-up pills, the red asterisk, a validation message and its field, a read-only field against a disabled button, and a busy button | each is drawn with the token's own value: the card on `--tt-surface` with a 1 px `--tt-border` and the `--tt-radius`; its 12 px muted uppercase label and 32 px green value; seven statuses in their six tones; the pill in `--tt-warning` or `--tt-disabled-bg` with its words; a red asterisk on four required fields and not on Attachment Notes, a fifth arriving with the Follow-up Note; the message beneath its field in `--tt-error`, tied by `aria-describedby`; `--tt-readonly-bg` against `--tt-disabled-bg`, the first focusable and the second not; and a busy button disabled, labelled "Saving…", with a spinner a screen reader skips and the `progress` cursor | `e2e/lab-04/ui-style.spec.ts` | Pass |
 
 ### 2.10 Responsive — `e2e/lab-04/responsive.spec.ts`
@@ -318,7 +319,7 @@ route's query string unchanged). DASH-07 and DASH-17 follow every link and compa
 | E2E-02 | E2E | AC-03 | an IT Staff member tries to resolve a Ticket with no action, records an action that needs follow-up, then a closing action, resolves, then closes | blocked with `ACTION_REQUIRED` and the link to the region (and the API refuses the same move, changing nothing); still blocked with `FOLLOW_UP_PENDING`; then `RESOLVED`; then `CLOSED`; the timeline shows each step and there is one history row per change and none for the refusals | `e2e/lab-04/ticket-resolution.spec.ts` | Pass |
 | E2E-03 | E2E | AC-14 | two browser contexts load the same Ticket; one changes the status; the other saves a different change | the second sees the conflict message with the current status and owner; the first change survives and the second was not applied; Show latest recovers, and the same save then succeeds; the other context's stale save is refused in turn, and Show latest keeps its reason and chosen move | `e2e/lab-04/ticket-resolution.spec.ts` | Pass |
 | E2E-04 | E2E | AC-04, AC-07, AC-27 | submit the create form empty, then too short, then with Yes and no note, then with a date in the future and one before the Ticket existed, then over a lost connection, then with valid data double-clicked | a message beneath each offending field with the typed values kept and focus on the first; the lost connection says so and keeps everything; one request and one action after the double click, with a note typed under Yes and then hidden not stored | `e2e/lab-04/actions-taken-flow.spec.ts` | Pass |
-| E2E-05 | E2E | AC-02, AC-18, AC-21, AC-34 | a Requester signs in, lands on the dashboard, and follows each card | the four numbers are exactly what the seven Tickets made for the run say (and a second query of the Requester's own list agrees); the two lists hold the right Tickets in the right order; each card opens My Tickets with the same total; another Requester's Ticket is nowhere; and a Requester with no Tickets sees zeros and empty lists | `e2e/lab-04/dashboards.spec.ts` | Pass |
+| E2E-05 | E2E | AC-02, AC-18, AC-21, AC-34 | a Requester signs in, lands on the dashboard, and follows each card | the four numbers are exactly what the seven Tickets made for the run say (and a second query of the Requester's own list agrees); the two lists hold the right Tickets in the right order (the order of the server's own `updatedAt` stamps, read from the API, and not the order the test made the Tickets in, because of the stepping clock of §7: the check is "the dashboard equals the API's sort"); each card opens My Tickets with the same total; another Requester's Ticket is nowhere; and a Requester with no Tickets sees zeros and empty lists | `e2e/lab-04/dashboards.spec.ts` | Pass |
 | E2E-06 | E2E | AC-19, AC-20, AC-21 | an IT Staff member and an Administrator open the dashboard and follow the cards | every card, status row, and list equals a tally of the whole queue made by the test; each link opens the queue with that total; IT Staff have no accounts region and are not sent the counts; the Administrator's accounts equal the user list and are plain numbers beside one link; an idle member sees zeros and the "me" figures differ between two members | `e2e/lab-04/dashboards.spec.ts` | Pass |
 | E2E-07 | E2E | AC-17 | an Administrator opens the queue and a Ticket and claims it, records an action, changes IT Priority, and moves the status; a Requester types `/queue` | each works under the Administrator's name (owner, action, and history); the Requester is sent to their Dashboard with the callout for `/queue`, `/queue/:id`, and `/users`, and the API refuses a Requester with `403`, IT Staff on an Administrator route with `403`, and no session with `401` | `e2e/lab-04/dashboards.spec.ts` | Pass |
 | E2E-08 | E2E | AC-12, AC-13, AC-15 | a Requester marks "appears resolved"; IT Staff resolve, reopen, and try to resolve again | the status is unchanged by the signal; a Reopened Ticket goes back to In Progress first (the matrix), and then resolving is blocked until a new action, also against a direct API call, which writes no history row; the timeline shows every step, and the Requester reads the same one | `e2e/lab-04/ticket-resolution.spec.ts` | Pass |
@@ -393,7 +394,7 @@ component, 7 UI style, 6 responsive, 9 E2E, and 3 regression suites.
 | 8 — IT Staff and Administrator Dashboard (#74) | DASH-10 – DASH-19, UI-22 – UI-26, UI-37 (IT Staff and Administrator), UI-38; completes SEC-05 (the staff dashboard half) and extends SEC-01, SEC-07, and UI-27 |
 | 9 — Final hardening and full regression (#75) | UNIT-12, WF-18, UI-17, HARD-01 – HARD-03, PERF-01 – PERF-03, UI-30 – UI-36, STYLE-01, STYLE-04, STYLE-05 |
 | 10 — Lab 4 E2E suite and visual evidence (#76) | RESP-01 – RESP-06, E2E-01 – E2E-09, STYLE-07, REG-01 – REG-03 |
-| 11 — Staging integration, documentation, and delivery (#77) | no new tests: the final run from `main` |
+| 11 — Staging integration, documentation, and delivery (#77) | nine client tests that close the gaps found by the client breaks the approving review of PR #85 asked for (§8.5) |
 
 Each issue also keeps every earlier test passing, and updates the old tests §6
 names in the issue that changes the behaviour they check.
@@ -650,7 +651,10 @@ is not listed, the issue adds it here with its reason in the same pull request.
 | Stand-in responses in three pictures | The dashboards' `loading`, `failure`, and `forbidden` screenshots hold or replace the API's response for one shot (§5.1). RESP-01 and RESP-02 also assert what each screen says; UI-18 to UI-26 prove the states in jsdom with a real mock. |
 | The browser's own 401 line | The signed-out Login screen asks `/api/auth/me` who is signed in, and the answer, `401`, is the contract (Lab 3). The browser writes it to the console as "Failed to load resource". RESP-06's sweep ignores exactly that line and nothing else. |
 | User Management is not paginated | By design (Lab 3 FR-39). On a database that every suite has added accounts to, the list is hundreds of rows, so its picture is of the seeded accounts, found by search (§5.1). |
-| Clock skew in the development stack | Docker Desktop's clock ran four seconds ahead of the host's and stepped now and then, so an action dated "now" by the host's clock, a few calls after its Ticket was created, was refused with "cannot be before the ticket was created" (BR-06), three times in Issue 10's own runs. The suites date an action from the server's clock and never earlier than a second after the Ticket's own creation (`actionTime` in `e2e/lab-04/helpers.ts`). The application is right in refusing it. **It also steps backwards, which the review of PR #89 caught.** A probe in the server container against the host (7 minutes, a sample every 100 ms) showed the VM's clock, on the machine that ran Issue 10, reading about 3.4 s ahead, drifting down to about 0.7 s ahead over 32.7 s, stepping back by 0.69 to 0.71 s (13 times, 32.76 s apart), and 0.2 s later jumping forward 3.4 s again. Two moves made a quarter of a second apart on either side of a backward step are stored with the second stamped earlier, and the Status History, which is ordered by `createdAt` and then `id` (api-spec, BR-22), shows them swapped: that is the rule working on the data it was given, not a defect. In 62 runs of E2E-08 on a fresh seed it happened twice (the Resolve and Reopen rows, 0.25 s apart, stamped 0.40 s the wrong way round). `settledTimeline` accepts a swapped list only when the API's own rows prove it, and only then: taken in the order they were made (`id`) they are exactly the moves expected, their stamps run backwards somewhere, and the screen shows precisely what the API sorted. A list that is wrong for any other reason still fails (§8.3, R05). |
+| Clock skew in the development stack | Docker Desktop's clock ran four seconds ahead of the host's and stepped now and then, so an action dated "now" by the host's clock, a few calls after its Ticket was created, was refused with "cannot be before the ticket was created" (BR-06), three times in Issue 10's own runs. The suites date an action from the server's clock and never earlier than a second after the Ticket's own creation (`actionTime` in `e2e/lab-04/helpers.ts`). The application is right in refusing it. **It also steps backwards, which the review of PR #89 caught.** A probe in the server container against the host (7 minutes, a sample every 100 ms) showed the VM's clock, on the machine that ran Issue 10, reading about 3.4 s ahead, drifting down to about 0.7 s ahead over 32.7 s, stepping back by 0.69 to 0.71 s (13 times, 32.76 s apart), and 0.2 s later jumping forward 3.4 s again. Two moves made a quarter of a second apart on either side of a backward step are stored with the second stamped earlier, and the Status History, which is ordered by `createdAt` and then `id` (api-spec, BR-22), shows them swapped: that is the rule working on the data it was given, not a defect. In 62 runs of E2E-08 on a fresh seed it happened twice (the Resolve and Reopen rows, 0.25 s apart, stamped 0.40 s the wrong way round). `settledTimeline` accepts a swapped list only when the API's own rows prove it, and only then: taken in the order they were made (`id`) they are exactly the moves expected, their stamps run backwards somewhere, the API returned them in the order BR-22 asks for (`createdAt`, then `id`), and the screen shows precisely what the API returned. A list that is wrong for any other reason still fails (§8.3, R05), and so does a server that sorts wrongly on a Ticket whose stamps also ran backwards, which the approving review of PR #89 found the first version of this tolerance would have accepted (§8.4, R10). |
+| A second place the stepping clock can reach | After a reopen, E2E-08 checks that an action recorded **before** it no longer opens the resolution gate (AC-12, D-07). The gate compares the two stored stamps, and in that test they are 0.57 to 1.14 s apart (15 runs on the real clock, six of them under 0.7 s). A backward step of 0.7 s landing between them would stamp the reopen before the action, and the application would then, correctly, count the action as recorded after the reopen, so the gate would be open and the test would fail at the expectation that "Resolved — Record at least one action before resolving this ticket." is listed. **Nothing failed this way in the 15 runs, so this is an estimate and not an observed rate:** a step every 32.76 s and a gap of about 0.6 s give about one run in a hundred on the machine that ran this lab. With the stamps pulled back at random by up to 2 s in the database, a far harsher clock than the VM's, the same expectation failed in 8 of 12 runs (§8.4), which shows the mechanism. The test is left as it is; a failure of E2E-08 at that expectation on a machine with a stepping clock should be read as this and the run repeated. |
+| A third place the stepping clock can reach | Lab 3's API-70 locks two emails and compares what each is told. A lock lasts exactly 15 minutes (`LOCK_MS`) and the message rounds the minutes left up (`auth.ts`), so "16 minutes" can only be said if the clock has gone back between the lock and the answer, and a 0.7 s step inside the well under a second between them does that. It failed once, in the first server run of Issue 11 (1091 of 1092, "16 minutes" against "15 minutes"); the test file then passed 15 of 15 runs alone, and the whole suite passed on the second run (§8.6). That the step caused it follows from the code's arithmetic and from the clock probe above; the step itself was not observed. No Lab 3 test is changed (BR-50). A failure of API-70 that says "16 minutes" on a machine with a stepping clock is this, and the run is repeated. |
+| PostgreSQL image | The suites are written for and run on `postgres:16-alpine`, which `docker-compose.yml` names, and whose text ordering is by bytes. On the Debian-based `postgres:16`, whose `en_US` collation orders by language rules, Lab 3's "orders by name" test fails once the Lab 4 E2E has made accounts called `E2E deactivated…` and `E2E First…`: there "deactivated" sorts before "First", and on Alpine the reverse (checked in Issue 11 with the same two names in each image). The reviewer of PR #89 met it on the Debian image and re-ran on Alpine, where the whole suite passed. No test is changed, because the compose file fixes the image; a different one is outside what the suites claim. |
 | Server test time budget | Lab 3's MIG-06 and Lab 4's MIG-06 run the whole seed twice, and the seed has grown across the labs: they took 4.2 and 4.7 s on the reviewer's machine against vitest's default of 5 s for a test, and MIG-06 failed by timing out in 3 of 5 of the review's server runs. **The approving review of PR #88 asked for this as a small thing and I missed it;** the review of PR #89 raised it again. `server/vitest.config.ts` now sets `testTimeout` and `hookTimeout` to 30 s, as `client/vite.config.ts` has since PR #88. No assertion is touched. |
 | The development database grows | A full Playwright run of every suite added 108 Tickets and 18 accounts in Issue 10 (the accounts deactivated afterwards, BR-50). Nothing deletes them; `docker exec toktickit-server npx prisma migrate reset --force` starts again from the seed. The dashboards' tests state their expectations from Tickets and accounts they make, or tally the whole queue themselves, so they hold at any size. |
 
@@ -661,7 +665,8 @@ is not listed, the issue adds it here with its reason in the same pull request.
 Run in Issue 10 (#76) on branch `feature/10-lab4-e2e-and-evidence`: `lab4-staging` at
 `c89e486` (PR #88 merged) plus this issue and the fixes of the review of PR #89. Every
 figure below is the runner's own output, read from its log; nothing is estimated or
-restated from memory. Issue 11 (#77) repeats the run from `main`.
+restated from memory. The run from `main` (Part 3) is recorded in the submission PDF, because nothing
+can be committed after the release.
 
 **On a fresh database, as the review asked.** The review found three checks that
 passed only on the large development database. The results below therefore come from
@@ -778,3 +783,126 @@ driver restores every file byte for byte and checks the SHA-256.
 | 3 | DASH-09 chose a Requester that cannot sign in | on the database a fresh seed leaves after the Lab 4 folder, the old test: `Signing in as e2e.responsive.… answered 401` (the Requester has 29 Tickets, Anucha 20) | the fixed test: **51 of 51**. With that account made *active* again, as after a killed run, a lookup restricted to `isActive` still fails with the same 401 and the seeded-only lookup passes; that is why DASH-09 looks among the seeded Requesters |
 | 4 | the server's `testTimeout` | `server/vitest.config.ts` had only `fileParallelism` | `testTimeout` and `hookTimeout` are 30 s; the whole server suite passes on the fresh database (1092 of 1092) |
 | 5 | not in the review: **the stack's clock steps backwards** | the DB: two E2E-08 tickets whose Resolve row is stamped 0.40 s *after* the Reopen row that came after it; a probe: 13 steps back of 0.69–0.71 s in 7 minutes, every 32.76 s (§7) | R03 a Reopen stamped 0.7 s early, the test as it was: **fails**; R04 the same, the fixed test: **passes**. R05 the history returned newest first (a real ordering fault), the fixed test: **still fails**, so the tolerance hides nothing. R08 the second and third action of a Ticket stamped 0.7 s early, E2E-06 and RESP-03 as they were: **2 fail**; R09 the same, the fixed tests: **2 pass** |
+
+### 8.4 What the approving review of PR #89 asked for
+
+The review approved PR #89 and asked for one small thing in `settledTimeline`, "in Issue 11's PR, in its own
+follow-ups section", and noted a difference between PostgreSQL images (§7).
+
+**R10: the hole in the clock-step tolerance.** `swappedByAClockStep` accepted a swapped Status History when the
+API's rows, taken in `id` order, were exactly the expected moves, their stamps ran backwards somewhere, and the screen
+showed what the API had returned. It never checked that the API's order was the order BR-22 asks for (`createdAt`,
+then `id`). So a server that sorted newest first, on a Ticket whose stamps also ran backwards, was accepted. The
+review made it happen with `statusHistory.ts` ordering `createdAt desc, id desc` and a database trigger that pulls
+each history row's `createdAt` back by up to 2 s. It was reproduced on the second stack with the same two changes,
+then fixed with the review's three lines: the API's rows must already be in `(createdAt, id)` order. Each row is a
+run of the test against the changed server; the server file and the helper were restored byte for byte afterwards
+(SHA-256).
+
+| Server | Stamps | `settledTimeline` | Test | Passed |
+| :--- | :--- | :--- | :--- | :--- |
+| newest first | pulled back by up to 2 s | as it was | E2E-02 | **6 of 10**: the wrong order was accepted |
+| newest first | pulled back by up to 2 s | fixed | E2E-02 | **0 of 10** |
+| newest first | pulled back by up to 2 s | fixed | E2E-08 | **0 of 6** |
+| newest first | as they are (R05) | fixed | E2E-02 | **0 of 3** |
+| correct | pulled back by up to 2 s | fixed | E2E-02 | **10 of 10**: a clock step is still accepted |
+
+**What the same experiment showed about E2E-08.** With every history stamp pulled back at random by up to 2 s,
+E2E-08 itself fails: 2 of 10 in the run above, and 8 of 12 in a later run that recorded where. All 8 failed at the
+same expectation, the gate after the reopen (`ticket-resolution.spec.ts:232`), and none in `settledTimeline`. That
+clock is far harsher than the VM's 0.7 s step every 32.8 s, so it is not a defect of the fix; it shows the mechanism
+that §7 records, with its estimated rate, as a residual risk.
+
+**The image.** The review's note is right and was checked: with the two names `E2E First user` and `E2E deactivated
+user`, `postgres:16` orders "deactivated" first and `postgres:16-alpine` orders "First" first (§7).
+
+**The review's last note** is also right: E2E-05's "Recently updated" no longer pins the order the Tickets were made
+in. It checks that the dashboard equals the API's own sort, which is the right call given the clock; the E2E-05 row of
+§2.11 now says so.
+
+### 8.5 The client breaks the review of PR #85 asked for
+
+In Issue 6, 66 client breaks were written and the machine ran low on memory after 29, so **37 never ran**, and three
+tests were added afterwards for the three breaks that survived and "not seen failing" (D08, D23, D26). The approving
+review of PR #85 asked for those 40 to be run once, on a quieter machine, before the final regression. It was missed
+in Issue 9 and is done here, one break at a time in the client container, nothing else running; the driver restores
+each file byte for byte and checks its SHA-256 (all 40 restored, and the working tree was clean afterwards). Two
+anchors had moved since Issue 6 and were refreshed with the same intent (D26 and D60).
+
+| Outcome | Breaks |
+| :--- | :--- |
+| **Caught by the tests that already existed** | 27 of the 37 (D31 to D47, D49, D51, and D56 to D63; D41 once it was written to compile); and all **3 earlier survivors**, D08, D23, and D26, so the three tests added in Issue 6 are now seen failing |
+| **Not caught: real gaps, now closed** | 9: **D16, D16b, D16c** (the API client dropped `expectedVersion` from a status, an owner, and an IT Priority change), **D48** (the first line of the timeline showed the current time instead of the Ticket's own), **D50** (a refresh blanked the timeline with a skeleton), **D52** (a failed read still drew the timeline), **D53** (the history of the wrong Ticket was requested), **D55** (the wrong path was requested), **D64** (on a phone the time stayed beside the name) |
+| **Not caught: an equivalent break** | 1: **D54** (a failed read leaves the old entries). The entries are drawn only when the state is `ready`, and a retry replaces them before it is, so the old ones are never visible and no test could tell the difference |
+| **Written wrongly** | D41 (the timeline an unordered list) changed only the opening tag, so the file did not compile and vitest ran no test; it was reported as "survived" and was not. Rewritten to change both tags, it is caught by two existing tests (STYLE-06 and UI-15) |
+
+The nine gaps were closed with nine small tests and a stronger assertion in an existing one. Each was written, then the
+break that it should catch was run again: **all nine are now caught** (the same driver, the same anchors), and D54
+still survives, as it should.
+
+| Break | The test that now catches it |
+| :--- | :--- |
+| D16, D16b, D16c | UI-13 (continued): three tests send the real client's request through a stubbed `fetch` and compare the path, the method, and the whole JSON body, `expectedVersion` included |
+| D55 | the same group: the Status History is read from `GET /api/tickets/:id/status-history` with the session cookie |
+| D53 | UI-15: on the staff screen and on the Requester's screen, the only history asked for is that of the Ticket shown (a Ticket other than the default, so a wrong id cannot match by luck) |
+| D48 | UI-15: the first line's time is the Ticket's own creation time, in the same format as the second |
+| D50 | UI-15: with the first read done and a second one held open, the four lines are still on screen and no skeleton is, until the second arrives with a fifth |
+| D52 | UI-15 (the failure test): a failed read draws no list and no "Ticket created" line |
+| D64 | STYLE-06: the time is pushed to the right edge, and on a phone it has its own line (`margin-left: 0`, `flex-basis: 100%`) |
+
+The client suite grows from 1019 to 1028 tests (nine new; none removed or weakened).
+
+### 8.6 The run on the tree of Issue 11
+
+Run in Issue 11 (#77) on branch `feature/11-lab4-delivery`: `lab4-staging` at `6911ca6` (PR #89 merged)
+plus this issue, on the same kind of **second, empty stack** as §8 (16 Tickets and 14 accounts from the
+seed; API on port 3100, client on 5174), and in the same order: every Playwright suite, then the server
+tests on the database they left, then the client tests. Every figure is the runner's own output, read
+from its log. The run from `main` (Part 3) is recorded in the submission PDF, because nothing
+can be committed after the release.
+
+| Suite | Command | Result |
+| :--- | :--- | :--- |
+| Playwright, every suite, on the fresh seed | `E2E_BASE_URL=http://localhost:5174 E2E_API_URL=http://localhost:3100 npx playwright test` | **85 passed** in 7.0 min: 21 of Lab 2, 25 of Lab 3, and 39 of Lab 4; the database went from 16 to 124 Tickets and 14 to 32 accounts |
+| Server, Labs 1–4, **on that same database** | `docker exec -e CLIENT_ORIGINS=http://localhost:5173 toktickit-fresh-server npx vitest run` | **first run: 38 files, 1091 passed and 1 failed** (96 s): Lab 3's API-70, "16 minutes" against "15 minutes" (§7, a third place the stepping clock can reach). **Second run, the same database: 38 files, 1092 passed** (92 s) |
+| `login-throttle.api.test.ts` alone, 15 times | `docker exec … npx vitest run tests/lab-03/login-throttle.api.test.ts` | **15 passed, 0 failed** |
+| Client, Labs 1–4 | `docker exec toktickit-client npx vitest run` | **26 files, 1028 passed** (44 s): the 1019 of §8 and the nine of §8.5 |
+| Type check | `npx tsc --noEmit` in each container | **exit 0 and no output**, server and client |
+| Production build | `npx vite build` | built |
+| The README's database commands | `prisma migrate deploy`, `npm run prisma:seed` twice, `prisma migrate reset --force` | "No pending migrations to apply"; the two seeds report the same totals; after the reset, 16 Tickets, 14 accounts, 18 Actions Taken, and 37 status changes |
+| The README's Lab 4 API claims | `curl` with a cookie jar per role, on what the README's API section states | every status and code the README states, as the roles it names: the dashboards `200` and `403` for the other role; the staff routes `200` for an Administrator and `403` for a Requester; the gate `409 ACTION_REQUIRED` and `409 FOLLOW_UP_PENDING`, then `200` once a colleague recorded the closing action; `409 STALE_UPDATE`; `409 TICKET_NOT_ACTIVE` on a resolved Ticket; `404` for another Requester's Ticket; `400` for a NUL character and for an out-of-range id |
+| The README's demonstration path | a throwaway Playwright script (not kept) that did what each of the eleven steps says, through the real screens, and checked what it says you see | passed on a fresh seed once the README told the reader to choose **Dashboard** after switching accounts (§8.7) |
+
+The Playwright run rewrote 152 tracked screenshots, as it always does; they were restored with
+`git checkout -- artifacts`, and the committed ones (§5.1) are unchanged.
+
+### 8.7 What checking the README found
+
+The README's Lab 4 text was written from the specification and then checked, claim by claim, against the running
+application. That found:
+
+* **Two claims that were wrong, and are fixed:** the IT Staff endpoints were still described as closed to an
+  Administrator ("IT Staff only … BR-19", Lab 3's text), when Lab 4 opens them (D-08); and the Lab 4 seed's
+  one-time catch-up of Last Updated, which the approving review of PR #80 asked the README to mention, was not
+  there. The catch-up was tested as the README now says it: with every sample Ticket's Last Updated set to 2020,
+  the first seed put all 16 back to their seeded values and the second changed none.
+* **A behaviour the demonstration path must work around:** a sign-in returns the person to the page they were
+  sent from, when their role may open it (Lab 3's `state.from`). After a Logout that page is the one the previous
+  person left, so a second sign-in in the same tab does not always land on the Dashboard. The README says so and
+  tells the reader to choose **Dashboard**; a first sign-in does land there, and the walk checked it.
+
+The walk also failed three times on mistakes in the script itself (a locator that matched both a card and the By
+status link of the same name, the wrong label for the staff queue's search field, and a click on a summary where
+the ticket opens from its number). They changed the script, not the README.
+
+### 8.8 What the review of PR #90 changed
+
+The review of PR #90 asked for one change before the merge: nothing in the repository may promise a commit
+that has to follow the release Pull Request into `main`, because nothing can follow it. Four places in this
+file did. The opening paragraph, the opening of §8, and the opening of §8.6 now say that the run from `main`
+(Part 3) is recorded in the submission PDF, and the Issue 11 row of §3.1 no longer lists it.
+
+One line the review did not name followed from it. `specification.md` §10.2 said `tests.md` records the
+runner's output from `main`. It now says the output from `lab4-staging` is here and the output from `main` is
+in the PDF. That is a change to the approved specification, made on this review's account. The evidence for
+Part 2 is not affected: the contract is PR #78, merged at 2026-10-05 16:08:34 UTC as `f14ae15`.

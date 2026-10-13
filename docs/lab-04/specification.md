@@ -569,7 +569,8 @@ Every criterion is observable and maps to at least one planned test in
       with the code that shipped, and this file records the PR and commit that
       approved it before implementation began.
 * [ ] `tests.md` records planned tests, AC traceability, real test-file paths, and
-      the runner's actual output from `main`.
+      the runner's actual output from `lab4-staging`; the output from `main` is in
+      the submission PDF, because nothing can be committed after the release PR.
 * [ ] Screenshots of every major Lab 4 screen exist at all three breakpoints under
       `artifacts/lab-04/screenshots/`, with the visual and accessibility checklist
       completed in `tests.md`.
