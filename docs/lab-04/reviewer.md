@@ -49,9 +49,9 @@ per the Part 9 agreement in the workflow guide. 5 of them (#78, #81, #87, #88, #
 **Changes requested** first; each fix was pushed to the same branch, answered on the thread, and re-reviewed before
 approval. Ten of the twelve are linked to their GitHub Issue ([#67](https://github.com/Menelaus122/TokTickITV2/issues/67) to [#76](https://github.com/Menelaus122/TokTickITV2/issues/76), Issues 1 to 10) through the
 Development panel; #82 and #84 are small follow-up Pull Requests with no Issue of their own. Every feature branch reached `lab4-staging` through a
-Pull Request: the first-parent history of `lab4-staging` after `main` is these twelve merge commits and nothing else.
+Pull Request: the first-parent history of `lab4-staging` after `main` was these twelve merge commits and nothing else, until #90 (below) was merged.
 
-The Pull Request for Issue 11 ([#90](https://github.com/Menelaus122/TokTickITV2/pull/90)) was still open when this record was written, so it is recorded at the end of this section only up to my reply of 2026-10-12 18:40 UTC. Its later reviews, its merge, and the release Pull Request into `main` are not recorded here; their reviews are in the submission PDF.
+The Pull Request for Issue 11 ([#90](https://github.com/Menelaus122/TokTickITV2/pull/90)) is recorded at the end of this section, to its merge on 2026-10-13 03:48 UTC; the table and the counts above are about the twelve Pull Requests before it. The Pull Request that brought this record up to the end of #90, and the release Pull Request into `main`, are not recorded here; their reviews are in the submission PDF.
 
 ### [#78](https://github.com/Menelaus122/TokTickITV2/pull/78) — Add the Lab 4 engineering contract (Issue 1)
 
@@ -1069,7 +1069,9 @@ The Pull Request for Issue 11 ([#90](https://github.com/Menelaus122/TokTickITV2/
 
 ### [#90](https://github.com/Menelaus122/TokTickITV2/pull/90) — Add the Lab 4 delivery documents and close the review follow-ups (Issue 11)
 
-**Status:** still open when this record was written, so it is recorded only up to my reply of 2026-10-12 18:40 UTC. On GitHub the review below is marked Approved, but its text asks for a change before the merge.
+**Verdict:** Approved · **merged** 2026-10-13 by @WirachatTH
+
+The first review below is marked Approved on GitHub, but its text asks for a change before the merge; the second review approves the fix.
 
 **Review — Approved** (2026-10-12 16:48 UTC, @WirachatTH)
 
@@ -1150,6 +1152,46 @@ The Pull Request for Issue 11 ([#90](https://github.com/Menelaus122/TokTickITV2/
 > 4. The README's `[x]` for Issue 11: the release PR will say it means "delivered at release".
 >
 > Could you re-check those places and re-approve?
+
+**Author's response** (2026-10-12 18:55 UTC, @Menelaus122)
+
+> One more commit, `e7d5e00`: two documents, nothing else since `1b1849c`.
+> - `ai-use.md`: I edited My Reflection in my own words.
+> - `reviewer.md`: #90 is now recorded up to my reply (your review and my reply, word for word). I changed the "not recorded here" line you suggested. It now says what is recorded, and that #90's later reviews, its merge and the release PR are in the PDF. If you'd rather keep your exact line, tell me and I'll switch back.
+
+**Review — Approved** (2026-10-13 03:48 UTC, @WirachatTH)
+
+> Approved! Thank you, and thank you for reading the text of the review and not the button on it. I checked `1b1849c` and `e7d5e00` against each place I named, and against the one you added.
+>
+> ### What I verified
+> - **The two commits change four documents and nothing else.** `git diff 67f22da e7d5e00 --stat`: `ai-use.md`, `reviewer.md` (86 lines added, none removed), `specification.md` (3 lines), `tests.md`. No code, no test, no README. The suites I ran at `67f22da` (Playwright 85, server 1092, client 1028, `tsc` 0 on both) are therefore the suites of this head, and I did not run them again.
+> - **Nothing in the tree promises work after the release.** I searched `README.md` and `docs/lab-04/*.md` for "from `main`", "after the release", "follows the release", "post-release", and "documents-only". What remains is the new sentence, in four places in `tests.md` (the opening paragraph, the opening of §8, the opening of §8.6, and §8.8's record of the change) and in `specification.md` §10.2: "the run from `main` (Part 3) is recorded in the submission PDF, because nothing can be committed after the release." The Issue 11 row of §3.1 no longer lists it.
+> - **The description is the same:** the release item, note 3 (no post-release PR any more), and note 7 ("… then every suite from `main`, recorded in the submission PDF").
+> - **The board:** #77 is at PR Review.
+>
+> ### The one you added: `specification.md` §10.2
+> The item read "`tests.md` records … the runner's actual output from `main`", which the repository can't hold; it now says the output from `lab4-staging` is in `tests.md` and the output from `main` is in the PDF. That is the right call, and the right way to make it:
+> - it removes the contradiction I'd have had to raise in the release PR (the Definition of Done could not have been ticked);
+> - it is one line, recorded in `tests.md` §8.8 with its reason;
+> - the Part 2 evidence is untouched: the contract is #78, merged as `f14ae15`, and the specification has been edited after approval before (its header, in #82).
+>
+> ### `reviewer.md` and the #90 section
+> - **Word for word:** my review (2026-10-12 16:48) and your reply (18:40) are both in the file exactly as GitHub returns them (same check as before, CRLF and quote markers ignored). The 18:55 comment isn't, which is what the line says it won't be.
+> - **Honest about the state:** "On GitHub the review below is marked Approved, but its text asks for a change before the merge." That is true, and it's the sentence a grader will need.
+> - **Your line or mine:** keep yours. It says what is recorded and what isn't, which mine didn't.
+>
+> ### `ai-use.md`
+> The reflection is in your words now; the facts are the same ones I checked last time (the three trailer commits, #88, #89's fresh-seed finding, the clock, the two items you found late). Nine prompts, both agents covered.
+>
+> ### 🟡 Minor (not blocking, text only, and it can be edited on the description at any time)
+> - **Note 3 of the description** says "neither this PR nor the release PR is recorded in `reviewer.md`", and the file now records #90 up to your reply; "the release PR is not recorded, and #90 only up to its first reply" would be exact. The same goes for "covers 24 Pull Requests" in the first item.
+>
+> Approving. This one was careful from the first commit to the last. 🙌
+> Wirachat 67070501041
+
+**Author's response** (2026-10-13 09:27 UTC, @Menelaus122)
+
+> Thx kub
 
 ## Pull Requests I reviewed for my partner
 
